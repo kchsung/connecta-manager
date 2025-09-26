@@ -55,25 +55,38 @@ pip install -r requirements.txt
 ```
 
 4. 환경 변수 설정
-`.env` 파일을 생성하고 Supabase 설정을 추가하세요:
+프로젝트 루트에 `.env` 파일을 생성하고 Supabase 설정을 추가하세요:
+```env
+SUPABASE_URL=your_supabase_url_here
+SUPABASE_ANON_KEY=your_supabase_anon_key_here
 ```
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_anon_key
 ```
+
+**주의**: `.env` 파일은 Git에 커밋되지 않습니다. 실제 Supabase 프로젝트의 URL과 키를 사용하세요.
 
 5. 애플리케이션 실행
 ```bash
 streamlit run app.py
 ```
 
+애플리케이션이 실행되면 브라우저에서 `http://localhost:8501`로 접속할 수 있습니다.
+
+### 로컬 테스트 시 주의사항
+- `.env` 파일이 올바르게 설정되었는지 확인하세요
+- Supabase 프로젝트에서 Authentication이 활성화되어 있는지 확인하세요
+- 로그인 기능이 활성화되어 있으므로 회원가입 후 로그인해야 합니다
+
 ### Streamlit Cloud 배포
 
 1. [Streamlit Cloud](https://share.streamlit.io/)에 접속
 2. GitHub 저장소 연결: `kchsung/connecta-manager`
 3. Secrets에서 다음 환경 변수 설정:
-   ```
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_KEY=your_supabase_anon_key
+   ```toml
+   [supabase]
+   url = "your_supabase_url_here"
+   anon_key = "your_supabase_anon_key_here"
    ```
 
 ## 데이터베이스 스키마

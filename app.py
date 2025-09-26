@@ -492,9 +492,23 @@ def main():
     try:
         load_css()                # 프로젝트 CSS + 위 레이아웃 CSS
 
-        # 인증 상태 초기화
+        # 인증 상태 초기화 및 세션 복원 시도
         if 'authenticated' not in st.session_state:
             st.session_state.authenticated = False
+        
+        # 페이지 로드 시 세션 복원 시도 (Streamlit Cloud에서 새로고침 시 로그인 유지)
+        if not st.session_state.get('authenticated', False):
+            # 자동 세션 복원 시도
+            if supabase_auth.is_authenticated():
+                st.session_state.authenticated = True
+        
+        # 로그인된 상태에서 세션 갱신 체크
+        if st.session_state.get('authenticated', False):
+            if not supabase_auth.refresh_session_if_needed():
+                # 세션 갱신 실패 시 로그아웃 처리
+                st.session_state.authenticated = False
+                if 'user' in st.session_state:
+                    del st.session_state.user
 
         render_sidebar()          # 실제 st.sidebar 렌더
         render_main_content()     # 본문
