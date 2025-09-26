@@ -53,7 +53,7 @@ header[data-testid="stHeader"] {
 .main-container {
     display: flex;
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
 }
 
 /* 좌측 로그인 패널 */
@@ -96,15 +96,15 @@ header[data-testid="stHeader"] {
 /* 입력 필드 스타일 */
 .stTextInput > div > div > input {
     border-radius: 10px;
-    border: 2px solid #e1e5e9;
+    border: 1px solid #e1e5e9;
     padding: 0.75rem;
     font-size: 1rem;
     transition: all 0.3s ease;
 }
 
 .stTextInput > div > div > input:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
 }
 
 /* 버튼 스타일 */
@@ -134,19 +134,19 @@ header[data-testid="stHeader"] {
 
 /* 메인 버튼 (Primary) */
 .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
     color: white;
 }
 
 .stButton > button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%);
 }
 
 /* 보조 버튼 (Secondary) */
 .stButton > button[kind="secondary"] {
     background: #f8f9fa;
     color: #6c757d;
-    border: 2px solid #e9ecef;
+    border: 1px solid #e9ecef;
 }
 
 .stButton > button[kind="secondary"]:hover {
@@ -182,7 +182,7 @@ header[data-testid="stHeader"] {
 }
 
 .stTabs [aria-selected="true"] {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
     color: white;
 }
 
@@ -195,7 +195,7 @@ header[data-testid="stHeader"] {
 
 /* 진행률 바 스타일 */
 .stProgress > div > div > div > div {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
     border-radius: 10px;
 }
 
@@ -235,7 +235,7 @@ header[data-testid="stHeader"] {
 .stSidebar {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
-    border-right: 1px solid rgba(102, 126, 234, 0.1);
+    border-right: 1px solid rgba(99, 102, 241, 0.1);
 }
 
 /* 사이드바 상단 공간 최소화 */
@@ -285,17 +285,17 @@ header[data-testid="stHeader"] {
 
 /* 파일 업로더 스타일 */
 .stFileUploader > div {
-    border: 2px dashed #667eea;
+    border: 1px dashed #6366f1;
     border-radius: 15px;
     padding: 2rem;
     text-align: center;
-    background: rgba(102, 126, 234, 0.05);
+    background: rgba(99, 102, 241, 0.05);
     transition: all 0.3s ease;
 }
 
 .stFileUploader > div:hover {
-    border-color: #5a6fd8;
-    background: rgba(102, 126, 234, 0.1);
+    border-color: #4f46e5;
+    background: rgba(99, 102, 241, 0.1);
 }
 
 /* 체크박스 스타일 */
@@ -305,7 +305,7 @@ header[data-testid="stHeader"] {
 
 /* 스피너 스타일 */
 .stSpinner {
-    color: #667eea;
+    color: #6366f1;
 }
 
 /* 다운로드 버튼 스타일 */
@@ -351,12 +351,12 @@ header[data-testid="stHeader"] {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
     border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%);
 }
 
 /* 애니메이션 */
@@ -382,7 +382,7 @@ header[data-testid="stHeader"] {
 }
 
 .brand-logo h1 {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -412,7 +412,7 @@ header[data-testid="stHeader"] {
 .stTextArea > div > div > textarea,
 .stSelectbox > div > div > select {
     border-radius: 10px;
-    border: 2px solid #e1e5e9;
+    border: 1px solid #e1e5e9;
     padding: 0.75rem;
     font-size: 1rem;
     transition: all 0.3s ease;
@@ -422,8 +422,8 @@ header[data-testid="stHeader"] {
 .stTextInput > div > div > input:focus,
 .stTextArea > div > div > textarea:focus,
 .stSelectbox > div > div > select:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
     outline: none;
 }
 
@@ -450,8 +450,8 @@ header[data-testid="stHeader"] {
     padding: 0.75rem 1.5rem;
     font-weight: 600;
     transition: all 0.3s ease;
-    background: rgba(102, 126, 234, 0.1);
-    color: #667eea;
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
 }
 
 .stTabs [aria-selected="true"] {
@@ -467,7 +467,7 @@ header[data-testid="stHeader"] {
     padding: 1.5rem;
     border-radius: 15px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(102, 126, 234, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.1);
     transition: transform 0.3s ease;
 }
 
@@ -481,21 +481,21 @@ header[data-testid="stHeader"] {
     border-radius: 15px;
     overflow: hidden;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(102, 126, 234, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.1);
 }
 
 /* 진행률 바 개선 */
 .stProgress > div > div > div > div {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
     border-radius: 10px;
     height: 8px;
 }
 
 /* 스피너 개선 */
 .stSpinner {
-    color: #667eea;
-    border: 3px solid rgba(102, 126, 234, 0.1);
-    border-top: 3px solid #667eea;
+    color: #6366f1;
+    border: 3px solid rgba(99, 102, 241, 0.1);
+    border-top: 3px solid #6366f1;
     border-radius: 50%;
     width: 40px;
     height: 40px;
@@ -527,17 +527,17 @@ header[data-testid="stHeader"] {
 
 /* 익스팬더 개선 */
 .stExpander {
-    border: 1px solid rgba(102, 126, 234, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.1);
     border-radius: 15px;
     margin-bottom: 1rem;
     overflow: hidden;
 }
 
 .stExpander > div:first-child {
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 50%, rgba(168, 85, 247, 0.1) 100%);
     padding: 1rem;
     font-weight: 600;
-    color: #667eea;
+    color: #6366f1;
 }
 
 /* 컨테이너 개선 */
@@ -547,5 +547,5 @@ header[data-testid="stHeader"] {
     border-radius: 15px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
     margin-bottom: 1rem;
-    border: 1px solid rgba(102, 126, 234, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.1);
 }
