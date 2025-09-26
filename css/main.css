@@ -5,7 +5,7 @@ section.main > div.block-container {
     max-width: 100% !important;
     width: 100% !important;
     margin: 0 !important;
-    padding-top: 0.5rem !important;           /* 상단 여백 최소화 */
+    padding-top: 0rem !important;           /* 상단 여백 최소화 */
     padding-bottom: 1rem !important;
     padding-left: 1rem !important;
     padding-right: 1rem !important;
@@ -116,10 +116,15 @@ header[data-testid="stHeader"] {
     border: none;
     width: 100%;
     margin-top: 1rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
     font-size: 0.9rem;
+    min-height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 
 .stButton > button:hover {
@@ -200,6 +205,10 @@ header[data-testid="stHeader"] {
     border: none;
     padding: 1rem 1.5rem;
     margin: 1rem 0;
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.4;
 }
 
 .stSuccess {
@@ -244,6 +253,21 @@ header[data-testid="stHeader"] {
     margin-bottom: 0.5rem;
 }
 
+/* 사이드바 버튼과 메시지 간격 조정 */
+.stSidebar .stButton {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.stSidebar .stAlert,
+.stSidebar .stSuccess,
+.stSidebar .stError,
+.stSidebar .stWarning,
+.stSidebar .stInfo {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
 .stSidebar .stSuccess {
     background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
     color: #155724;
@@ -252,9 +276,11 @@ header[data-testid="stHeader"] {
     padding: 0.75rem;
     margin-bottom: 1rem;
     font-size: 0.9rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    min-height: auto;
+    line-height: 1.4;
 }
 
 /* 파일 업로더 스타일 */

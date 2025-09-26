@@ -2,6 +2,8 @@ import streamlit as st
 from supabase import Client
 from .config import supabase_config
 from typing import Optional, Dict, Any
+import json
+import base64
 
 class SupabaseAuth:
     def __init__(self):
@@ -12,6 +14,26 @@ class SupabaseAuth:
         if not self.client:
             self.client = supabase_config.get_client()
         return self.client
+    
+    def _save_token_to_browser(self, token: str):
+        """브라우저에 토큰 저장"""
+        # Streamlit의 session state를 사용하여 토큰 저장
+        st.session_state.auth_token = token
+        st.session_state.token_saved = True
+    
+    def _get_token_from_browser(self) -> Optional[str]:
+        """브라우저에서 토큰 가져오기"""
+        # session state에서 토큰 확인
+        if 'auth_token' in st.session_state:
+            return st.session_state.auth_token
+        return None
+    
+    def _clear_token_from_browser(self):
+        """브라우저에서 토큰 제거"""
+        if 'auth_token' in st.session_state:
+            del st.session_state.auth_token
+        if 'token_saved' in st.session_state:
+            del st.session_state.token_saved
     
     def sign_up(self, email: str, password: str) -> Dict[str, Any]:
         """회원가입"""
@@ -26,10 +48,14 @@ class SupabaseAuth:
             })
             
             # 회원가입 성공 시 자동으로 로그인 처리
-            if response.user:
+            if response.user and response.session:
                 # 세션 정보를 Streamlit 세션 상태에 저장
                 st.session_state.user = response.user
                 st.session_state.authenticated = True
+                
+                # 토큰을 브라우저에 저장
+                if response.session.access_token:
+                    self._save_token_to_browser(response.session.access_token)
                 
                 return {
                     "success": True,
@@ -58,9 +84,13 @@ class SupabaseAuth:
             })
             
             # 세션 정보를 Streamlit 세션 상태에 저장
-            if response.user:
+            if response.user and response.session:
                 st.session_state.user = response.user
                 st.session_state.authenticated = True
+                
+                # 토큰을 브라우저에 저장
+                if response.session.access_token:
+                    self._save_token_to_browser(response.session.access_token)
                 
             return {
                 "success": True,
@@ -85,6 +115,9 @@ class SupabaseAuth:
                 del st.session_state.user
             if 'authenticated' in st.session_state:
                 del st.session_state.authenticated
+            
+            # 브라우저에서 토큰 제거
+            self._clear_token_from_browser()
                 
             return {
                 "success": True,
@@ -105,7 +138,23 @@ class SupabaseAuth:
     
     def is_authenticated(self) -> bool:
         """인증 상태 확인"""
-        return st.session_state.get('authenticated', False)
+        # 먼저 session state에서 확인
+        if st.session_state.get('authenticated', False):
+            return True
+        
+        # Supabase 클라이언트에서 현재 세션 확인
+        try:
+            client = self.get_client()
+            session = client.auth.get_session()
+            if session and session.user:
+                # 세션이 유효한 경우 session state 업데이트
+                st.session_state.user = session.user
+                st.session_state.authenticated = True
+                return True
+        except Exception as e:
+            print(f"세션 확인 실패: {e}")
+        
+        return False
     
     def reset_password(self, email: str) -> Dict[str, Any]:
         """비밀번호 재설정 이메일 발송"""
