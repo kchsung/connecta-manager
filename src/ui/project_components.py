@@ -877,7 +877,7 @@ def render_participation_edit_modal():
                     st.text_input(f"링크 {i+1}", value=link, key=f"existing_link_{i}", disabled=True)
                 with col2:
                     # 마이너스 버튼으로 삭제
-                    if st.form_submit_button("➖", key=f"delete_link_{i}", help="링크 삭제"):
+                    if st.form_submit_button("➖", help="링크 삭제"):
                         # 삭제할 링크를 None으로 표시
                         content_links[i] = None
                         # None 값 제거 (삭제된 링크들)
@@ -894,7 +894,7 @@ def render_participation_edit_modal():
             with col1:
                 new_link = st.text_input("새 링크 추가", key="new_content_link", placeholder="https://...")
             with col2:
-                if st.form_submit_button("➕", key="add_content_link", help="링크 추가"):
+                if st.form_submit_button("➕", help="링크 추가"):
                     if new_link and new_link.strip():
                         content_links.append(new_link.strip())
                         st.session_state[f"content_links_{participation['id']}"] = content_links
