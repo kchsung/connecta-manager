@@ -623,286 +623,295 @@ def render_campaign_participation_tab():
     # 인플루언서 추가 섹션 (새로운 워크플로우)
     render_add_influencer_workflow(campaign_id)
     
-    # 참여 인플루언서 목록
-    st.subheader("📋 참여 인플루언서 목록")
+    # 좌우 배치를 위한 컬럼 생성
+    left_col, right_col = st.columns([1, 1])
     
-    # 참여 인플루언서 목록 컴팩트 스타일
-    st.markdown("""
-    <style>
-    /* 참여 인플루언서 목록 컴팩트 스타일 */
-    div[data-testid="column"] .stButton > button {
-        height: 1.5rem !important;
-        min-height: 1.5rem !important;
-        width: 100% !important;
-        font-size: 0.75rem !important;
-        padding: 0.1rem 0.3rem !important;
-        margin: 0.1rem 0 !important;
-    }
-    
-    /* 리스트 아이템 간격 줄이기 */
-    .stContainer {
-        margin: 0.1rem 0 !important;
-        padding: 0.2rem 0 !important;
-    }
-    
-    /* 텍스트 크기 줄이기 */
-    .stMarkdown {
-        margin: 0.05rem 0 !important;
-        line-height: 1.2 !important;
-    }
-    
-    /* 캡션 텍스트 크기 줄이기 */
-    .stCaption {
-        font-size: 0.7rem !important;
-        margin: 0.02rem 0 !important;
-        line-height: 1.1 !important;
-    }
-    
-    /* 제목 텍스트 크기 조정 */
-    .stMarkdown h3 {
-        margin: 0.1rem 0 !important;
-        font-size: 1rem !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    participations = db_manager.get_campaign_participations(campaign_id)
-    
-    if participations:
-        # 페이지네이션을 위한 설정
-        items_per_page = 20
-        total_pages = (len(participations) - 1) // items_per_page + 1
+    with left_col:
+        # 참여 인플루언서 목록
+        st.subheader("📋 참여 인플루언서 목록")
         
-        # 페이지 선택
-        if total_pages > 1:
-            page = st.selectbox("페이지 선택", range(1, total_pages + 1), key="participation_page") - 1
-            start_idx = page * items_per_page
-            end_idx = min(start_idx + items_per_page, len(participations))
-            page_participations = participations[start_idx:end_idx]
-            st.caption(f"페이지 {page + 1}/{total_pages} (총 {len(participations)}명)")
-        else:
-            page_participations = participations
+        # 참여 인플루언서 목록 컴팩트 스타일
+        st.markdown("""
+        <style>
+        /* 참여 인플루언서 목록 컴팩트 스타일 */
+        .participation-list .stButton > button {
+            height: 1.5rem !important;
+            min-height: 1.5rem !important;
+            width: 100% !important;
+            font-size: 0.75rem !important;
+            padding: 0.1rem 0.3rem !important;
+            margin: 0.1rem 0 !important;
+        }
         
-        for i, participation in enumerate(page_participations):
+        /* 리스트 아이템 간격 줄이기 */
+        .participation-list .stContainer {
+            margin: 0.1rem 0 !important;
+            padding: 0.2rem 0 !important;
+        }
+        
+        /* 텍스트 크기 줄이기 */
+        .participation-list .stMarkdown {
+            margin: 0.05rem 0 !important;
+            line-height: 1.2 !important;
+        }
+        
+        /* 캡션 텍스트 크기 줄이기 */
+        .participation-list .stCaption {
+            font-size: 0.7rem !important;
+            margin: 0.02rem 0 !important;
+            line-height: 1.1 !important;
+        }
+        
+        /* 제목 텍스트 크기 조정 */
+        .participation-list .stMarkdown h3 {
+            margin: 0.1rem 0 !important;
+            font-size: 1rem !important;
+        }
+        
+        /* 스크롤 가능한 목록 */
+        .participation-list {
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+        
+        .participation-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .participation-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .participation-list::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        .participation-list::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        participations = db_manager.get_campaign_participations(campaign_id)
+        
+        if participations:
+            # 스크롤 가능한 컨테이너로 목록 표시
             with st.container():
-                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                st.markdown('<div class="participation-list">', unsafe_allow_html=True)
                 
-                with col1:
-                    # 모든 필드 정보 표시 (컴팩트하게)
-                    st.markdown(f"**{participation.get('influencer_name', 'N/A')}**")
-                    st.caption(f"📱 SNS ID: {participation.get('sns_id', 'N/A')} | 👥 팔로워: {participation.get('followers_count', 0):,}명")
-                    st.caption(f"🌐 플랫폼: {participation.get('platform', 'N/A')} | 📦 샘플상태: {participation.get('sample_status', 'N/A')}")
-                    st.caption(f"💰 비용: {participation.get('cost_krw', 0):,}원 | 📤 업로드: {'✅' if participation.get('content_uploaded', False) else '❌'}")
-                    
-                    # 컨텐츠 링크 표시 (첫 번째 링크만)
-                    content_links = participation.get('content_links', [])
-                    if content_links and len(content_links) > 0:
-                        first_link = content_links[0]
-                        link_count = len(content_links)
-                        if link_count > 1:
-                            st.caption(f"🔗 컨텐츠 링크: {first_link} (+{link_count-1}개 더)")
-                        else:
-                            st.caption(f"🔗 컨텐츠 링크: {first_link}")
-                    
-                    if participation['manager_comment']:
-                        st.caption(f"💬 담당자 의견: {participation['manager_comment']}")
-                    if participation['influencer_requests']:
-                        st.caption(f"📋 요청사항: {participation['influencer_requests']}")
-                    if participation['memo']:
-                        st.caption(f"📝 메모: {participation['memo']}")
-                    if participation['influencer_feedback']:
-                        st.caption(f"💭 피드백: {participation['influencer_feedback']}")
+                for i, participation in enumerate(participations):
+                    with st.container():
+                        col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                        
+                        with col1:
+                            # 모든 필드 정보 표시 (컴팩트하게)
+                            st.markdown(f"**{participation.get('influencer_name', 'N/A')}**")
+                            st.caption(f"📱 SNS ID: {participation.get('sns_id', 'N/A')} | 👥 팔로워: {participation.get('followers_count', 0):,}명")
+                            st.caption(f"🌐 플랫폼: {participation.get('platform', 'N/A')} | 📦 샘플상태: {participation.get('sample_status', 'N/A')}")
+                            st.caption(f"💰 비용: {participation.get('cost_krw', 0):,}원 | 📤 업로드: {'✅' if participation.get('content_uploaded', False) else '❌'}")
+                            
+                            # 컨텐츠 링크 표시 (첫 번째 링크만)
+                            content_links = participation.get('content_links', [])
+                            if content_links and len(content_links) > 0:
+                                first_link = content_links[0]
+                                link_count = len(content_links)
+                                if link_count > 1:
+                                    st.caption(f"🔗 컨텐츠 링크: {first_link} (+{link_count-1}개 더)")
+                                else:
+                                    st.caption(f"🔗 컨텐츠 링크: {first_link}")
+                            
+                            if participation['manager_comment']:
+                                st.caption(f"💬 담당자 의견: {participation['manager_comment']}")
+                            if participation['influencer_requests']:
+                                st.caption(f"📋 요청사항: {participation['influencer_requests']}")
+                            if participation['memo']:
+                                st.caption(f"📝 메모: {participation['memo']}")
+                            if participation['influencer_feedback']:
+                                st.caption(f"💭 피드백: {participation['influencer_feedback']}")
+                        
+                        with col2:
+                            if st.button("상세보기", key=f"detail_participation_{participation['id']}_{i}"):
+                                st.session_state.viewing_participation = participation
+                                st.rerun()
+                        
+                        with col3:
+                            if st.button("수정", key=f"edit_participation_{participation['id']}_{i}"):
+                                st.session_state.editing_participation = participation
+                                st.rerun()
+                        
+                        with col4:
+                            if st.button("제거", key=f"remove_participation_{participation['id']}_{i}"):
+                                result = db_manager.remove_influencer_from_campaign(participation['id'])
+                                if result["success"]:
+                                    st.success("인플루언서가 제거되었습니다!")
+                                    st.rerun()
+                                else:
+                                    st.error(f"제거 실패: {result['message']}")
+                        
+                        # 구분선을 더 얇게
+                        st.markdown("---")
                 
-                with col2:
-                    if st.button("상세보기", key=f"detail_participation_{participation['id']}_{i}"):
-                        st.session_state.viewing_participation = participation
-                        st.rerun()
-                
-                with col3:
-                    if st.button("수정", key=f"edit_participation_{participation['id']}_{i}"):
-                        st.session_state.editing_participation = participation
-                        st.rerun()
-                
-                with col4:
-                    if st.button("제거", key=f"remove_participation_{participation['id']}_{i}"):
-                        result = db_manager.remove_influencer_from_campaign(participation['id'])
-                        if result["success"]:
-                            st.success("인플루언서가 제거되었습니다!")
-                            st.rerun()
-                        else:
-                            st.error(f"제거 실패: {result['message']}")
-                
-                # 구분선을 더 얇게
-                st.markdown("---")
-    else:
-        st.info("이 캠페인에 참여한 인플루언서가 없습니다.")
+                st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.info("이 캠페인에 참여한 인플루언서가 없습니다.")
     
-    # 참여 상세보기 모달
-    if 'viewing_participation' in st.session_state:
-        render_participation_detail_modal()
-    
-    # 참여 수정 모달
-    if 'editing_participation' in st.session_state:
-        render_participation_edit_modal()
+    with right_col:
+        # 우측 패널 스타일
+        st.markdown("""
+        <style>
+        .participation-right-panel {
+            background-color: #f8f9fa;
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid #e9ecef;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        st.markdown('<div class="participation-right-panel">', unsafe_allow_html=True)
+        
+        # 참여 상세보기 모달
+        if 'viewing_participation' in st.session_state:
+            render_participation_detail_modal()
+        
+        # 참여 수정 모달
+        elif 'editing_participation' in st.session_state:
+            render_participation_edit_modal()
+        
+        # 기본 상태 - 안내 메시지
+        else:
+            st.subheader("📝 참여 정보 관리")
+            st.info("좌측 목록에서 인플루언서의 '수정' 버튼을 클릭하여 참여 정보를 수정하거나, '상세보기' 버튼을 클릭하여 상세 정보를 확인할 수 있습니다.")
+            
+            # 현재 선택된 캠페인 정보 표시
+            st.markdown("**현재 선택된 캠페인:**")
+            st.markdown(f"- **캠페인명:** {selected_campaign['campaign_name']}")
+            st.markdown(f"- **캠페인 유형:** {selected_campaign['campaign_type']}")
+            st.markdown(f"- **시작일:** {selected_campaign['start_date'][:10] if selected_campaign['start_date'] else 'N/A'}")
+            st.markdown(f"- **종료일:** {selected_campaign['end_date'][:10] if selected_campaign['end_date'] else 'N/A'}")
+            
+            if participations:
+                st.markdown(f"- **참여 인플루언서 수:** {len(participations)}명")
+            else:
+                st.markdown("- **참여 인플루언서 수:** 0명")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def render_participation_detail_modal():
     """참여 상세보기 모달"""
     participation = st.session_state.viewing_participation
     
-    with st.expander("📋 참여 상세 정보", expanded=True):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown(f"**인플루언서:** {participation.get('influencer_name') or participation['sns_id']}")
-            st.markdown(f"**플랫폼:** {participation['platform']}")
-            st.markdown(f"**SNS ID:** {participation['sns_id']}")
-            st.markdown(f"**팔로워 수:** {participation.get('followers_count', 0):,}")
-            st.markdown(f"**게시물 수:** {participation.get('post_count', 0):,}")
-        
-        with col2:
-            st.markdown(f"**샘플 상태:** {participation['sample_status']}")
-            st.markdown(f"**비용:** {participation['cost_krw']:,}원")
-            st.markdown(f"**업로드 완료:** {'✅' if participation['content_uploaded'] else '❌'}")
-            st.markdown(f"**참여일:** {participation['created_at'][:10] if participation['created_at'] else 'N/A'}")
-        
-        if participation['manager_comment']:
-            st.markdown("**담당자 의견:**")
-            st.info(participation['manager_comment'])
-        
-        if participation['influencer_requests']:
-            st.markdown("**인플루언서 요청사항:**")
-            st.info(participation['influencer_requests'])
-        
-        if participation['influencer_feedback']:
-            st.markdown("**인플루언서 피드백:**")
-            st.info(participation['influencer_feedback'])
-        
-        if participation['memo']:
-            st.markdown("**메모:**")
-            st.info(participation['memo'])
-        
-        content_links = participation.get('content_links', [])
-        if content_links and len(content_links) > 0:
-            st.markdown("**컨텐츠 링크:**")
-            first_link = content_links[0]
-            link_count = len(content_links)
-            if link_count > 1:
-                st.markdown(f"- {first_link}")
-                st.caption(f"총 {link_count}개의 링크가 있습니다. (첫 번째 링크만 표시)")
-            else:
-                st.markdown(f"- {first_link}")
-        
-        if st.button("닫기", key="close_participation_detail"):
-            del st.session_state.viewing_participation
-            st.rerun()
+    st.subheader("📋 참여 상세 정보")
+    
+    # 기본 정보를 컴팩트하게 표시
+    st.markdown(f"**인플루언서:** {participation.get('influencer_name') or participation['sns_id']}")
+    st.markdown(f"**플랫폼:** {participation['platform']} | **SNS ID:** {participation['sns_id']}")
+    st.markdown(f"**팔로워:** {participation.get('followers_count', 0):,}명 | **게시물:** {participation.get('post_count', 0):,}개")
+    st.markdown(f"**샘플 상태:** {participation['sample_status']} | **비용:** {participation['cost_krw']:,}원")
+    st.markdown(f"**업로드 완료:** {'✅' if participation['content_uploaded'] else '❌'} | **참여일:** {participation['created_at'][:10] if participation['created_at'] else 'N/A'}")
+    
+    # 추가 정보가 있는 경우에만 표시
+    additional_info = []
+    
+    if participation.get('manager_comment'):
+        additional_info.append(f"**담당자 의견:** {participation['manager_comment']}")
+    
+    if participation.get('influencer_requests'):
+        additional_info.append(f"**요청사항:** {participation['influencer_requests']}")
+    
+    if participation.get('influencer_feedback'):
+        additional_info.append(f"**피드백:** {participation['influencer_feedback']}")
+    
+    if participation.get('memo'):
+        additional_info.append(f"**메모:** {participation['memo']}")
+    
+    content_links = participation.get('content_links', [])
+    if content_links and len(content_links) > 0:
+        first_link = content_links[0]
+        link_count = len(content_links)
+        if link_count > 1:
+            additional_info.append(f"**컨텐츠 링크:** {first_link} (+{link_count-1}개 더)")
+        else:
+            additional_info.append(f"**컨텐츠 링크:** {first_link}")
+    
+    # 추가 정보가 있으면 표시
+    if additional_info:
+        st.markdown("---")
+        for info in additional_info:
+            st.markdown(info)
+    
+    st.markdown("---")
+    if st.button("닫기", key="close_participation_detail", use_container_width=True):
+        del st.session_state.viewing_participation
+        st.rerun()
 
 def render_participation_edit_modal():
     """참여 수정 모달"""
     participation = st.session_state.editing_participation
     
-    with st.expander("✏️ 참여 정보 수정", expanded=True):
-        with st.form("edit_participation_form"):
-            col1, col2 = st.columns(2)
+    st.subheader("✏️ 참여 정보 수정")
+    st.markdown(f"**인플루언서:** {participation.get('influencer_name') or participation['sns_id']}")
+    
+    with st.form("edit_participation_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            status_options = ["요청", "발송준비", "발송완료", "수령"]
+            current_status = participation.get('sample_status', '요청')
+            try:
+                status_index = status_options.index(current_status)
+            except ValueError:
+                status_index = 0  # 기본값으로 "요청" 선택
             
-            with col1:
-                sample_status = st.selectbox(
-                    "샘플 상태",
-                    ["요청", "발송준비", "발송완료", "수령"],
-                    index=["요청", "발송준비", "발송완료", "수령"].index(participation.get('sample_status', '요청')),
-                    key="edit_sample_status"
-                )
-                cost_krw = st.number_input(
-                    "비용 (원)",
-                    min_value=0,
-                    value=int(participation.get('cost_krw', 0) or 0),
-                    key="edit_cost_krw"
-                )
-                content_uploaded = st.checkbox(
-                    "컨텐츠 업로드 완료",
-                    value=participation.get('content_uploaded', False),
-                    key="edit_content_uploaded"
-                )
-            
-            with col2:
-                manager_comment = st.text_area(
-                    "담당자 의견",
-                    value=participation.get('manager_comment', '') or "",
-                    key="edit_manager_comment"
-                )
-                influencer_requests = st.text_area(
-                    "인플루언서 요청사항",
-                    value=participation.get('influencer_requests', '') or "",
-                    key="edit_influencer_requests"
-                )
-                memo = st.text_area(
-                    "메모",
-                    value=participation.get('memo', '') or "",
-                    key="edit_memo"
-                )
-            
-            influencer_feedback = st.text_area(
-                "인플루언서 피드백",
-                value=participation.get('influencer_feedback', '') or "",
-                key="edit_influencer_feedback"
+            sample_status = st.selectbox(
+                "샘플 상태",
+                status_options,
+                index=status_index,
+                key="edit_sample_status"
             )
-            
-            # 컨텐츠 링크 관리
-            st.markdown("**컨텐츠 링크:**")
-            
-            # 버튼 정렬을 위한 CSS
-            st.markdown("""
-            <style>
-            .stButton > button {
-                height: 2.5rem !important;
-                min-height: 2.5rem !important;
-                align-self: flex-end !important;
-            }
-            .stColumns > div {
-                display: flex !important;
-                align-items: flex-end !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # 세션 상태에서 링크 관리
-            if f"content_links_{participation['id']}" not in st.session_state:
-                st.session_state[f"content_links_{participation['id']}"] = participation['content_links'] or []
-            
-            content_links = st.session_state[f"content_links_{participation['id']}"]
-            
-            # 기존 링크 표시
-            for i, link in enumerate(content_links):
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    st.text_input(f"링크 {i+1}", value=link, key=f"existing_link_{i}", disabled=True)
-                with col2:
-                    # 마이너스 버튼으로 삭제
-                    if st.form_submit_button("➖", help="링크 삭제"):
-                        # 삭제할 링크를 None으로 표시
-                        content_links[i] = None
-                        # None 값 제거 (삭제된 링크들)
-                        content_links = [link for link in content_links if link is not None]
-                        st.session_state[f"content_links_{participation['id']}"] = content_links
-                        st.rerun()
-            
-            # None 값 제거 (삭제된 링크들)
-            content_links = [link for link in content_links if link is not None]
-            st.session_state[f"content_links_{participation['id']}"] = content_links
-            
-            # 새 링크 추가
-            col1, col2 = st.columns([4, 1])
-            with col1:
-                new_link = st.text_input("새 링크 추가", key="new_content_link", placeholder="https://...")
-            with col2:
-                if st.form_submit_button("➕", help="링크 추가"):
-                    if new_link and new_link.strip():
-                        content_links.append(new_link.strip())
-                        st.session_state[f"content_links_{participation['id']}"] = content_links
-                        st.rerun()
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.form_submit_button("수정 완료", type="primary"):
+            cost_krw = st.number_input(
+                "비용 (원)",
+                min_value=0,
+                value=int(participation.get('cost_krw', 0) or 0),
+                key="edit_cost_krw"
+            )
+            content_uploaded = st.checkbox(
+                "컨텐츠 업로드 완료",
+                value=participation.get('content_uploaded', False),
+                key="edit_content_uploaded"
+            )
+        
+        with col2:
+            manager_comment = st.text_area(
+                "담당자 의견",
+                value=participation.get('manager_comment', '') or "",
+                key="edit_manager_comment"
+            )
+            influencer_requests = st.text_area(
+                "인플루언서 요청사항",
+                value=participation.get('influencer_requests', '') or "",
+                key="edit_influencer_requests"
+            )
+            memo = st.text_area(
+                "메모",
+                value=participation.get('memo', '') or "",
+                key="edit_memo"
+            )
+        
+        influencer_feedback = st.text_area(
+            "인플루언서 피드백",
+            value=participation.get('influencer_feedback', '') or "",
+            key="edit_influencer_feedback"
+        )
+        
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.form_submit_button("수정 완료", type="primary"):
+                try:
                     updates = {
                         "sample_status": sample_status,
                         "cost_krw": cost_krw,
@@ -910,28 +919,30 @@ def render_participation_edit_modal():
                         "manager_comment": manager_comment,
                         "influencer_requests": influencer_requests,
                         "memo": memo,
-                        "influencer_feedback": influencer_feedback,
-                        "content_links": content_links
+                        "influencer_feedback": influencer_feedback
                     }
                     
+                    st.write("수정 중...")  # 디버깅용
                     result = db_manager.update_campaign_participation(participation['id'], updates)
+                    st.write(f"결과: {result}")  # 디버깅용
+                    
                     if result["success"]:
                         st.success("참여 정보가 수정되었습니다!")
                         # 세션 상태 정리
                         del st.session_state.editing_participation
-                        if f"content_links_{participation['id']}" in st.session_state:
-                            del st.session_state[f"content_links_{participation['id']}"]
                         st.rerun()
                     else:
                         st.error(f"수정 실패: {result['message']}")
-            
-            with col2:
-                if st.form_submit_button("취소"):
-                    # 세션 상태 정리
-                    del st.session_state.editing_participation
-                    if f"content_links_{participation['id']}" in st.session_state:
-                        del st.session_state[f"content_links_{participation['id']}"]
-                    st.rerun()
+                except Exception as e:
+                    st.error(f"수정 중 오류 발생: {str(e)}")
+                    import traceback
+                    st.write(traceback.format_exc())
+        
+        with col2:
+            if st.form_submit_button("취소"):
+                # 세션 상태 정리
+                del st.session_state.editing_participation
+                st.rerun()
 
 def render_influencer_management():
     """인플루언서 관리 메인 컴포넌트"""
