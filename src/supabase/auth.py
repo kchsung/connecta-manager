@@ -14,6 +14,17 @@ class SupabaseAuth:
         """Supabase 클라이언트 반환"""
         if not self.client:
             self.client = supabase_config.get_client()
+        
+        # 현재 인증 토큰이 있다면 클라이언트에 설정
+        if 'auth_token' in st.session_state:
+            try:
+                self.client.auth.set_session(
+                    access_token=st.session_state.auth_token,
+                    refresh_token=st.session_state.get('refresh_token', '')
+                )
+            except Exception as e:
+                print(f"토큰 설정 실패: {e}")
+        
         return self.client
     
     def _save_token_to_browser(self, token: str, refresh_token: str = None):

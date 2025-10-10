@@ -18,8 +18,8 @@ class UserStats(BaseModel):
 
 class Campaign(BaseModel):
     """캠페인 데이터 모델"""
-    id: Optional[str] = None
-    created_by: Optional[str] = None
+    # id 필드는 제거 - 데이터베이스에서 자동으로 생성됨
+    # created_by 필드는 제거 - 데이터베이스에서 자동으로 설정됨
     campaign_name: str
     campaign_description: Optional[str] = None
     campaign_type: str  # seeding, promotion, sales
@@ -28,21 +28,39 @@ class Campaign(BaseModel):
     status: str = "planned"  # planned, active, paused, completed, canceled
     campaign_instructions: Optional[str] = None  # 캠페인 지시사항
     tags: Optional[str] = None  # 관련 Tag정보(쉼표로 구분된 문자열)
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    # created_at, updated_at 필드는 제거 - 데이터베이스에서 자동으로 설정됨
 
 class Influencer(BaseModel):
     """인플루언서 데이터 모델"""
-    id: Optional[str] = None
-    user_id: Optional[str] = None
+    # id 필드는 제거 - 데이터베이스에서 자동으로 생성됨
     platform: str  # instagram, youtube, tiktok, twitter
+    content_category: str
+    influencer_name: Optional[str] = ""
     sns_id: str
     sns_url: str
-    influencer_name: str
+    contact_method: Optional[str] = "dm"  # dm, email, phone, kakao
+    followers_count: Optional[int] = 0
+    phone_number: Optional[str] = None
+    kakao_channel_id: Optional[str] = None
+    email: Optional[str] = None
+    shipping_address: Optional[str] = None
+    interested_products: Optional[str] = None
     owner_comment: Optional[str] = None
-    content_category: str = "일반"
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    manager_rating: Optional[int] = None  # 1-5
+    content_rating: Optional[int] = None  # 1-5
+    comments_count: Optional[int] = 0
+    foreign_followers_ratio: Optional[float] = None  # 0-100
+    activity_score: Optional[float] = None
+    preferred_mode: Optional[str] = None  # influencer_pref enum
+    price_krw: Optional[float] = None
+    tags: Optional[str] = None  # text field
+    # created_by 필드는 제거 - 데이터베이스에서 자동으로 설정됨
+    # created_at, updated_at 필드는 제거 - 데이터베이스에서 자동으로 설정됨
+    active: Optional[bool] = True
+    post_count: Optional[int] = 0
+    profile_text: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    first_crawled: Optional[bool] = False
 
 class CampaignInfluencer(BaseModel):
     """캠페인-인플루언서 연결 데이터 모델"""

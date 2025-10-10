@@ -22,14 +22,12 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="streamlit")
 # ── Path ─────────────────────────────────────────────────────
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from src.ui.auth_components import render_auth_sidebar, render_user_profile  # (미사용 시 삭제해도 됨)
 # 크롤링 컴포넌트 import가 제거되었습니다.
 from src.ui.project_components import (
     render_single_url_crawl, render_batch_url_crawl,
     render_campaign_management, render_performance_management, render_performance_crawl,
     render_influencer_management
 )
-from src.supabase.auth import supabase_auth
 
 
 # ── CSS ──────────────────────────────────────────────────────
@@ -95,19 +93,6 @@ def inject_layout_css():
          font-weight: 600 !important;
      }
 
-    /* 로그인 성공 배지: 한 줄, 넘치면 말줄임 */
-    .login-ok {
-        background: #e9f7ef;
-        border: 1px solid #d4edda;
-        color: #155724;
-        padding: .6rem .75rem;
-        border-radius: .5rem;
-        font-size: .95rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .login-ok .email { font-weight: 600; }
 
     /* 사이드바 헤드라인(로고 영역) 줄바꿈 방지 */
     .sidebar-title { white-space: nowrap; }
@@ -175,13 +160,6 @@ def inject_layout_css():
     /* 필요 시 상단 헤더를 숨기지 않음(접힘 버튼 살리기) */
     /* #MainMenu만 숨기고, header/footer는 유지 */
     #MainMenu { display: none !important; }
-    /* ===== 로그인/회원가입 사이드바 폼 정돈 ===== */
-
-    /* 경고/안내 배지: 아래 여백 확보해 겹침 방지 */
-    .login-alert, .login-ok {
-      display: block !important;
-      margin: 8px 0 12px !important;
-    }
 
     /* 사이드바 폼 전체 간격 */
     .stSidebar .stForm, .stSidebar form {
@@ -211,18 +189,6 @@ def inject_layout_css():
     /* 탭 상단 여백 제거로 컴팩트 */
     .stSidebar [data-baseweb="tab-list"] { margin-top: 0 !important; }
 
-    /* 로그인 성공 배지는 한 줄 유지 + 말줄임 */
-    .login-ok { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    /* 경고 배지 별도 색상 */
-    .login-warn {
-      background: #fff3cd;
-      border: 1px solid #ffeaa7;
-      color: #856404;
-      padding: .6rem .75rem;
-      border-radius: .5rem;
-      font-size: .95rem;
-    }
 
     /* ====== AUTH 사이드바 전용 리셋/정돈 ====== */
 
@@ -235,11 +201,6 @@ def inject_layout_css():
       margin: 0 !important;
     }
 
-    /* 경고/안내 배지 아래로 충분한 여백: 탭/폼과 겹침 방지 */
-    .login-warn, .login-ok {
-      display: block !important;
-      margin: 10px 0 12px !important;
-    }
 
     /* 사이드바 요소 기본 간격(너무 촘촘했던 2px → 8px로 일괄 정리) */
     [data-testid="stSidebar"] [data-testid="element-container"] {
@@ -269,43 +230,7 @@ def inject_layout_css():
       white-space: nowrap !important;
     }
 
-    /* 로그인/회원가입 묶음에 카드 느낌(시각적 그룹화 + 균일 마진) */
-    .stSidebar .auth-card {
-      padding: 12px !important;
-      border: none !important;
-      border-radius: 12px !important;
-      background: #fff !important;
-      box-shadow: none !important;
-      margin: 6px 0 12px !important;
-    }
 
-    /* 카드 내부 요소 간격 살짝 축소 */
-    .stSidebar .auth-card [data-testid="element-container"] {
-      margin-bottom: 6px !important;
-    }
-
-    /* 경고 배지 룩 고정 */
-    .login-warn {
-      background: #fff8e1 !important;
-      border: 1px solid #ffeaa7 !important;
-      color: #7a5d00 !important;
-      padding: .6rem .75rem !important;
-      border-radius: .5rem !important;
-      font-size: .95rem !important;
-    }
-
-    /* 성공 배지 룩 고정 */
-    .login-ok {
-      background: #e9f7ef !important;
-      border: 1px solid #d4edda !important;
-      color: #155724 !important;
-      padding: .6rem .75rem !important;
-      border-radius: .5rem !important;
-      font-size: .95rem !important;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
 
     </style>
     """, unsafe_allow_html=True)
@@ -329,90 +254,7 @@ def render_sidebar():
         </div>
         """, unsafe_allow_html=True)
 
-        # 로그인 상태 표시
-        if supabase_auth.is_authenticated():
-            user = supabase_auth.get_current_user()
-            # ✅ 커스텀 배지 (한 줄/말줄임)
-            st.markdown(
-                f"""<div class="login-ok">✅ 로그인됨:<br><span class="email">{user.email}</span></div>""",
-                unsafe_allow_html=True
-            )
-        else:
-            st.markdown(
-                """<div class="login-warn login-alert">⚠️ 로그인이 필요합니다</div>""",
-                unsafe_allow_html=True
-            )
         
-        # 로그인/로그아웃 버튼
-        if supabase_auth.is_authenticated():
-            if st.button("🚪 로그아웃", type="secondary", use_container_width=True, key="logout_btn"):
-                result = supabase_auth.sign_out()
-                if result["success"]:
-                    st.success(result["message"])
-                    st.rerun()
-                else:
-                    st.error(result["message"])
-        else:
-            # 로그인/회원가입 탭 (카드 래핑)
-            st.markdown('<div class="auth-card">', unsafe_allow_html=True)
-            tab1, tab2 = st.tabs(["로그인", "회원가입"])
-
-            with tab1:
-                with st.form("login_form", border=False):
-                    email = st.text_input("이메일", placeholder="your@email.com", key="login_email")
-                    password = st.text_input("비밀번호", type="password", key="login_password")
-
-                    # 세로 배치 + 풀폭 (유지)
-                    do_login = st.form_submit_button("로그인", type="primary", use_container_width=True)
-                    do_reset = st.form_submit_button("비밀번호 찾기", use_container_width=True)
-
-                    if do_login:
-                        if not email or not password:
-                            st.error("이메일과 비밀번호를 입력해주세요.")
-                        else:
-                            with st.spinner("로그인 중..."):
-                                result = supabase_auth.sign_in(email, password)
-                            if result["success"]:
-                                st.success(result["message"])
-                                st.rerun()
-                            else:
-                                st.error(result["message"])
-
-                    if do_reset:
-                        if not email:
-                            st.error("이메일을 입력해주세요.")
-                        else:
-                            with st.spinner("비밀번호 재설정 이메일 발송 중..."):
-                                result = supabase_auth.reset_password(email)
-                            if result["success"]:
-                                st.success(result["message"])
-                            else:
-                                st.error(result["message"])
-
-            with tab2:
-                with st.form("signup_form", border=False):
-                    email = st.text_input("이메일", placeholder="your@email.com", key="signup_email")
-                    password = st.text_input("비밀번호", type="password", key="signup_password")
-                    confirm = st.text_input("비밀번호 확인", type="password", key="signup_confirm")
-
-                    do_signup = st.form_submit_button("회원가입", type="primary", use_container_width=True)
-
-                    if do_signup:
-                        if not email or not password or not confirm:
-                            st.error("모든 필드를 입력해주세요.")
-                        elif password != confirm:
-                            st.error("비밀번호가 일치하지 않습니다.")
-                        elif len(password) < 6:
-                            st.error("비밀번호는 최소 6자 이상이어야 합니다.")
-                        else:
-                            with st.spinner("회원가입 중..."):
-                                result = supabase_auth.sign_up(email, password)
-                            if result["success"]:
-                                st.success(result["message"])
-                                st.rerun()
-                            else:
-                                st.error(result["message"])
-            st.markdown('</div>', unsafe_allow_html=True)  # auth-card 종료
         
         st.markdown("---")
     
@@ -456,16 +298,6 @@ def render_sidebar():
 
 # ── Main content ─────────────────────────────────────────────
 def render_main_content():
-    # 로그인 체크 활성화
-    if not supabase_auth.is_authenticated():
-        st.markdown("""
-        <div style="text-align:left; margin:0; padding:0;">
-            <p style="font-size:1.05rem; color:#6c757d; margin:.5rem 0 0;">
-                Connecta Manager를 사용하려면 먼저 로그인해주세요.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        return
 
     # 현재 선택된 페이지에 따라 다른 컴포넌트 렌더링
     current_page = st.session_state.get('current_page', 'campaign_management')
@@ -492,23 +324,8 @@ def main():
     try:
         load_css()                # 프로젝트 CSS + 위 레이아웃 CSS
 
-        # 인증 상태 초기화 및 세션 복원 시도
-        if 'authenticated' not in st.session_state:
-            st.session_state.authenticated = False
         
-        # 페이지 로드 시 세션 복원 시도 (Streamlit Cloud에서 새로고침 시 로그인 유지)
-        if not st.session_state.get('authenticated', False):
-            # 자동 세션 복원 시도
-            if supabase_auth.is_authenticated():
-                st.session_state.authenticated = True
-        
-        # 로그인된 상태에서 세션 갱신 체크
-        if st.session_state.get('authenticated', False):
-            if not supabase_auth.refresh_session_if_needed():
-                # 세션 갱신 실패 시 로그아웃 처리
-                st.session_state.authenticated = False
-                if 'user' in st.session_state:
-                    del st.session_state.user
+        # 모든 모드에서 메인 컨텐츠 렌더링
 
         render_sidebar()          # 실제 st.sidebar 렌더
         render_main_content()     # 본문

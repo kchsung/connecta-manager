@@ -9,3 +9,4 @@ pygments==2.19.2
 mdurl==0.1.2
 markdown-it-py==4.0.0
 rich>=10.14.0,<14
+requests>=2.31.0

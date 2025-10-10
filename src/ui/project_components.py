@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from ..db.database import db_manager
 from ..db.models import Campaign, Influencer, CampaignInfluencer, CampaignInfluencerParticipation, PerformanceMetric
-from ..supabase.auth import supabase_auth
 
 def check_database_for_influencer(platform: str, sns_id: str) -> Dict[str, Any]:
     """데이터베이스에서 인플루언서 정보 확인"""
@@ -259,7 +259,7 @@ def render_campaign_edit_form(campaign):
             campaign_type = st.selectbox(
                 "캠페인 유형",
                 ["seeding", "promotion", "sales"],
-                index=["seeding", "promotion", "sales"].index(campaign['campaign_type']),
+                index=["seeding", "promotion", "sales"].index(campaign.get('campaign_type', 'seeding')),
                 key=f"edit_type_{campaign['id']}",
                 format_func=lambda x: {
                     "seeding": "🌱 시딩",
@@ -285,7 +285,7 @@ def render_campaign_edit_form(campaign):
             status = st.selectbox(
                 "캠페인 상태",
                 ["planned", "active", "paused", "completed", "canceled"],
-                index=["planned", "active", "paused", "completed", "canceled"].index(campaign['status']),
+                index=["planned", "active", "paused", "completed", "canceled"].index(campaign.get('status', 'planned')),
                 key=f"edit_status_{campaign['id']}",
                 format_func=lambda x: {
                     "planned": "📅 계획됨",
@@ -401,19 +401,57 @@ def render_add_influencer_workflow(campaign_id):
         if not sns_id:
             st.error("SNS ID를 입력해주세요.")
         else:
-            # SNS ID에서 @ 제거
-            clean_sns_id = sns_id.replace('@', '')
-            
-            # 인플루언서 검색
-            influencer_info = db_manager.get_influencer_info(platform, clean_sns_id)
+            # 인플루언서 검색 (개선된 로직 사용)
+            influencer_info = db_manager.get_influencer_info(platform, sns_id)
             
             if influencer_info["success"] and influencer_info["exists"]:
                 selected_influencer = influencer_info["data"]
                 st.session_state["selected_influencer_for_campaign"] = selected_influencer
-                st.success("인플루언서를 찾았습니다!")
+                st.success(f"✅ 인플루언서를 찾았습니다: {selected_influencer.get('influencer_name') or selected_influencer['sns_id']}")
                 st.rerun()
             else:
-                st.error("해당 인플루언서를 찾을 수 없습니다. 먼저 인플루언서를 등록해주세요.")
+                # 더 자세한 오류 메시지 표시
+                error_message = influencer_info.get("message", "해당 인플루언서를 찾을 수 없습니다.")
+                st.error(error_message)
+                
+                # 디버깅 정보 표시
+                if "debug_info" in influencer_info:
+                    with st.expander("🔍 디버깅 정보", expanded=True):
+                        st.json(influencer_info["debug_info"])
+                        
+                        # 추가 디버깅 정보
+                        st.markdown("**📊 상세 디버깅 정보:**")
+                        debug_info = influencer_info["debug_info"]
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**원본 SNS ID:** {debug_info.get('original_sns_id')}")
+                            st.write(f"**정리된 SNS ID:** {debug_info.get('clean_sns_id')}")
+                            st.write(f"**플랫폼:** {debug_info.get('platform')}")
+                            st.write(f"**정확한 매칭 시도:** {debug_info.get('exact_match_attempted')}")
+                            st.write(f"**정확한 매칭 결과:** {debug_info.get('exact_match_result')}")
+                        
+                        with col2:
+                            st.write(f"**정리된 매칭 시도:** {debug_info.get('clean_match_attempted')}")
+                            st.write(f"**정리된 매칭 결과:** {debug_info.get('clean_match_result')}")
+                            st.write(f"**대소문자 무시 검색:** {debug_info.get('case_insensitive_search')}")
+                            st.write(f"**대소문자 무시 결과:** {debug_info.get('case_insensitive_result')}")
+                            st.write(f"**부분 매칭 시도:** {debug_info.get('partial_match_attempted')}")
+                            st.write(f"**부분 매칭 결과:** {debug_info.get('partial_match_result')}")
+                        
+                        # 비활성화된 인플루언서 정보
+                        if "inactive_matches" in debug_info and debug_info["inactive_matches"]:
+                            st.warning("**⚠️ 비활성화된 인플루언서에서 일치하는 항목 발견:**")
+                            for inf in debug_info["inactive_matches"]:
+                                st.write(f"- SNS ID: {inf.get('sns_id')}, 이름: {inf.get('influencer_name')}, 활성: {inf.get('active')}")
+                        
+                        # 플랫폼의 모든 인플루언서
+                        if "all_influencers_in_platform" in debug_info:
+                            st.write(f"**📋 해당 플랫폼의 모든 활성 인플루언서 ({len(debug_info['all_influencers_in_platform'])}명):**")
+                            for inf in debug_info["all_influencers_in_platform"][:10]:  # 처음 10개만 표시
+                                st.write(f"- {inf.get('sns_id')} ({inf.get('influencer_name') or '이름 없음'})")
+                            if len(debug_info["all_influencers_in_platform"]) > 10:
+                                st.write(f"... 외 {len(debug_info['all_influencers_in_platform']) - 10}명 더")
     
     # 세션에서 선택된 인플루언서 가져오기
     if "selected_influencer_for_campaign" in st.session_state:
@@ -470,10 +508,7 @@ def render_add_influencer_workflow(campaign_id):
             
             with col1:
                 if st.form_submit_button("✅ 인플루언서 추가", type="primary"):
-                    # 디버깅 정보
-                    st.write("🔍 디버깅 정보:")
-                    st.write(f"- Campaign ID: {campaign_id}")
-                    st.write(f"- Influencer ID: {selected_influencer['id']}")
+                    # 인플루언서 추가 처리
                     st.write(f"- Manager Comment: {manager_comment}")
                     st.write(f"- Cost: {cost_krw}")
                     
@@ -512,54 +547,39 @@ def render_add_influencer_workflow(campaign_id):
 
 def render_influencer_info_inline(influencer):
     """인라인 인플루언서 정보 표시 (폼 내에서 사용)"""
-    # 정보 카드 형태로 표시
-    col1, col2 = st.columns([1, 2])
+    # 정보 카드 형태로 표시 (이미지 제거로 전체 폭 사용)
+    st.markdown("---")
+    st.markdown(f"**📱 SNS ID:** `{influencer['sns_id']}`")
+    st.markdown(f"**👤 인플루언서 이름:** {influencer.get('influencer_name', 'N/A')}")
+    st.markdown(f"**🌐 SNS URL:** {influencer.get('sns_url', 'N/A')}")
+    st.markdown(f"**👥 팔로워 수:** {influencer.get('followers_count', 0):,}")
+    st.markdown(f"**💬 카카오 채널 ID:** {influencer.get('kakao_channel_id', 'N/A')}")
     
-    with col1:
-        # 프로필 이미지 (가운데 정렬)
-        profile_image_url = influencer.get('profile_image_url')
-        if profile_image_url and profile_image_url.strip():
-            try:
-                # CSS를 사용하여 이미지 가운데 정렬
-                st.markdown("""
-                <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">
-                    <img src="{}" style="width: 150px; height: 150px; object-fit: cover; border-radius: 50%; border: 2px solid #e0e0e0;">
-                </div>
-                """.format(profile_image_url), unsafe_allow_html=True)
-                st.markdown("<div style='text-align: center; font-size: 0.8em; color: #666;'>프로필 이미지</div>", unsafe_allow_html=True)
-            except Exception as e:
-                st.warning(f"프로필 이미지를 불러올 수 없습니다: {profile_image_url}")
-        else:
-            # 프로필 이미지가 없을 때도 가운데 정렬
-            st.markdown("""
-            <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">
-                <div style="width: 150px; height: 150px; background-color: #f0f0f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid #e0e0e0;">
-                    <span style="color: #999; font-size: 0.9em;">이미지 없음</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown("<div style='text-align: center; font-size: 0.8em; color: #666;'>프로필 이미지</div>", unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"**📱 SNS ID:** `{influencer['sns_id']}`")
-        st.markdown(f"**👤 인플루언서 이름:** {influencer.get('influencer_name', 'N/A')}")
-        st.markdown(f"**🌐 SNS URL:** {influencer.get('sns_url', 'N/A')}")
-        st.markdown(f"**👥 팔로워 수:** {influencer.get('followers_count', 0):,}")
-        st.markdown(f"**💬 카카오 채널 ID:** {influencer.get('kakao_channel_id', 'N/A')}")
-        
-        # 프로필 텍스트 (멀티라인으로 표시)
-        profile_text = influencer.get('profile_text')
-        if profile_text and profile_text.strip():
-            st.markdown("**📝 프로필 텍스트:**")
-            # 텍스트 영역으로 표시하여 멀티라인 지원
+    # 프로필 텍스트 (멀티라인으로 표시) - 안전한 텍스트 표시
+    profile_text = influencer.get('profile_text')
+    if profile_text and profile_text.strip():
+        st.markdown("**📝 프로필 텍스트:**")
+        try:
+            # 특수 문자를 안전하게 처리
+            safe_profile_text = str(profile_text) if profile_text else ''
             st.text_area(
                 "프로필 텍스트 내용",
-                value=profile_text,
+                value=safe_profile_text,
                 height=100,
                 disabled=True,
                 key=f"profile_text_{influencer['sns_id']}",
                 label_visibility="collapsed"
             )
+        except Exception as e:
+            st.text_area(
+                "프로필 텍스트 내용",
+                value="[텍스트 표시 오류]",
+                height=100,
+                disabled=True,
+                key=f"profile_text_{influencer['sns_id']}",
+                label_visibility="collapsed"
+            )
+            st.caption(f"텍스트 표시 오류: {str(e)}")
 
 
 def render_campaign_participation_tab():
@@ -669,10 +689,10 @@ def render_campaign_participation_tab():
                 
                 with col1:
                     # 모든 필드 정보 표시 (컴팩트하게)
-                    st.markdown(f"**{participation.get('influencer_name') or participation['sns_id']}**")
-                    st.caption(f"📱 SNS ID: {participation['sns_id']} | 👥 팔로워: {participation.get('followers_count', 0):,}명")
-                    st.caption(f"🌐 플랫폼: {participation['platform']} | 📦 샘플상태: {participation['sample_status']}")
-                    st.caption(f"💰 비용: {participation['cost_krw']:,}원 | 📤 업로드: {'✅' if participation['content_uploaded'] else '❌'}")
+                    st.markdown(f"**{participation.get('influencer_name', 'N/A')}**")
+                    st.caption(f"📱 SNS ID: {participation.get('sns_id', 'N/A')} | 👥 팔로워: {participation.get('followers_count', 0):,}명")
+                    st.caption(f"🌐 플랫폼: {participation.get('platform', 'N/A')} | 📦 샘플상태: {participation.get('sample_status', 'N/A')}")
+                    st.caption(f"💰 비용: {participation.get('cost_krw', 0):,}원 | 📤 업로드: {'✅' if participation.get('content_uploaded', False) else '❌'}")
                     
                     # 컨텐츠 링크 표시 (첫 번째 링크만)
                     content_links = participation.get('content_links', [])
@@ -788,41 +808,41 @@ def render_participation_edit_modal():
                 sample_status = st.selectbox(
                     "샘플 상태",
                     ["요청", "발송준비", "발송완료", "수령"],
-                    index=["요청", "발송준비", "발송완료", "수령"].index(participation['sample_status']),
+                    index=["요청", "발송준비", "발송완료", "수령"].index(participation.get('sample_status', '요청')),
                     key="edit_sample_status"
                 )
                 cost_krw = st.number_input(
                     "비용 (원)",
                     min_value=0,
-                    value=int(participation['cost_krw']),
+                    value=int(participation.get('cost_krw', 0) or 0),
                     key="edit_cost_krw"
                 )
                 content_uploaded = st.checkbox(
                     "컨텐츠 업로드 완료",
-                    value=participation['content_uploaded'],
+                    value=participation.get('content_uploaded', False),
                     key="edit_content_uploaded"
                 )
             
             with col2:
                 manager_comment = st.text_area(
                     "담당자 의견",
-                    value=participation['manager_comment'] or "",
+                    value=participation.get('manager_comment', '') or "",
                     key="edit_manager_comment"
                 )
                 influencer_requests = st.text_area(
                     "인플루언서 요청사항",
-                    value=participation['influencer_requests'] or "",
+                    value=participation.get('influencer_requests', '') or "",
                     key="edit_influencer_requests"
                 )
                 memo = st.text_area(
                     "메모",
-                    value=participation['memo'] or "",
+                    value=participation.get('memo', '') or "",
                     key="edit_memo"
                 )
             
             influencer_feedback = st.text_area(
                 "인플루언서 피드백",
-                value=participation['influencer_feedback'] or "",
+                value=participation.get('influencer_feedback', '') or "",
                 key="edit_influencer_feedback"
             )
             
@@ -1007,21 +1027,138 @@ def render_influencer_search_and_filter():
     # 1명 검색 기능
     st.markdown("### 🔍 인플루언서 검색")
     with st.form("search_influencer_form"):
-        search_term = st.text_input("SNS ID 또는 이름", placeholder="정확한 SNS ID 또는 이름 입력", key="influencer_search_input")
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            search_platform = st.selectbox(
+                "플랫폼",
+                ["전체", "instagram", "youtube", "tiktok", "twitter"],
+                key="search_platform_select",
+                format_func=lambda x: {
+                    "전체": "🌐 전체",
+                    "instagram": "📸 Instagram",
+                    "youtube": "📺 YouTube",
+                    "tiktok": "🎵 TikTok",
+                    "twitter": "🐦 Twitter"
+                }[x]
+            )
+        
+        with col2:
+            search_term = st.text_input("SNS ID 또는 이름", placeholder="정확한 SNS ID 또는 이름 입력", key="influencer_search_input")
+        
         search_clicked = st.form_submit_button("🔍 검색", type="primary")
     
     if search_clicked:
         if not search_term:
             st.error("검색어를 입력해주세요.")
         else:
-            # 단일 인플루언서 검색
-            search_result = search_single_influencer(search_term)
+            # 플랫폼별 단일 인플루언서 검색
+            if search_platform == "전체":
+                # 전체 플랫폼에서 검색
+                search_result = search_single_influencer(search_term)
+            else:
+                # 특정 플랫폼에서 검색
+                search_result = search_single_influencer_by_platform(search_term, search_platform)
+            
             if search_result:
                 st.session_state.selected_influencer = search_result
-                st.success(f"인플루언서를 찾았습니다: {search_result.get('influencer_name') or search_result['sns_id']}")
+                active_status = "활성" if search_result.get('active', True) else "비활성"
+                st.success(f"✅ 인플루언서를 찾았습니다: {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')}) [{active_status}]")
                 st.rerun()
             else:
-                st.error("해당 인플루언서를 찾을 수 없습니다.")
+                # 더 자세한 오류 메시지와 도움말 제공
+                platform_text = f" ({search_platform})" if search_platform != "전체" else ""
+                st.error(f"❌ '{search_term}'{platform_text}를 찾을 수 없습니다.")
+                
+                # 도움말 및 디버깅 정보 제공
+                with st.expander("💡 검색 도움말", expanded=False):
+                    st.markdown("""
+                    **검색 팁:**
+                    - SNS ID를 정확히 입력해주세요 (예: `username` 또는 `@username`)
+                    - 플랫폼을 선택하면 해당 플랫폼에서만 검색합니다
+                    - "전체"를 선택하면 모든 플랫폼에서 검색합니다
+                    - 대소문자는 구분하지 않습니다
+                    - 인플루언서 이름으로도 검색할 수 있습니다
+                    - 부분 검색도 지원됩니다
+                    
+                    **문제가 계속되면:**
+                    1. 인플루언서가 먼저 등록되어 있는지 확인하세요
+                    2. 플랫폼이 올바른지 확인하세요
+                    3. SNS ID에 오타가 없는지 확인하세요
+                    """)
+                
+                # 모든 인플루언서 목록 표시
+                with st.expander("🔍 모든 인플루언서 목록", expanded=True):
+                    try:
+                        all_influencers = db_manager.get_influencers()
+                        st.write(f"**총 {len(all_influencers)}명의 인플루언서가 등록되어 있습니다:**")
+                        
+                        # 검색어와 정확히 일치하는 인플루언서 찾기
+                        exact_matches = []
+                        partial_matches = []
+                        clean_search_term = search_term.replace('@', '').strip().lower()
+                        
+                        for inf in all_influencers:
+                            sns_id = inf.get('sns_id', '').lower()
+                            name = (inf.get('influencer_name', '') or '').lower()
+                            clean_sns_id = sns_id.replace('@', '').strip()
+                            
+                            # 정확한 매칭
+                            if (search_term.lower() == sns_id or 
+                                search_term.lower() == name or
+                                clean_search_term == clean_sns_id or
+                                clean_search_term == name):
+                                exact_matches.append(inf)
+                            
+                            # 부분 매칭
+                            elif (clean_search_term in clean_sns_id or 
+                                  clean_search_term in name or
+                                  search_term.lower() in sns_id or
+                                  search_term.lower() in name):
+                                partial_matches.append(inf)
+                        
+                        # 정확한 매칭 결과
+                        if exact_matches:
+                            st.success(f"**✅ 정확한 매칭 ({len(exact_matches)}명):**")
+                            for inf in exact_matches:
+                                active_status = "활성" if inf.get('active', True) else "비활성"
+                                st.write(f"- {inf.get('sns_id')} ({inf.get('platform')}) - {inf.get('influencer_name') or '이름 없음'} [{active_status}]")
+                        
+                        # 부분 매칭 결과
+                        if partial_matches:
+                            st.info(f"**🔍 부분 매칭 ({len(partial_matches)}명):**")
+                            for inf in partial_matches[:5]:  # 최대 5명만 표시
+                                active_status = "활성" if inf.get('active', True) else "비활성"
+                                st.write(f"- {inf.get('sns_id')} ({inf.get('platform')}) - {inf.get('influencer_name') or '이름 없음'} [{active_status}]")
+                            if len(partial_matches) > 5:
+                                st.write(f"... 외 {len(partial_matches) - 5}명 더")
+                        
+                        # 매칭이 없으면 전체 목록 표시
+                        if not exact_matches and not partial_matches:
+                            st.warning("**❌ 검색어와 일치하는 인플루언서가 없습니다.**")
+                            
+                            # 플랫폼별로 그룹화
+                            platform_groups = {}
+                            for inf in all_influencers:
+                                platform = inf.get('platform', 'unknown')
+                                if platform not in platform_groups:
+                                    platform_groups[platform] = []
+                                platform_groups[platform].append(inf)
+                            
+                            st.write("**전체 인플루언서 목록:**")
+                            for platform, influencers in platform_groups.items():
+                                st.write(f"**{platform.upper()} ({len(influencers)}명):**")
+                                for inf in influencers[:10]:  # 각 플랫폼당 최대 10명 표시
+                                    active_status = "활성" if inf.get('active', True) else "비활성"
+                                    st.write(f"- {inf.get('sns_id')} ({inf.get('influencer_name') or '이름 없음'}) [{active_status}]")
+                                if len(influencers) > 10:
+                                    st.write(f"... 외 {len(influencers) - 10}명 더")
+                                st.write("")
+                            
+                    except Exception as e:
+                        st.error(f"인플루언서 목록 조회 중 오류: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
     
     # 필터링 기능
     st.markdown("### 🎯 필터링")
@@ -1090,13 +1227,76 @@ def render_influencer_search_and_filter():
     render_influencer_list_with_pagination()
 
 def search_single_influencer(search_term: str):
-    """단일 인플루언서 검색"""
+    """단일 인플루언서 검색 - 개선된 검색 로직 (전체 플랫폼)"""
     try:
-        # 모든 인플루언서 조회
-        all_influencers = db_manager.get_influencers()
+        # Supabase에서 직접 검색 (페이징 없이)
+        simple_client_instance = db_manager.get_client()
+        client = simple_client_instance.get_client()
         
-        # 정확한 매칭 시도
-        for influencer in all_influencers:
+        if not client:
+            st.error("데이터베이스 연결에 실패했습니다.")
+            return None
+        
+        # 검색어 정규화 (@ 제거, 공백 제거, 소문자 변환)
+        clean_search_term = search_term.replace('@', '').strip().lower()
+        
+        # 1단계: 정확한 매칭 시도 (원본 검색어)
+        exact_search = client.table("connecta_influencers")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, created_at, updated_at, active")\
+            .or_(f"sns_id.eq.{search_term},influencer_name.eq.{search_term}")\
+            .execute()
+        
+        if exact_search.data:
+            return exact_search.data[0]
+        
+        # 2단계: 정리된 검색어로 정확한 매칭
+        clean_exact_search = client.table("connecta_influencers")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, created_at, updated_at, active")\
+            .or_(f"sns_id.eq.{clean_search_term},influencer_name.eq.{clean_search_term}")\
+            .execute()
+        
+        if clean_exact_search.data:
+            return clean_exact_search.data[0]
+        
+        # 3단계: 부분 매칭 시도 (SNS ID 우선)
+        partial_search = client.table("connecta_influencers")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, created_at, updated_at, active")\
+            .or_(f"sns_id.ilike.%{clean_search_term}%,influencer_name.ilike.%{clean_search_term}%")\
+            .execute()
+        
+        if partial_search.data:
+            return partial_search.data[0]
+        
+        # 4단계: 원본 검색어로 부분 매칭
+        original_partial_search = client.table("connecta_influencers")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, created_at, updated_at, active")\
+            .or_(f"sns_id.ilike.%{search_term}%,influencer_name.ilike.%{search_term}%")\
+            .execute()
+        
+        if original_partial_search.data:
+            return original_partial_search.data[0]
+        
+        st.write("❌ 모든 단계에서 매칭을 찾지 못했습니다.")
+        return None
+        
+    except Exception as e:
+        st.error(f"검색 중 오류가 발생했습니다: {str(e)}")
+        import traceback
+        st.write("상세 오류 정보:")
+        st.code(traceback.format_exc())
+        return None
+
+def search_single_influencer_by_platform(search_term: str, platform: str):
+    """특정 플랫폼에서 단일 인플루언서 검색"""
+    try:
+        # 특정 플랫폼의 인플루언서만 조회
+        platform_influencers = db_manager.get_influencers(platform=platform)
+        
+        # 검색어 정규화 (@ 제거, 공백 제거, 소문자 변환)
+        clean_search_term = search_term.replace('@', '').strip().lower()
+        
+        # 1단계: 정확한 매칭 시도 (원본 검색어)
+        for influencer in platform_influencers:
             sns_id = influencer.get('sns_id', '').lower()
             name = (influencer.get('influencer_name', '') or '').lower()
             search_lower = search_term.lower()
@@ -1104,8 +1304,24 @@ def search_single_influencer(search_term: str):
             if search_lower == sns_id or search_lower == name:
                 return influencer
         
-        # 부분 매칭 시도
-        for influencer in all_influencers:
+        # 2단계: 정리된 검색어로 정확한 매칭
+        for influencer in platform_influencers:
+            sns_id = influencer.get('sns_id', '').replace('@', '').strip().lower()
+            name = (influencer.get('influencer_name', '') or '').strip().lower()
+            
+            if clean_search_term == sns_id or clean_search_term == name:
+                return influencer
+        
+        # 3단계: 부분 매칭 시도 (SNS ID 우선)
+        for influencer in platform_influencers:
+            sns_id = influencer.get('sns_id', '').replace('@', '').strip().lower()
+            name = (influencer.get('influencer_name', '') or '').strip().lower()
+            
+            if clean_search_term in sns_id or clean_search_term in name:
+                return influencer
+        
+        # 4단계: 원본 검색어로 부분 매칭
+        for influencer in platform_influencers:
             sns_id = influencer.get('sns_id', '').lower()
             name = (influencer.get('influencer_name', '') or '').lower()
             search_lower = search_term.lower()
@@ -1201,8 +1417,8 @@ def render_influencer_list_with_pagination():
 
 def render_influencer_list_item(influencer, index):
     """인플루언서 리스트 아이템 표시"""
-    # 인플루언서 정보 조합 표시
-    col1, col2, col3 = st.columns([3, 1, 1])
+    # 인플루언서 정보 조합 표시 (이미지 제거로 2컬럼으로 변경)
+    col1, col2 = st.columns([4, 1])
     
     with col1:
         # SNS ID와 팔로워 수
@@ -1214,26 +1430,24 @@ def render_influencer_list_item(influencer, index):
             sns_url = influencer['sns_url']
             st.caption(f"🔗 URL: [{sns_url}]({sns_url})")
         
-        # Owner Comment (있는 경우)
+        # Owner Comment (있는 경우) - 안전한 텍스트 표시
         if influencer.get('owner_comment'):
-            st.caption(f"💬 코멘트: {influencer['owner_comment']}")
+            try:
+                safe_comment = str(influencer['owner_comment'])
+                st.caption(f"💬 코멘트: {safe_comment}")
+            except:
+                st.caption("💬 코멘트: [텍스트 표시 오류]")
         
-        # 프로필 텍스트 (간단히)
+        # 프로필 텍스트 (간단히) - 안전한 텍스트 표시
         if influencer.get('profile_text'):
-            profile_text = influencer['profile_text'][:100] + "..." if len(influencer['profile_text']) > 100 else influencer['profile_text']
-            st.caption(f"📝 프로필: {profile_text}")
+            try:
+                safe_profile_text = str(influencer['profile_text'])
+                profile_text = safe_profile_text[:100] + "..." if len(safe_profile_text) > 100 else safe_profile_text
+                st.caption(f"📝 프로필: {profile_text}")
+            except:
+                st.caption("📝 프로필: [텍스트 표시 오류]")
     
     with col2:
-        # 프로필 이미지 (작은 크기)
-        if influencer.get('profile_image_url'):
-            try:
-                st.image(influencer['profile_image_url'], width=80, caption="프로필")
-            except:
-                st.caption("이미지 로드 실패")
-        else:
-            st.caption("이미지 없음")
-    
-    with col3:
         # 현재 선택된 인플루언서인지 확인
         is_selected = (st.session_state.get('selected_influencer', {}).get('id') == influencer['id'])
         
@@ -1279,9 +1493,7 @@ def render_influencer_detail_form(influencer):
     """인플루언서 상세 정보 폼"""
     st.markdown(f"**{influencer.get('influencer_name') or influencer['sns_id']}**")
     
-    # 프로필 이미지를 가장 상단에 표시
-    if influencer.get('profile_image_url'):
-        st.image(influencer['profile_image_url'], width=200, caption="프로필 이미지")
+    # 프로필 이미지 제거됨 - 깔끔한 레이아웃
     
     # 기본 정보 표시
     col1, col2 = st.columns(2)
@@ -1310,15 +1522,27 @@ def render_influencer_detail_form(influencer):
     else:
         st.markdown(f"**🔗 SNS URL:** {sns_url}")
     
-    # Owner Comment (필수)
+    # Owner Comment (필수) - 안전한 텍스트 표시
     owner_comment = influencer.get('owner_comment', 'N/A')
     st.markdown("**💬 Owner Comment:**")
-    st.text_area("", value=owner_comment, height=80, disabled=True, key=f"owner_comment_{influencer['id']}")
+    try:
+        # 특수 문자를 안전하게 처리
+        safe_owner_comment = str(owner_comment) if owner_comment else 'N/A'
+        st.text_area("", value=safe_owner_comment, height=80, disabled=True, key=f"owner_comment_{influencer['id']}")
+    except Exception as e:
+        st.text_area("", value="[텍스트 표시 오류]", height=80, disabled=True, key=f"owner_comment_{influencer['id']}")
+        st.caption(f"텍스트 표시 오류: {str(e)}")
     
-    # 프로필 텍스트 표시
+    # 프로필 텍스트 표시 - 안전한 텍스트 표시
     if influencer.get('profile_text'):
         st.markdown("**프로필 텍스트:**")
-        st.text_area("", value=influencer['profile_text'], height=100, disabled=True, key=f"profile_text_{influencer['id']}")
+        try:
+            # 특수 문자를 안전하게 처리
+            safe_profile_text = str(influencer['profile_text']) if influencer['profile_text'] else ''
+            st.text_area("", value=safe_profile_text, height=100, disabled=True, key=f"profile_text_{influencer['id']}")
+        except Exception as e:
+            st.text_area("", value="[텍스트 표시 오류]", height=100, disabled=True, key=f"profile_text_{influencer['id']}")
+            st.caption(f"텍스트 표시 오류: {str(e)}")
     
     # 추가 정보
     if influencer.get('kakao_channel_id'):
@@ -1373,8 +1597,7 @@ def render_influencer_detail_form(influencer):
                     help="태그를 쉼표로 구분하여 입력하세요"
                 )
                 
-                # 디버깅: 태그 입력 필드 값 확인
-                st.write(f"🔍 디버깅 - tags_input field value: '{tags_input}'")
+                # 태그 입력 필드
                 
                 # Contact Method (enum: dm, email, kakao, phone, form, other)
                 contact_method_options = ["dm", "email", "kakao", "phone", "form", "other"]
@@ -1427,7 +1650,7 @@ def render_influencer_detail_form(influencer):
                 new_manager_rating = st.selectbox(
                     "⭐ Manager Rating",
                     ["1", "2", "3", "4", "5"],
-                    index=["1", "2", "3", "4", "5"].index(str(influencer.get('manager_rating', '3'))),
+                    index=["1", "2", "3", "4", "5"].index(str(influencer.get('manager_rating', '3') or '3')),
                     key=f"edit_manager_rating_{influencer['id']}",
                     help="담당자 평가 (1-5점)"
                 )
@@ -1499,19 +1722,12 @@ def render_influencer_detail_form(influencer):
                     # 폼 제출 시점에서 세션 상태에서 실제 값 가져오기
                     actual_tags_input = st.session_state.get(f"edit_tags_{influencer['id']}", "")
                     
-                    # 디버깅: 태그 데이터 확인
-                    st.write(f"🔍 디버깅 - tags_input (form variable): '{tags_input}'")
-                    st.write(f"🔍 디버깅 - actual_tags_input (session state): '{actual_tags_input}'")
-                    
                     # 실제 세션 상태 값으로 태그 처리
                     if actual_tags_input and actual_tags_input.strip():
                         # 문자열 그대로 저장
                         actual_tags = actual_tags_input.strip()
                     else:
                         actual_tags = ""
-                    
-                    st.write(f"🔍 디버깅 - actual_tags: {actual_tags}")
-                    st.write(f"🔍 디버깅 - actual_tags type: {type(actual_tags)}")
                     
                     # 수정 데이터 준비
                     update_data = {
@@ -1529,13 +1745,8 @@ def render_influencer_detail_form(influencer):
                         "kakao_channel_id": new_kakao_channel_id
                     }
                     
-                    st.write(f"🔍 디버깅 - update_data: {update_data}")
-                    
                     # 데이터베이스 업데이트
                     result = db_manager.update_influencer(influencer['id'], update_data)
-                    
-                    # 디버깅: 데이터베이스 응답 확인
-                    st.write(f"🔍 디버깅 - DB result: {result}")
                     
                     if result["success"]:
                         st.success("인플루언서 정보가 수정되었습니다!")
@@ -1881,6 +2092,30 @@ def render_performance_management_tab():
                 with col3:
                     st.metric("👁️ 총 조회수", f"{total_views:,}")
                 
+                # 성과 지표 차트
+                st.subheader("📊 성과 지표 차트")
+                chart_data = pd.DataFrame({
+                    '지표': ['좋아요', '댓글', '조회수'],
+                    '값': [total_likes, total_comments, total_views]
+                })
+                
+                # 막대 차트
+                st.bar_chart(chart_data.set_index('지표'))
+                
+                # 파이 차트 (상대적 비율)
+                if total_likes + total_comments + total_views > 0:
+                    st.subheader("🥧 성과 지표 비율")
+                    pie_data = pd.DataFrame({
+                        '지표': ['좋아요', '댓글', '조회수'],
+                        '값': [total_likes, total_comments, total_views]
+                    })
+                    st.plotly_chart(
+                        px.pie(pie_data, values='값', names='지표', 
+                               title="성과 지표 비율",
+                               color_discrete_sequence=['#FF6B6B', '#4ECDC4', '#45B7D1']),
+                        use_container_width=True
+                    )
+                
                 # 평균 성과 계산
                 if len(filtered_participations) > 0:
                     st.subheader("📊 평균 성과")
@@ -1891,6 +2126,32 @@ def render_performance_management_tab():
                         st.metric("평균 댓글", f"{total_comments//len(filtered_participations):,}")
                     with col3:
                         st.metric("평균 조회수", f"{total_views//len(filtered_participations):,}")
+                
+                # 인플루언서별 성과 비교 차트
+                st.subheader("👥 인플루언서별 성과 비교")
+                influencer_performance = []
+                for participation in filtered_participations:
+                    contents = db_manager.get_campaign_influencer_contents(participation['id'])
+                    if contents:
+                        total_participant_likes = sum(content.get('likes', 0) for content in contents)
+                        total_participant_comments = sum(content.get('comments', 0) for content in contents)
+                        total_participant_views = sum(content.get('views', 0) for content in contents)
+                        
+                        influencer_performance.append({
+                            '인플루언서': participation.get('influencer_name') or participation['sns_id'],
+                            '좋아요': total_participant_likes,
+                            '댓글': total_participant_comments,
+                            '조회수': total_participant_views
+                        })
+                
+                if influencer_performance:
+                    perf_df = pd.DataFrame(influencer_performance)
+                    st.bar_chart(perf_df.set_index('인플루언서'))
+                    
+                    # 상세 테이블
+                    st.subheader("📋 인플루언서별 상세 성과")
+                    st.dataframe(perf_df, use_container_width=True)
+                
             else:
                 st.info("아직 성과 데이터가 없습니다. 인플루언서들의 성과를 입력해주세요.")
         
@@ -1924,108 +2185,186 @@ def render_performance_input_modal():
     
     st.divider()
     
-    # 컨텐츠 링크 표시 및 선택
-    content_links = influencer.get('content_links', [])
-    if content_links:
-        st.markdown("**📎 컨텐츠 링크:**")
-        selected_content_link = st.selectbox(
-            "성과를 입력할 컨텐츠를 선택하세요",
-            content_links,
-            key="selected_content_link",
-            help="인플루언서가 올린 컨텐츠별로 성과를 입력할 수 있습니다"
-        )
-    else:
-        st.warning("컨텐츠 링크가 없습니다.")
-        # 컨텐츠 링크가 없어도 성과 입력은 가능하도록 함
-        selected_content_link = st.text_input(
-            "컨텐츠 링크 (선택사항)",
-            placeholder="https://...",
-            key="manual_content_link",
-            help="컨텐츠 링크를 직접 입력하거나 비워둘 수 있습니다"
-        )
+    # 기존 콘텐츠 목록 표시
+    st.markdown("**📋 기존 콘텐츠 목록**")
+    existing_contents = db_manager.get_campaign_influencer_contents(influencer['id'])
     
-    # 성과 입력 폼 (컨텐츠 링크가 있든 없든 항상 표시)
-    with st.form("performance_input_form"):
-        st.markdown("**📊 성과 지표 입력**")
+    if existing_contents:
+        for i, content in enumerate(existing_contents):
+            with st.expander(f"콘텐츠 {i+1}: {content.get('content_url', 'N/A')[:50]}..."):
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("❤️ 좋아요", f"{content.get('likes', 0):,}")
+                with col2:
+                    st.metric("💬 댓글", f"{content.get('comments', 0):,}")
+                with col3:
+                    st.metric("👁️ 조회수", f"{content.get('views', 0):,}")
+                
+                if content.get('caption'):
+                    st.caption(f"📝 캡션: {content['caption'][:100]}...")
+                
+                # 콘텐츠 편집 버튼
+                if st.button("✏️ 편집", key=f"edit_content_{content['id']}"):
+                    st.session_state.editing_content = content
+                    st.rerun()
+    else:
+        st.info("등록된 콘텐츠가 없습니다.")
+    
+    st.divider()
+    
+    # 새 콘텐츠 추가
+    st.markdown("**➕ 새 콘텐츠 추가**")
+    with st.form("add_content_form"):
+        content_url = st.text_input(
+            "콘텐츠 URL",
+            placeholder="https://instagram.com/p/...",
+            help="인플루언서가 올린 콘텐츠의 URL을 입력하세요"
+        )
         
-        # 지표 유형과 지표값을 같은 줄에 좌/우 배치
-        col1, col2 = st.columns(2)
-        with col1:
-            metric_type = st.selectbox(
-                "지표 유형",
-                ["likes", "comments", "shares", "views", "clicks", "conversions"],
-                format_func=lambda x: {
-                    "likes": "👍 좋아요",
-                    "comments": "💬 댓글",
-                    "shares": "🔄 공유",
-                    "views": "👁️ 조회수",
-                    "clicks": "🖱️ 클릭수",
-                    "conversions": "💰 전환수"
-                }[x],
-                key=f"metric_type_{influencer['id']}"
-            )
-        with col2:
-            metric_value = st.number_input("지표 값", min_value=0, value=0, help="숫자만 입력하세요")
+        posted_at = st.date_input(
+            "게시일",
+            help="콘텐츠가 게시된 날짜를 선택하세요"
+        )
         
-        # 정성평가는 별도로 길게 배치
-        qualitative_evaluation = st.text_area(
-            "정성평가",
-            placeholder="컨텐츠의 품질, 반응, 브랜드 적합성 등에 대한 평가를 입력하세요...",
-            key="qualitative_evaluation",
-            help="컨텐츠의 품질에 대한 정성적 평가",
+        caption = st.text_area(
+            "캡션 (선택사항)",
+            placeholder="콘텐츠의 캡션을 입력하세요...",
             height=100
         )
         
-        # 저장 버튼
-        col1, col2, col3 = st.columns([1, 2, 1])
+        qualitative_note = st.text_area(
+            "정성적 평가 (선택사항)",
+            placeholder="콘텐츠에 대한 정성적 평가나 메모를 입력하세요...",
+            height=100
+        )
+        
+        # 성과 지표 입력
+        st.markdown("**📊 성과 지표**")
+        col1, col2 = st.columns(2)
+        with col1:
+            likes = st.number_input("❤️ 좋아요", min_value=0, value=0)
+            comments = st.number_input("💬 댓글", min_value=0, value=0)
+            shares = st.number_input("🔄 공유", min_value=0, value=0)
         with col2:
-            if st.form_submit_button("💾 성과 저장", type="primary", use_container_width=True):
-                # 성과 데이터 저장 (측정일은 현재 날짜로 자동 설정)
-                from datetime import date
+            views = st.number_input("👁️ 조회수", min_value=0, value=0)
+            clicks = st.number_input("🖱️ 클릭수", min_value=0, value=0)
+            conversions = st.number_input("💰 전환수", min_value=0, value=0)
+        
+        if st.form_submit_button("📝 콘텐츠 추가", use_container_width=True):
+            if content_url:
+                content_data = {
+                    "participation_id": influencer['id'],
+                    "content_url": content_url,
+                    "posted_at": posted_at.isoformat() if posted_at else None,
+                    "caption": caption if caption else None,
+                    "qualitative_note": qualitative_note if qualitative_note else None,
+                    "likes": likes,
+                    "comments": comments,
+                    "shares": shares,
+                    "views": views,
+                    "clicks": clicks,
+                    "conversions": conversions
+                }
                 
-                # participation_id 가져오기
-                participation_id = influencer.get('id')
-                if not participation_id:
-                    st.error("참여 정보를 찾을 수 없습니다.")
+                result = db_manager.create_campaign_influencer_content(content_data)
+                if result.get("success"):
+                    st.success("콘텐츠가 성공적으로 추가되었습니다!")
+                    st.rerun()
                 else:
-                    performance_metric = PerformanceMetric(
-                        participation_id=participation_id,
-                        content_link=selected_content_link,
-                        metric_type=metric_type,
-                        metric_value=metric_value,
-                        measurement_date=date.today(),
-                        qualitative_evaluation=qualitative_evaluation
-                    )
-                
-                    result = db_manager.create_performance_metric(performance_metric)
-                    if result["success"]:
-                        st.success("✅ 성과가 저장되었습니다!")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ 저장 실패: {result['message']}")
+                    st.error(f"콘텐츠 추가 실패: {result.get('message', '알 수 없는 오류')}")
+            else:
+                st.error("콘텐츠 URL을 입력해주세요.")
     
-    # 기존 성과 데이터 표시
+    # 콘텐츠 편집 모달 처리
+    if 'editing_content' in st.session_state:
+        render_content_edit_modal()
+
+def render_content_edit_modal():
+    """콘텐츠 편집 모달"""
+    content = st.session_state.editing_content
+    
+    st.markdown(f"### ✏️ 콘텐츠 편집")
+    st.caption(f"URL: {content.get('content_url', 'N/A')[:100]}...")
+    
+    if st.button("❌ 닫기", key="close_edit_modal", help="편집을 취소합니다"):
+        del st.session_state.editing_content
+        st.rerun()
+    
     st.divider()
-    st.markdown("**📈 기존 성과 데이터**")
     
-    participation_id = influencer.get('id')
-    if participation_id:
-        contents = db_manager.get_campaign_influencer_contents(participation_id)
-        if contents:
-            for i, content in enumerate(contents):
-                with st.expander(f"컨텐츠 {i+1}: {content.get('content_url', 'N/A')[:50]}...", expanded=False):
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("좋아요", f"{content.get('likes', 0):,}")
-                    with col2:
-                        st.metric("댓글", f"{content.get('comments', 0):,}")
-                    with col3:
-                        st.metric("조회수", f"{content.get('views', 0):,}")
-                    
-                    if content.get('qualitative_note'):
-                        st.caption(f"정성평가: {content['qualitative_note']}")
-        else:
-            st.info("아직 성과 데이터가 없습니다.")
+    with st.form("edit_content_form"):
+        # 기본 정보
+        content_url = st.text_input(
+            "콘텐츠 URL",
+            value=content.get('content_url', ''),
+            help="콘텐츠의 URL을 수정할 수 있습니다"
+        )
+        
+        posted_at = st.date_input(
+            "게시일",
+            value=pd.to_datetime(content.get('posted_at')).date() if content.get('posted_at') else None,
+            help="콘텐츠가 게시된 날짜를 수정할 수 있습니다"
+        )
+        
+        caption = st.text_area(
+            "캡션",
+            value=content.get('caption', ''),
+            placeholder="콘텐츠의 캡션을 입력하세요...",
+            height=100
+        )
+        
+        qualitative_note = st.text_area(
+            "정성적 평가",
+            value=content.get('qualitative_note', ''),
+            placeholder="콘텐츠에 대한 정성적 평가나 메모를 입력하세요...",
+            height=100
+        )
+        
+        # 성과 지표 수정
+        st.markdown("**📊 성과 지표 수정**")
+        col1, col2 = st.columns(2)
+        with col1:
+            likes = st.number_input("❤️ 좋아요", min_value=0, value=content.get('likes', 0))
+            comments = st.number_input("💬 댓글", min_value=0, value=content.get('comments', 0))
+            shares = st.number_input("🔄 공유", min_value=0, value=content.get('shares', 0))
+        with col2:
+            views = st.number_input("👁️ 조회수", min_value=0, value=content.get('views', 0))
+            clicks = st.number_input("🖱️ 클릭수", min_value=0, value=content.get('clicks', 0))
+            conversions = st.number_input("💰 전환수", min_value=0, value=content.get('conversions', 0))
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.form_submit_button("💾 저장", use_container_width=True):
+                update_data = {
+                    "content_url": content_url,
+                    "posted_at": posted_at.isoformat() if posted_at else None,
+                    "caption": caption if caption else None,
+                    "qualitative_note": qualitative_note if qualitative_note else None,
+                    "likes": likes,
+                    "comments": comments,
+                    "shares": shares,
+                    "views": views,
+                    "clicks": clicks,
+                    "conversions": conversions
+                }
+                
+                result = db_manager.update_campaign_influencer_content(content['id'], update_data)
+                if result.get("success"):
+                    st.success("콘텐츠가 성공적으로 업데이트되었습니다!")
+                    del st.session_state.editing_content
+                    st.rerun()
+                else:
+                    st.error(f"콘텐츠 업데이트 실패: {result.get('message', '알 수 없는 오류')}")
+        
+        with col2:
+            if st.form_submit_button("🗑️ 삭제", use_container_width=True):
+                result = db_manager.delete_campaign_influencer_content(content['id'])
+                if result.get("success"):
+                    st.success("콘텐츠가 성공적으로 삭제되었습니다!")
+                    del st.session_state.editing_content
+                    st.rerun()
+                else:
+                    st.error(f"콘텐츠 삭제 실패: {result.get('message', '알 수 없는 오류')}")
 
 def render_performance_detail_modal():
     """성과 상세보기 모달 - 우측 레이아웃에 최적화"""
@@ -2076,6 +2415,55 @@ def render_performance_detail_modal():
                 st.metric("평균 댓글", f"{total_comments//len(contents):,}")
             with col3:
                 st.metric("평균 조회수", f"{total_views//len(contents):,}")
+        
+        st.divider()
+        
+        # 개별 콘텐츠 상세 정보
+        st.markdown("**📋 개별 콘텐츠 상세**")
+        for i, content in enumerate(contents):
+            with st.expander(f"콘텐츠 {i+1}: {content.get('content_url', 'N/A')[:50]}...", expanded=False):
+                # 기본 정보
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f"**URL:** {content.get('content_url', 'N/A')}")
+                    if content.get('posted_at'):
+                        st.markdown(f"**게시일:** {content.get('posted_at')}")
+                with col2:
+                    if content.get('caption'):
+                        st.markdown(f"**캡션:** {content['caption'][:100]}...")
+                
+                # 성과 지표
+                st.markdown("**📊 성과 지표**")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("❤️ 좋아요", f"{content.get('likes', 0):,}")
+                    st.metric("🔄 공유", f"{content.get('shares', 0):,}")
+                with col2:
+                    st.metric("💬 댓글", f"{content.get('comments', 0):,}")
+                    st.metric("🖱️ 클릭수", f"{content.get('clicks', 0):,}")
+                with col3:
+                    st.metric("👁️ 조회수", f"{content.get('views', 0):,}")
+                    st.metric("💰 전환수", f"{content.get('conversions', 0):,}")
+                
+                # 정성적 평가
+                if content.get('qualitative_note'):
+                    st.markdown("**📝 정성적 평가**")
+                    st.info(content['qualitative_note'])
+                
+                # 액션 버튼
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✏️ 편집", key=f"edit_content_detail_{content['id']}"):
+                        st.session_state.editing_content = content
+                        st.rerun()
+                with col2:
+                    if st.button("🗑️ 삭제", key=f"delete_content_detail_{content['id']}"):
+                        result = db_manager.delete_campaign_influencer_content(content['id'])
+                        if result.get("success"):
+                            st.success("콘텐츠가 삭제되었습니다!")
+                            st.rerun()
+                        else:
+                            st.error(f"삭제 실패: {result.get('message', '알 수 없는 오류')}")
         
         st.divider()
         

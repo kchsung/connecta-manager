@@ -66,4 +66,5 @@ temp/
 tmp/
 
 # Streamlit
-.streamlit/
+.streamlit/config.toml
+.streamlit/secrets.toml.example
