@@ -373,3 +373,4 @@ const response = await fetch('https://YOUR_PROJECT_REF.supabase.co/functions/v1/
 1. **RLS 정책 먼저 설정**: `rls_policies.sql`을 Supabase SQL Editor에서 실행
 2. **인증 토큰 필요**: 모든 API 호출에 JWT 토큰 포함
 3. **환경 변수**: Supabase에서 자동으로 설정됨
+

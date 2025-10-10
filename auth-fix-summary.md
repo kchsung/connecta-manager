@@ -63,3 +63,4 @@ result = direct_client.get_campaigns()
 ## 🎉 **결과**
 
 이제 "Missing authorization header" 오류 없이 안전하게 데이터베이스에 접근할 수 있습니다!
+

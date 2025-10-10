@@ -81,3 +81,4 @@ streamlit run app.py
 - **성능 향상**: Edge Function으로 서버리스 처리
 - **유지보수성**: 중앙화된 API 관리
 - **확장성**: 필요에 따라 기능 추가 가능
+

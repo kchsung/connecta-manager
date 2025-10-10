@@ -216,6 +216,7 @@ class SimpleSupabaseClient:
                 offset += page_size
             
             self._debug_print(f"✅ 인플루언서 조회 성공: 총 {len(all_influencers)}개")
+            
             return all_influencers
         except Exception as e:
             self._handle_error(e, "인플루언서 조회")
@@ -388,7 +389,7 @@ class SimpleSupabaseClient:
             query = client.table('campaign_influencer_participations').select("""
                 *,
                 campaigns!inner(id, campaign_name, created_by),
-                connecta_influencers!inner(id, influencer_name, sns_id, platform, followers_count)
+                connecta_influencers!inner(id, influencer_name, sns_id, platform, followers_count, phone_number, shipping_address, email, kakao_channel_id)
             """)
             
             # 사용자 필터링 (RLS 정책 적용)
@@ -443,6 +444,10 @@ class SimpleSupabaseClient:
                         'sns_id': item.get('connecta_influencers', {}).get('sns_id'),
                         'platform': item.get('connecta_influencers', {}).get('platform'),
                         'followers_count': item.get('connecta_influencers', {}).get('followers_count'),
+                        'phone_number': item.get('connecta_influencers', {}).get('phone_number'),
+                        'shipping_address': item.get('connecta_influencers', {}).get('shipping_address'),
+                        'email': item.get('connecta_influencers', {}).get('email'),
+                        'kakao_channel_id': item.get('connecta_influencers', {}).get('kakao_channel_id'),
                     }
                     flattened_data.append(flattened_item)
                 
