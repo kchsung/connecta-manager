@@ -414,6 +414,10 @@ class SimpleSupabaseClient:
                 # 데이터 평면화
                 flattened_data = []
                 for item in result.data:
+                    # sample_status 값은 이미 DB enum과 UI가 동일하므로 그대로 사용
+                    db_sample_status = item.get('sample_status')
+                    ui_sample_status = db_sample_status
+                    
                     flattened_item = {
                         # 참여 기본 정보
                         'id': item.get('id'),
@@ -422,7 +426,7 @@ class SimpleSupabaseClient:
                         'manager_comment': item.get('manager_comment'),
                         'influencer_requests': item.get('influencer_requests'),
                         'memo': item.get('memo'),
-                        'sample_status': item.get('sample_status'),
+                        'sample_status': ui_sample_status,  # UI 값으로 변환
                         'influencer_feedback': item.get('influencer_feedback'),
                         'content_uploaded': item.get('content_uploaded'),
                         'cost_krw': item.get('cost_krw'),
@@ -457,6 +461,23 @@ class SimpleSupabaseClient:
             if not client:
                 return {"success": False, "message": "데이터베이스 연결 실패"}
             
+            # 자동 생성되는 필드들 제거 (데이터베이스에서 자동 설정)
+            auto_generated_fields = ['id', 'created_at', 'updated_at']
+            for field in auto_generated_fields:
+                if field in participation_data and (participation_data[field] is None or participation_data[field] == ''):
+                    del participation_data[field]
+            
+            # sample_status 값 검증 (DB enum 값과 일치하는지 확인)
+            if 'sample_status' in participation_data:
+                valid_statuses = ['요청', '발송준비', '발송완료', '수령']
+                original_status = participation_data['sample_status']
+                if original_status not in valid_statuses:
+                    participation_data['sample_status'] = '요청'  # 기본값
+            
+            # content_links가 빈 리스트인 경우 빈 배열로 설정
+            if 'content_links' in participation_data and not participation_data['content_links']:
+                participation_data['content_links'] = []
+            
             # 직접 Supabase 클라이언트 사용 (Edge Function 우회)
             result = client.table('campaign_influencer_participations').insert([participation_data]).execute()
             
@@ -481,6 +502,23 @@ class SimpleSupabaseClient:
             client = self.get_client()
             if not client:
                 return {"success": False, "message": "데이터베이스 연결 실패"}
+            
+            # 자동 생성되는 필드들 제거 (데이터베이스에서 자동 설정)
+            auto_generated_fields = ['id', 'created_at', 'updated_at']
+            for field in auto_generated_fields:
+                if field in update_data:
+                    del update_data[field]
+            
+            # sample_status 값 검증 (DB enum 값과 일치하는지 확인)
+            if 'sample_status' in update_data:
+                valid_statuses = ['요청', '발송준비', '발송완료', '수령']
+                original_status = update_data['sample_status']
+                if original_status not in valid_statuses:
+                    update_data['sample_status'] = '요청'  # 기본값
+            
+            # content_links가 빈 리스트인 경우 빈 배열로 설정
+            if 'content_links' in update_data and not update_data['content_links']:
+                update_data['content_links'] = []
             
             # 직접 Supabase 클라이언트 사용 (Edge Function 우회)
             result = client.table('campaign_influencer_participations').update(update_data).eq('id', participation_id).execute()
