@@ -535,31 +535,6 @@ def render_influencer_info_inline(influencer):
     st.markdown(f"**👥 팔로워 수:** {influencer.get('followers_count', 0):,}")
     st.markdown(f"**💬 카카오 채널 ID:** {influencer.get('kakao_channel_id', 'N/A')}")
     
-    # 프로필 텍스트 (멀티라인으로 표시) - 안전한 텍스트 표시
-    profile_text = influencer.get('profile_text')
-    if profile_text and profile_text.strip():
-        st.markdown("**📝 프로필 텍스트:**")
-        try:
-            # 특수 문자를 안전하게 처리
-            safe_profile_text = str(profile_text) if profile_text else ''
-            st.text_area(
-                "프로필 텍스트 내용",
-                value=safe_profile_text,
-                height=100,
-                disabled=True,
-                key=f"profile_text_{influencer['sns_id']}",
-                label_visibility="collapsed"
-            )
-        except Exception as e:
-            st.text_area(
-                "프로필 텍스트 내용",
-                value="[텍스트 표시 오류]",
-                height=100,
-                disabled=True,
-                key=f"profile_text_{influencer['sns_id']}",
-                label_visibility="collapsed"
-            )
-            st.caption(f"텍스트 표시 오류: {str(e)}")
 
 
 def render_campaign_participation_tab():
@@ -597,6 +572,12 @@ def render_campaign_participation_tab():
     
     campaign_id = campaign_options[selected_campaign_id]
     selected_campaign = next(c for c in campaigns if c['id'] == campaign_id)
+    
+    # 캠페인이 변경되면 페이징 상태 초기화
+    if f'last_campaign_id' not in st.session_state or st.session_state['last_campaign_id'] != campaign_id:
+        st.session_state['last_campaign_id'] = campaign_id
+        if f'participation_page_{campaign_id}' in st.session_state:
+            del st.session_state[f'participation_page_{campaign_id}']
     
     st.subheader(f"📊 {selected_campaign['campaign_name']} 참여 인플루언서")
     
@@ -675,7 +656,37 @@ def render_campaign_participation_tab():
         </style>
         """, unsafe_allow_html=True)
         
-        participations = db_manager.get_campaign_participations(campaign_id)
+        # 페이징 상태 초기화
+        if f'participation_page_{campaign_id}' not in st.session_state:
+            st.session_state[f'participation_page_{campaign_id}'] = 1
+        
+        current_page = st.session_state[f'participation_page_{campaign_id}']
+        
+        # 페이징된 데이터 조회
+        participation_result = db_manager.get_campaign_participations(campaign_id, page=current_page, page_size=5)
+        participations = participation_result.get('data', [])
+        total_count = participation_result.get('total_count', 0)
+        total_pages = participation_result.get('total_pages', 0)
+        
+        # 페이징 정보 및 페이지 선택 (상단)
+        if total_count > 0:
+            st.caption(f"총 {total_count}명의 참여인플루언서")
+            
+            # 페이지 선택 UI (상단)
+            if total_pages > 1:
+                # 페이지 선택 드롭다운만 표시
+                selected_page = st.selectbox(
+                    "페이지 선택",
+                    options=list(range(1, total_pages + 1)),
+                    index=current_page - 1,
+                    key=f"page_select_{campaign_id}",
+                    help="이동할 페이지를 선택하세요"
+                )
+                if selected_page != current_page:
+                    st.session_state[f'participation_page_{campaign_id}'] = selected_page
+                    st.rerun()
+                
+                st.markdown("---")
         
         if participations:
             # 스크롤 가능한 컨테이너로 목록 표시
@@ -773,8 +784,9 @@ def render_campaign_participation_tab():
             st.markdown(f"- **시작일:** {selected_campaign['start_date'][:10] if selected_campaign['start_date'] else 'N/A'}")
             st.markdown(f"- **종료일:** {selected_campaign['end_date'][:10] if selected_campaign['end_date'] else 'N/A'}")
             
-            if participations:
-                st.markdown(f"- **참여 인플루언서 수:** {len(participations)}명")
+            if total_count > 0:
+                st.markdown(f"- **참여 인플루언서 수:** {total_count}명")
+                st.markdown(f"- **현재 페이지:** {current_page}/{total_pages}")
             else:
                 st.markdown("- **참여 인플루언서 수:** 0명")
         
@@ -1574,16 +1586,6 @@ def render_influencer_detail_form(influencer):
         st.text_area("", value="[텍스트 표시 오류]", height=80, disabled=True, key=f"owner_comment_{influencer['id']}")
         st.caption(f"텍스트 표시 오류: {str(e)}")
     
-    # 프로필 텍스트 표시 - 안전한 텍스트 표시
-    if influencer.get('profile_text'):
-        st.markdown("**프로필 텍스트:**")
-        try:
-            # 특수 문자를 안전하게 처리
-            safe_profile_text = str(influencer['profile_text']) if influencer['profile_text'] else ''
-            st.text_area("", value=safe_profile_text, height=100, disabled=True, key=f"profile_text_{influencer['id']}")
-        except Exception as e:
-            st.text_area("", value="[텍스트 표시 오류]", height=100, disabled=True, key=f"profile_text_{influencer['id']}")
-            st.caption(f"텍스트 표시 오류: {str(e)}")
     
     # 추가 정보 섹션
     st.markdown("### 📞 연락처 정보")
@@ -1692,6 +1694,8 @@ def render_influencer_detail_form(influencer):
                 st.session_state[f"edit_phone_number_{influencer['id']}"] = influencer.get('phone_number') or ''
                 st.session_state[f"edit_email_{influencer['id']}"] = influencer.get('email') or ''
                 st.session_state[f"edit_kakao_channel_id_{influencer['id']}"] = influencer.get('kakao_channel_id') or ''
+                st.session_state[f"edit_followers_count_{influencer['id']}"] = influencer.get('followers_count') or 0
+                st.session_state[f"edit_influencer_name_{influencer['id']}"] = influencer.get('influencer_name') or ''
                 st.session_state[f"{form_key}_initialized"] = True
             
             col1, col2 = st.columns(2)
@@ -1833,6 +1837,29 @@ def render_influencer_detail_form(influencer):
                     placeholder="@channel_id"
                 )
             
+            # 기본 정보 (새로운 행)
+            st.markdown("**👤 기본 정보**")
+            col5, col6 = st.columns(2)
+            
+            with col5:
+                # 팔로워수
+                new_followers_count = st.number_input(
+                    "👥 팔로워수", 
+                    min_value=0,
+                    step=1,
+                    key=f"edit_followers_count_{influencer['id']}",
+                    help="인플루언서 팔로워 수"
+                )
+            
+            with col6:
+                # 이름
+                new_influencer_name = st.text_input(
+                    "👤 이름", 
+                    key=f"edit_influencer_name_{influencer['id']}",
+                    help="인플루언서 이름",
+                    placeholder="인플루언서 이름"
+                )
+            
             
             col1, col2 = st.columns(2)
             with col1:
@@ -1861,7 +1888,9 @@ def render_influencer_detail_form(influencer):
                         "shipping_address": new_shipping_address,
                         "phone_number": new_phone_number,
                         "email": new_email,
-                        "kakao_channel_id": new_kakao_channel_id
+                        "kakao_channel_id": new_kakao_channel_id,
+                        "followers_count": int(new_followers_count) if new_followers_count and new_followers_count > 0 else None,
+                        "influencer_name": new_influencer_name
                     }
                     
                     # 데이터베이스 업데이트
@@ -1964,7 +1993,7 @@ def render_performance_management_tab():
     # 모든 캠페인의 참여 인플루언서를 가져와서 표시
     all_participations = []
     for campaign in campaigns:
-        participations = db_manager.get_campaign_participations(campaign['id'])
+        participations = db_manager.get_all_campaign_participations(campaign['id'])
         for participation in participations:
             participation['campaign_name'] = campaign['campaign_name']
             participation['campaign_type'] = campaign['campaign_type']
@@ -2696,7 +2725,7 @@ def render_performance_report_tab():
     all_contents = []
     
     for campaign in campaigns:
-        participations = db_manager.get_campaign_participations(campaign['id'])
+        participations = db_manager.get_all_campaign_participations(campaign['id'])
         for participation in participations:
             participation['campaign_name'] = campaign['campaign_name']
             participation['campaign_type'] = campaign['campaign_type']

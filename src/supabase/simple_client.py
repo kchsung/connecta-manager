@@ -336,12 +336,12 @@ class SimpleSupabaseClient:
             return self._handle_error(e, "사용자 통계 조회")
     
     # 캠페인 참여 관련 메서드들
-    def get_campaign_participations(self, campaign_id: str = None, participation_id: str = None) -> List[Dict[str, Any]]:
-        """캠페인 참여 목록 조회"""
+    def get_campaign_participations(self, campaign_id: str = None, participation_id: str = None, page: int = 1, page_size: int = 5) -> Dict[str, Any]:
+        """캠페인 참여 목록 조회 (페이징 지원)"""
         try:
             client = self.get_client()
             if not client:
-                return []
+                return {"data": [], "total_count": 0, "total_pages": 0, "current_page": page}
             
             # 직접 Supabase 클라이언트 사용 (Edge Function 우회)
             query = client.table('campaign_influencer_participations').select("""
@@ -364,7 +364,19 @@ class SimpleSupabaseClient:
             if campaign_id:
                 query = query.eq('campaign_id', campaign_id)
             
-            result = query.order('created_at', desc=True).execute()
+            # 전체 개수 조회 (페이징을 위해)
+            count_query = client.table('campaign_influencer_participations').select("id", count="exact")
+            if campaign_id:
+                count_query = count_query.eq('campaign_id', campaign_id)
+            if participation_id:
+                count_query = count_query.eq('id', participation_id)
+            
+            count_result = count_query.execute()
+            total_count = count_result.count if count_result.count is not None else 0
+            
+            # 페이징 적용
+            offset = (page - 1) * page_size
+            result = query.order('created_at', desc=True).range(offset, offset + page_size - 1).execute()
             
             if result.data:
                 # 데이터 구조 디버깅
@@ -409,12 +421,32 @@ class SimpleSupabaseClient:
                     }
                     flattened_data.append(flattened_item)
                 
-                return flattened_data
+                total_pages = (total_count + page_size - 1) // page_size
+                
+                return {
+                    "data": flattened_data,
+                    "total_count": total_count,
+                    "total_pages": total_pages,
+                    "current_page": page,
+                    "page_size": page_size
+                }
             else:
-                return []
+                return {
+                    "data": [],
+                    "total_count": 0,
+                    "total_pages": 0,
+                    "current_page": page,
+                    "page_size": page_size
+                }
                 
         except Exception as e:
-            return []
+            return {
+                "data": [],
+                "total_count": 0,
+                "total_pages": 0,
+                "current_page": page,
+                "page_size": page_size
+            }
     
     def create_campaign_participation(self, participation_data: Dict[str, Any]) -> Dict[str, Any]:
         """캠페인 참여 생성"""

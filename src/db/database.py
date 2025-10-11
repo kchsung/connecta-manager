@@ -116,10 +116,20 @@ class DatabaseManager:
             return self._handle_error(e, "인플루언서 삭제")
     
     # 캠페인 참여 관련 메서드들
-    def get_campaign_participations(self, campaign_id: str) -> List[Dict[str, Any]]:
-        """캠페인 참여자 목록 조회"""
+    def get_campaign_participations(self, campaign_id: str, page: int = 1, page_size: int = 5) -> Dict[str, Any]:
+        """캠페인 참여자 목록 조회 (페이징 지원)"""
         try:
-            return simple_client.get_campaign_participations(campaign_id=campaign_id)
+            return simple_client.get_campaign_participations(campaign_id=campaign_id, page=page, page_size=page_size)
+        except Exception as e:
+            self._handle_error(e, "캠페인 참여자 조회")
+            return {"data": [], "total_count": 0, "total_pages": 0, "current_page": page, "page_size": page_size}
+    
+    def get_all_campaign_participations(self, campaign_id: str) -> List[Dict[str, Any]]:
+        """캠페인 참여자 목록 조회 (모든 데이터, 페이징 없음)"""
+        try:
+            # 큰 page_size로 설정하여 모든 데이터를 가져옴
+            result = simple_client.get_campaign_participations(campaign_id=campaign_id, page=1, page_size=1000)
+            return result.get('data', []) if isinstance(result, dict) else result
         except Exception as e:
             self._handle_error(e, "캠페인 참여자 조회")
             return []
