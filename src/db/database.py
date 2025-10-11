@@ -2,14 +2,12 @@ import streamlit as st
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from ..supabase.simple_client import simple_client
-from ..supabase.edge_function_client import EdgeFunctionClient
 from ..supabase.auth import supabase_auth
 from .models import Campaign, Influencer, CampaignInfluencer, CampaignInfluencerParticipation, PerformanceMetric
 
 class DatabaseManager:
     def __init__(self):
         self.client = None
-        self.edge_client = EdgeFunctionClient()
     
     def get_client(self):
         """간단한 Supabase 클라이언트 반환 (호환성을 위해 유지)"""

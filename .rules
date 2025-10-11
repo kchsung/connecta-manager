@@ -1,0 +1,62 @@
+# Connecta Manager 프로젝트 룰
+
+## 1. 데이터베이스
+- **Supabase Cloud DB 사용**: 모든 데이터베이스 작업은 Supabase Cloud DB를 사용
+- **Enum 값 참조**: 데이터베이스의 enum 값을 직접 참조하여 사용
+- **RLS 정책 적용**: Row Level Security 정책을 통해 사용자별 데이터 접근 제어
+
+## 2. Edge Functions
+- **connecta-manager-api.ts 참조**: Supabase Edge Function은 `supabase/functions/connecta-manager-api.ts`와 동일하게 구현
+- **API 엔드포인트**: 
+  - `/campaigns` - 캠페인 관리
+  - `/influencers` - 인플루언서 관리  
+  - `/campaign-participations` - 캠페인 참여 관리
+  - `/analytics` - 분석 및 통계
+
+## 3. 데이터베이스 스키마
+- **테이블 구조**: `supabase/db/` 폴더의 스키마 파일들을 참조
+- **주요 테이블**:
+  - `connecta_influencers` - 인플루언서 정보
+  - `campaigns` - 캠페인 정보
+  - `campaign_influencer_participations` - 캠페인 참여 정보
+  - `campaign_influencer_contents` - 콘텐츠 성과 정보
+  - `enums` - 공통 enum 값들
+
+## 4. 개발 원칙
+- **단일 클라이언트**: `simple_client.py`를 통한 데이터베이스 접근
+- **타입 안전성**: TypeScript/Python 타입 정의 준수
+- **에러 처리**: 일관된 에러 응답 형식 사용
+- **CORS 지원**: 모든 API는 CORS 헤더 포함
+
+## 5. 파일 구조
+```
+supabase/
+├── functions/
+│   └── connecta-manager-api.ts    # Edge Function API
+└── db/                            # 데이터베이스 스키마
+    ├── connecta_influencers.sql
+    ├── campaigns.sql
+    ├── campaign_influencer_participations.sql
+    ├── campaign_influencer_contents.sql
+    └── enums.sql
+
+tests/                              # 테스트 파일
+├── unit/                          # 단위 테스트
+├── integration/                   # 통합 테스트
+└── e2e/                          # End-to-End 테스트
+
+samples/                           # 샘플 파일
+├── data/                         # 샘플 데이터
+├── scripts/                      # 샘플 스크립트
+└── configs/                      # 샘플 설정 파일
+```
+
+## 6. 테스트 및 샘플 파일 관리
+- **테스트 파일**: 모든 테스트는 `tests/` 폴더 하위에 생성
+  - `tests/unit/`: 단위 테스트 (개별 함수/클래스 테스트)
+  - `tests/integration/`: 통합 테스트 (컴포넌트 간 상호작용 테스트)
+  - `tests/e2e/`: E2E 테스트 (전체 사용자 시나리오 테스트)
+- **샘플 파일**: 모든 샘플 데이터와 스크립트는 `samples/` 폴더 하위에 생성
+  - `samples/data/`: 샘플 데이터 파일 (Excel, JSON 등)
+  - `samples/scripts/`: 테스트 데이터 생성, 임포트 스크립트
+  - `samples/configs/`: 설정 파일 예시

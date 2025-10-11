@@ -373,7 +373,6 @@ def render_add_influencer_workflow(campaign_id):
     st.subheader("➕ 인플루언서 추가")
     
     # 1단계: 인플루언서 검색 (별도 폼)
-    st.markdown("### 1️⃣ 인플루언서 검색")
     with st.form("search_influencer_form"):
         col1, col2 = st.columns([1, 1])
         
@@ -459,11 +458,9 @@ def render_add_influencer_workflow(campaign_id):
     
     # 2단계: 검색된 인플루언서 정보 표시
     if selected_influencer:
-        st.markdown("### 2️⃣ 인플루언서 정보 확인")
         render_influencer_info_inline(selected_influencer)
         
         # 3단계: 담당자 의견 및 비용 입력 (별도 폼)
-        st.markdown("### 3️⃣ 담당자 의견 및 비용 입력")
         with st.form("add_influencer_form"):
             col1, col2 = st.columns(2)
             
