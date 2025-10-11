@@ -599,6 +599,25 @@ def render_campaign_participation_tab():
         # 참여 인플루언서 목록
         st.subheader("📋 참여 인플루언서 목록")
         
+        # SNS ID 검색 기능
+        search_col1, search_col2 = st.columns([3, 1])
+        with search_col1:
+            search_sns_id = st.text_input(
+                "🔍 SNS ID로 검색",
+                key=f"sns_search_{campaign_id}",
+                placeholder="인플루언서의 SNS ID를 입력하세요",
+                help="SNS ID의 일부만 입력해도 검색됩니다"
+            )
+        with search_col2:
+            if st.button("검색", key=f"search_btn_{campaign_id}"):
+                # 검색 버튼 클릭 시 페이지를 1로 리셋
+                st.session_state[f'participation_page_{campaign_id}'] = 1
+                st.rerun()
+        
+        # 검색어가 있으면 표시
+        if search_sns_id and search_sns_id.strip():
+            st.info(f"🔍 '{search_sns_id}'로 검색 중...")
+        
         # 참여 인플루언서 목록 컴팩트 스타일
         st.markdown("""
         <style>
@@ -670,8 +689,13 @@ def render_campaign_participation_tab():
         
         current_page = st.session_state[f'participation_page_{campaign_id}']
         
-        # 페이징된 데이터 조회
-        participation_result = db_manager.get_campaign_participations(campaign_id, page=current_page, page_size=5)
+        # 페이징된 데이터 조회 (검색어 포함)
+        participation_result = db_manager.get_campaign_participations(
+            campaign_id, 
+            page=current_page, 
+            page_size=5, 
+            search_sns_id=search_sns_id if search_sns_id and search_sns_id.strip() else None
+        )
         participations = participation_result.get('data', [])
         total_count = participation_result.get('total_count', 0)
         total_pages = participation_result.get('total_pages', 0)
@@ -709,8 +733,8 @@ def render_campaign_participation_tab():
                             # 모든 필드 정보 표시 (컴팩트하게)
                             st.markdown(f"**{participation.get('influencer_name', 'N/A')}**")
                             st.caption(f"📱 SNS ID: {participation.get('sns_id', 'N/A')} | 👥 팔로워: {participation.get('followers_count', 0):,}명")
-                            st.caption(f"🌐 플랫폼: {participation.get('platform', 'N/A')} | 📦 샘플상태: {participation.get('sample_status', 'N/A')}")
-                            st.caption(f"💰 비용: {participation.get('cost_krw', 0):,}원 | 📤 업로드: {'✅' if participation.get('content_uploaded', False) else '❌'}")
+                            st.caption(f"🌐 플랫폼: {participation.get('platform', 'N/A')} | 💰 비용: {participation.get('cost_krw', 0):,}원")
+                            st.caption(f"📤 업로드: {'✅' if participation.get('content_uploaded', False) else '❌'}")
                             
                             # 컨텐츠 링크 표시 (첫 번째 링크만)
                             content_links = participation.get('content_links', [])
@@ -755,7 +779,10 @@ def render_campaign_participation_tab():
                 
                 st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.info("이 캠페인에 참여한 인플루언서가 없습니다.")
+            if search_sns_id and search_sns_id.strip():
+                st.info(f"'{search_sns_id}'와 일치하는 참여인플루언서가 없습니다.")
+            else:
+                st.info("이 캠페인에 참여한 인플루언서가 없습니다.")
     
     with right_col:
         # 우측 패널 스타일
@@ -2026,8 +2053,114 @@ def render_performance_management_tab():
     else:
         filtered_participations = [p for p in all_participations if p['campaign_name'] == selected_campaign]
     
+    # 필터링 기능 추가
+    st.subheader("🔍 필터링 옵션")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        upload_filter = st.selectbox(
+            "업로드 여부",
+            ["전체", "업로드 완료", "업로드 미완료"],
+            key="upload_filter_performance",
+            help="업로드 상태에 따라 필터링합니다"
+        )
+    
+    with col2:
+        performance_filter = st.selectbox(
+            "성과 입력 여부",
+            ["전체", "성과 입력 완료", "성과 미입력"],
+            key="performance_filter_performance",
+            help="성과 입력 상태에 따라 필터링합니다"
+        )
+    
+    with col3:
+        sns_id_search = st.text_input(
+            "SNS ID 검색",
+            placeholder="인플루언서 SNS ID 입력...",
+            key="sns_id_search_performance",
+            help="SNS ID로 인플루언서를 검색합니다"
+        )
+    
+    with col4:
+        # 필터 적용 버튼
+        if st.button("🔍 필터 적용", key="apply_filter_performance"):
+            st.rerun()
+    
+    # 업로드 필터 적용
+    if upload_filter == "업로드 완료":
+        filtered_participations = [p for p in filtered_participations if p.get('content_uploaded', False)]
+    elif upload_filter == "업로드 미완료":
+        filtered_participations = [p for p in filtered_participations if not p.get('content_uploaded', False)]
+    
+    # 성과 입력 여부 필터 적용
+    if performance_filter == "성과 입력 완료":
+        # 성과가 입력된 인플루언서만 필터링 (campaign_influencer_contents 테이블에 데이터가 있는 경우)
+        filtered_participations = [p for p in filtered_participations if db_manager.get_campaign_influencer_contents(p['id'])]
+    elif performance_filter == "성과 미입력":
+        # 성과가 입력되지 않은 인플루언서만 필터링 (campaign_influencer_contents 테이블에 데이터가 없는 경우)
+        filtered_participations = [p for p in filtered_participations if not db_manager.get_campaign_influencer_contents(p['id'])]
+    
+    # SNS ID 검색 필터 적용
+    if sns_id_search and sns_id_search.strip():
+        search_term = sns_id_search.strip().lower()
+        filtered_participations = [
+            p for p in filtered_participations 
+            if (p.get('sns_id') and search_term in p.get('sns_id', '').lower()) or 
+               (p.get('influencer_name') and search_term in p.get('influencer_name', '').lower())
+        ]
+    
+    # 필터가 변경되면 페이지를 1로 초기화
+    filter_key = f"{selected_campaign}_{upload_filter}_{performance_filter}_{sns_id_search}"
+    if 'last_filter_key' not in st.session_state or st.session_state['last_filter_key'] != filter_key:
+        st.session_state['last_filter_key'] = filter_key
+        st.session_state['performance_page'] = 1
+    
+    # 페이징 설정
+    items_per_page = 5
+    total_items = len(filtered_participations)
+    total_pages = (total_items + items_per_page - 1) // items_per_page
+    
+    # 페이징 상태 초기화
+    if 'performance_page' not in st.session_state:
+        st.session_state['performance_page'] = 1
+    
+    # 현재 페이지가 총 페이지 수를 초과하면 마지막 페이지로 조정
+    if st.session_state['performance_page'] > total_pages and total_pages > 0:
+        st.session_state['performance_page'] = total_pages
+    
+    # 페이징 컨트롤 (드롭다운 형태로 변경)
+    if total_pages > 1:
+        st.subheader("📄 페이지 네비게이션")
+        col1, col2 = st.columns([1, 3])
+        
+        with col1:
+            # 페이지 선택 드롭다운
+            page_options = [f"페이지 {i}" for i in range(1, total_pages + 1)]
+            selected_page_text = st.selectbox(
+                "페이지 선택",
+                options=page_options,
+                index=st.session_state['performance_page'] - 1,
+                key="page_select_performance",
+                help=f"총 {total_pages}페이지 중 선택하세요"
+            )
+            
+            # 드롭다운에서 선택된 페이지로 업데이트
+            if selected_page_text:
+                selected_page_num = int(selected_page_text.split()[1])
+                if st.session_state['performance_page'] != selected_page_num:
+                    st.session_state['performance_page'] = selected_page_num
+                    st.rerun()
+        
+        with col2:
+            st.markdown(f"**총 {total_items}개 항목** (페이지 {st.session_state['performance_page']} / {total_pages})")
+    
+    # 현재 페이지에 해당하는 데이터만 표시
+    start_idx = (st.session_state['performance_page'] - 1) * items_per_page
+    end_idx = start_idx + items_per_page
+    current_page_participations = filtered_participations[start_idx:end_idx]
+    
     if not filtered_participations:
-        st.info("선택된 캠페인에 참여자가 없습니다.")
+        st.info("선택된 조건에 맞는 참여자가 없습니다.")
         return
     
     # 좌/우 레이아웃으로 변경 (반응형 고려)
@@ -2177,12 +2310,12 @@ def render_performance_management_tab():
         with st.container():
             st.markdown('<div class="performance-list">', unsafe_allow_html=True)
             
-            for i, participation in enumerate(filtered_participations):
+            for i, participation in enumerate(current_page_participations):
                 with st.container():
                     # 인플루언서 기본 정보
                     st.markdown(f"**{participation.get('influencer_name') or participation['sns_id']}**")
                     st.caption(f"캠페인: {participation['campaign_name']} ({participation['campaign_type']})")
-                    st.caption(f"플랫폼: {participation['platform']} | 샘플상태: {participation['sample_status']}")
+                    st.caption(f"플랫폼: {participation['platform']} | SNS ID: {participation.get('sns_id', 'N/A')}")
                     st.caption(f"비용: {participation['cost_krw']:,}원 | 업로드: {'✅' if participation['content_uploaded'] else '❌'}")
                     
                     # 성과 지표 표시 (campaign_influencer_contents 테이블에서)
@@ -2395,7 +2528,14 @@ def render_performance_input_modal():
     
     # 새 콘텐츠 추가
     st.markdown("**➕ 새 콘텐츠 추가**")
-    with st.form("add_content_form"):
+    
+    # 새 콘텐츠 추가 폼 (동적 키로 폼 초기화 보장)
+    form_key = f"add_content_form_{influencer['id']}"
+    if 'new_content_form_cleared' in st.session_state:
+        form_key = f"add_content_form_{influencer['id']}_{datetime.now().timestamp()}"
+        del st.session_state['new_content_form_cleared']
+    
+    with st.form(form_key):
         content_url = st.text_input(
             "콘텐츠 URL",
             placeholder="https://instagram.com/p/...",
@@ -2450,6 +2590,9 @@ def render_performance_input_modal():
                 result = db_manager.create_campaign_influencer_content(content_data)
                 if result.get("success"):
                     st.success("콘텐츠가 성공적으로 추가되었습니다!")
+                    # 콘텐츠 추가 성공 후 입력 영역 초기화를 위해 세션 상태 초기화
+                    if 'new_content_form_cleared' not in st.session_state:
+                        st.session_state['new_content_form_cleared'] = True
                     st.rerun()
                 else:
                     st.error(f"콘텐츠 추가 실패: {result.get('message', '알 수 없는 오류')}")
@@ -2917,18 +3060,128 @@ def render_performance_report_tab():
             # 날짜순 정렬
             sorted_dates = sorted(date_performance.items())
             
-            # 간단한 차트 표시
+            # 데이터프레임 생성
+            trend_data = []
+            for date, perf in sorted_dates:
+                trend_data.append({
+                    '날짜': date,
+                    '좋아요': perf['likes'],
+                    '조회수': perf['views'],
+                    '댓글': perf['comments']
+                })
+            
+            trend_df = pd.DataFrame(trend_data)
+            trend_df['날짜'] = pd.to_datetime(trend_df['날짜'])
+            trend_df = trend_df.set_index('날짜')
+            
+            # 그래프 표시
+            st.subheader("📈 일별 성과 트렌드")
+            
+            # 좋아요와 조회수 트렌드 차트
             col1, col2 = st.columns(2)
             
             with col1:
-                st.write("**일별 좋아요 트렌드**")
-                for date, perf in sorted_dates:
-                    st.write(f"{date}: {perf['likes']:,} 좋아요")
+                st.markdown("**❤️ 일별 좋아요 트렌드**")
+                st.line_chart(trend_df[['좋아요']], use_container_width=True)
+                
+                # 좋아요 통계
+                max_likes_date = trend_df['좋아요'].idxmax()
+                max_likes_value = trend_df['좋아요'].max()
+                st.metric("최고 좋아요", f"{max_likes_value:,}", f"{max_likes_date.strftime('%m/%d')}")
             
             with col2:
-                st.write("**일별 조회수 트렌드**")
-                for date, perf in sorted_dates:
-                    st.write(f"{date}: {perf['views']:,} 조회수")
+                st.markdown("**👁️ 일별 조회수 트렌드**")
+                st.line_chart(trend_df[['조회수']], use_container_width=True)
+                
+                # 조회수 통계
+                max_views_date = trend_df['조회수'].idxmax()
+                max_views_value = trend_df['조회수'].max()
+                st.metric("최고 조회수", f"{max_views_value:,}", f"{max_views_date.strftime('%m/%d')}")
+            
+            # 통합 트렌드 차트
+            st.markdown("**📊 통합 성과 트렌드**")
+            
+            # Plotly를 사용한 인터랙티브 차트
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+            
+            # 서브플롯 생성 (좋아요와 조회수용)
+            fig = make_subplots(
+                rows=2, cols=1,
+                subplot_titles=('❤️ 일별 좋아요 트렌드', '👁️ 일별 조회수 트렌드'),
+                vertical_spacing=0.1
+            )
+            
+            # 좋아요 차트
+            fig.add_trace(
+                go.Scatter(
+                    x=trend_df.index,
+                    y=trend_df['좋아요'],
+                    mode='lines+markers',
+                    name='좋아요',
+                    line=dict(color='#FF6B6B', width=3),
+                    marker=dict(size=8),
+                    hovertemplate='<b>%{x}</b><br>좋아요: %{y:,}<extra></extra>'
+                ),
+                row=1, col=1
+            )
+            
+            # 조회수 차트
+            fig.add_trace(
+                go.Scatter(
+                    x=trend_df.index,
+                    y=trend_df['조회수'],
+                    mode='lines+markers',
+                    name='조회수',
+                    line=dict(color='#4ECDC4', width=3),
+                    marker=dict(size=8),
+                    hovertemplate='<b>%{x}</b><br>조회수: %{y:,}<extra></extra>'
+                ),
+                row=2, col=1
+            )
+            
+            # 레이아웃 설정
+            fig.update_layout(
+                height=600,
+                showlegend=False,
+                title_text="📈 일별 성과 트렌드 분석",
+                title_x=0.5,
+                title_font_size=20
+            )
+            
+            # X축 설정
+            fig.update_xaxes(title_text="날짜", row=1, col=1)
+            fig.update_xaxes(title_text="날짜", row=2, col=1)
+            
+            # Y축 설정
+            fig.update_yaxes(title_text="좋아요 수", row=1, col=1)
+            fig.update_yaxes(title_text="조회수", row=2, col=1)
+            
+            # 차트 표시
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # 통계 요약
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                avg_likes = trend_df['좋아요'].mean()
+                st.metric("평균 좋아요", f"{avg_likes:,.0f}")
+            
+            with col2:
+                avg_views = trend_df['조회수'].mean()
+                st.metric("평균 조회수", f"{avg_views:,.0f}")
+            
+            with col3:
+                total_likes = trend_df['좋아요'].sum()
+                st.metric("총 좋아요", f"{total_likes:,}")
+            
+            with col4:
+                total_views = trend_df['조회수'].sum()
+                st.metric("총 조회수", f"{total_views:,}")
+            
+            # 원본 데이터 테이블
+            with st.expander("📋 상세 데이터 보기"):
+                st.dataframe(trend_df, use_container_width=True)
     
     # 샘플 상태별 분석
     st.subheader("📦 샘플 상태별 분석")

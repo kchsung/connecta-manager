@@ -116,10 +116,10 @@ class DatabaseManager:
             return self._handle_error(e, "인플루언서 삭제")
     
     # 캠페인 참여 관련 메서드들
-    def get_campaign_participations(self, campaign_id: str, page: int = 1, page_size: int = 5) -> Dict[str, Any]:
-        """캠페인 참여자 목록 조회 (페이징 지원)"""
+    def get_campaign_participations(self, campaign_id: str, page: int = 1, page_size: int = 5, search_sns_id: str = None) -> Dict[str, Any]:
+        """캠페인 참여자 목록 조회 (페이징 지원, SNS ID 검색 지원)"""
         try:
-            return simple_client.get_campaign_participations(campaign_id=campaign_id, page=page, page_size=page_size)
+            return simple_client.get_campaign_participations(campaign_id=campaign_id, page=page, page_size=page_size, search_sns_id=search_sns_id)
         except Exception as e:
             self._handle_error(e, "캠페인 참여자 조회")
             return {"data": [], "total_count": 0, "total_pages": 0, "current_page": page, "page_size": page_size}

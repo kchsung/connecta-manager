@@ -338,8 +338,8 @@ class SimpleSupabaseClient:
             return self._handle_error(e, "사용자 통계 조회")
     
     # 캠페인 참여 관련 메서드들
-    def get_campaign_participations(self, campaign_id: str = None, participation_id: str = None, page: int = 1, page_size: int = 5) -> Dict[str, Any]:
-        """캠페인 참여 목록 조회 (페이징 지원)"""
+    def get_campaign_participations(self, campaign_id: str = None, participation_id: str = None, page: int = 1, page_size: int = 5, search_sns_id: str = None) -> Dict[str, Any]:
+        """캠페인 참여 목록 조회 (페이징 지원, SNS ID 검색 지원)"""
         try:
             client = self.get_client()
             if not client:
@@ -366,12 +366,31 @@ class SimpleSupabaseClient:
             if campaign_id:
                 query = query.eq('campaign_id', campaign_id)
             
+            # SNS ID 검색 필터링
+            if search_sns_id and search_sns_id.strip():
+                query = query.ilike('connecta_influencers.sns_id', f'%{search_sns_id.strip()}%')
+            
             # 전체 개수 조회 (페이징을 위해)
-            count_query = client.table('campaign_influencer_participations').select("id", count="exact")
+            count_query = client.table('campaign_influencer_participations').select("""
+                id,
+                campaigns!inner(id, campaign_name, created_by),
+                connecta_influencers!inner(id, influencer_name, sns_id, platform, followers_count, phone_number, shipping_address, email, kakao_channel_id)
+            """, count="exact")
+            
+            # 사용자 필터링 (RLS 정책 적용)
+            if hasattr(self, '_get_current_user_id'):
+                user_id = self._get_current_user_id()
+                if user_id:
+                    count_query = count_query.eq('campaigns.created_by', user_id)
+            
             if campaign_id:
                 count_query = count_query.eq('campaign_id', campaign_id)
             if participation_id:
                 count_query = count_query.eq('id', participation_id)
+            
+            # SNS ID 검색 필터링 (count_query에도 적용)
+            if search_sns_id and search_sns_id.strip():
+                count_query = count_query.ilike('connecta_influencers.sns_id', f'%{search_sns_id.strip()}%')
             
             count_result = count_query.execute()
             total_count = count_result.count if count_result.count is not None else 0
