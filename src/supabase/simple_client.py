@@ -27,7 +27,6 @@ class SimpleSupabaseClient:
             dev_user_id = "dev-user-123"
             dev_email = "dev@example.com"
             
-            self._debug_print(f"🔧 개발 모드: anon key 사용하여 가상 사용자 세션 설정")
             
             # session_state에 가상 사용자 정보 설정
             st.session_state.user = {
@@ -37,33 +36,20 @@ class SimpleSupabaseClient:
             
             # anon key를 사용하므로 RLS 정책이 적용됨
             # 하지만 개발 모드에서는 가상 사용자로 데이터 접근
-            self._debug_print(f"✅ 개발 모드: 가상 사용자 세션 설정 완료 ({dev_user_id})")
             
         except Exception as e:
-            self._debug_print(f"❌ 개발 모드 세션 설정 실패: {e}")
+            pass
     
     def _get_service_role_client(self):
         """Service Role Key를 사용한 클라이언트 (RLS 우회) - 사용하지 않음"""
         # 이 메서드는 더 이상 사용하지 않음 (RLS 정책을 적용하기 위해)
         pass
     
-    def _is_dev_mode(self) -> bool:
-        """개발 모드 체크 공통 함수"""
-        return (
-            os.getenv("DEV_MODE", "false").lower() == "true" or
-            st.session_state.get("dev_mode", False) or
-            st.secrets.get("dev_mode", False)
-        )
     
-    def _debug_print(self, message: str):
-        """개발 모드일 때만 디버깅 메시지 출력"""
-        if self._is_dev_mode():
-            print(message)
     
     def _handle_error(self, error: Exception, operation: str) -> Dict[str, Any]:
         """에러 처리 공통 함수"""
         error_msg = str(error)
-        self._debug_print(f"데이터베이스 오류 ({operation}): {error_msg}")
         
         # 중복 제약조건 오류 감지
         if "duplicate key value violates unique constraint" in error_msg and "uq_platform_sns" in error_msg:
@@ -96,9 +82,7 @@ class SimpleSupabaseClient:
                 return []
             
             # 개발 모드일 때만 디버깅 메시지 표시
-            self._debug_print("🔍 캠페인 조회 시도...")
             response = client.table("campaigns").select("*").execute()
-            self._debug_print(f"✅ 캠페인 조회 성공: {len(response.data) if response.data else 0}개")
             return response.data if response.data else []
         except Exception as e:
             self._handle_error(e, "캠페인 조회")
@@ -122,11 +106,8 @@ class SimpleSupabaseClient:
             # UUID 형식이 아닌 문자열을 전달하면 오류가 발생하므로 null 사용
             if "created_by" in campaign_data:
                 del campaign_data["created_by"]  # 필드를 완전히 제거
-            self._debug_print("🔧 created_by 필드를 제거하여 데이터베이스 기본값 사용")
             
-            self._debug_print("🔍 캠페인 생성 시도...")
             response = client.table("campaigns").insert(campaign_data).execute()
-            self._debug_print(f"✅ 캠페인 생성 성공: {response.data[0]['id'] if response.data else 'None'}")
             
             if response.data:
                 return {
@@ -146,9 +127,7 @@ class SimpleSupabaseClient:
             if not client:
                 return {"success": False, "message": "데이터베이스 연결 실패"}
             
-            self._debug_print(f"🔍 캠페인 업데이트 시도: {campaign_id}")
             response = client.table("campaigns").update(update_data).eq("id", campaign_id).execute()
-            self._debug_print(f"✅ 캠페인 업데이트 성공")
             
             if response.data:
                 return {
@@ -168,9 +147,7 @@ class SimpleSupabaseClient:
             if not client:
                 return {"success": False, "message": "데이터베이스 연결 실패"}
             
-            self._debug_print(f"🔍 캠페인 삭제 시도: {campaign_id}")
             response = client.table("campaigns").delete().eq("id", campaign_id).execute()
-            self._debug_print(f"✅ 캠페인 삭제 성공")
             
             return {
                 "success": True,
@@ -187,7 +164,6 @@ class SimpleSupabaseClient:
             if not client:
                 return []
             
-            self._debug_print(f"🔍 인플루언서 조회 시도 (platform: {platform})")
             
             # 페이지네이션으로 모든 데이터 조회
             all_influencers = []
@@ -195,7 +171,6 @@ class SimpleSupabaseClient:
             offset = 0
             
             while True:
-                self._debug_print(f"  조회 중... offset: {offset}, limit: {page_size}")
                 query = client.table("connecta_influencers").select("*")
                 
                 if platform:
@@ -207,7 +182,6 @@ class SimpleSupabaseClient:
                     break
                     
                 all_influencers.extend(response.data)
-                self._debug_print(f"  조회된 레코드: {len(response.data)}개 (총 누적: {len(all_influencers)}개)")
                 
                 # 마지막 페이지인지 확인
                 if len(response.data) < page_size:
@@ -215,7 +189,6 @@ class SimpleSupabaseClient:
                     
                 offset += page_size
             
-            self._debug_print(f"✅ 인플루언서 조회 성공: 총 {len(all_influencers)}개")
             
             return all_influencers
         except Exception as e:
@@ -229,7 +202,6 @@ class SimpleSupabaseClient:
             if not client:
                 return {"success": False, "exists": False}
             
-            self._debug_print(f"🔍 인플루언서 정보 조회: {platform}/{sns_id}")
             response = client.table("connecta_influencers")\
                 .select("*")\
                 .eq("platform", platform)\
@@ -237,14 +209,12 @@ class SimpleSupabaseClient:
                 .execute()
             
             if response.data and len(response.data) > 0:
-                self._debug_print(f"✅ 인플루언서 찾음: {response.data[0]['influencer_name']}")
                 return {
                     "success": True,
                     "exists": True,
                     "data": response.data[0]
                 }
             else:
-                self._debug_print(f"❌ 인플루언서 없음: {platform}/{sns_id}")
                 return {
                     "success": True,
                     "exists": False,
@@ -268,12 +238,8 @@ class SimpleSupabaseClient:
             )
             
             # created_by 필드는 모델에서 제거되어 데이터베이스 기본값(auth.uid()) 사용
-            self._debug_print("🔧 created_by 필드는 모델에서 제거되어 데이터베이스 기본값 사용")
             
-            self._debug_print(f"🔍 인플루언서 생성 시도: {influencer_data.get('sns_id')}")
-            self._debug_print(f"🔍 전달되는 데이터: {influencer_data}")
             response = client.table("connecta_influencers").insert(influencer_data).execute()
-            self._debug_print(f"✅ 인플루언서 생성 성공: {response.data[0]['id'] if response.data else 'None'}")
             
             if response.data:
                 return {
@@ -293,9 +259,7 @@ class SimpleSupabaseClient:
             if not client:
                 return {"success": False, "message": "데이터베이스 연결 실패"}
             
-            self._debug_print(f"🔍 인플루언서 업데이트 시도: {influencer_id}")
             response = client.table("connecta_influencers").update(update_data).eq("id", influencer_id).execute()
-            self._debug_print(f"✅ 인플루언서 업데이트 성공")
             
             if response.data:
                 return {
@@ -315,9 +279,7 @@ class SimpleSupabaseClient:
             if not client:
                 return {"success": False, "message": "데이터베이스 연결 실패"}
             
-            self._debug_print(f"🔍 인플루언서 삭제 시도: {influencer_id}")
             response = client.table("connecta_influencers").delete().eq("id", influencer_id).execute()
-            self._debug_print(f"✅ 인플루언서 삭제 성공")
             
             return {
                 "success": True,
@@ -347,17 +309,14 @@ class SimpleSupabaseClient:
                     user = st.session_state.user
                     user_id = user.get('id', 'dev-user-123') if isinstance(user, dict) else user.id
                     user_email = user.get('email', 'dev@example.com') if isinstance(user, dict) else user.email
-                    self._debug_print(f"🔧 개발 모드: 세션 사용자 정보 사용 ({user_id})")
                 else:
                     user_id = "dev-user-123"
                     user_email = "dev@example.com"
-                    self._debug_print("🔧 개발 모드: 기본 사용자 정보 사용")
             else:
                 # 일반 모드: 기본 사용자 정보 사용
                 user_id = "default-user-123"
                 user_email = "default@example.com"
             
-            self._debug_print("🔍 사용자 통계 조회 시도...")
             # 간단한 통계 조회
             campaigns_response = client.table("campaigns").select("id").eq("created_by", user_id).execute()
             influencers_response = client.table("connecta_influencers").select("id").eq("created_by", user_id).execute()
@@ -369,7 +328,6 @@ class SimpleSupabaseClient:
                 "total_influencers": len(influencers_response.data) if influencers_response.data else 0
             }
             
-            self._debug_print(f"✅ 사용자 통계 조회 성공: {stats}")
             return {
                 "success": True,
                 "data": stats
@@ -456,7 +414,6 @@ class SimpleSupabaseClient:
                 return []
                 
         except Exception as e:
-            self._debug_print(f"❌ 참여 조회 오류: {str(e)}")
             return []
     
     def create_campaign_participation(self, participation_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -569,7 +526,6 @@ class SimpleSupabaseClient:
             if not client:
                 return []
             
-            self._debug_print(f"🔍 캠페인 콘텐츠 조회 시도: {participation_id}")
             
             # campaign_influencer_contents 테이블에서 조회
             response = client.table("campaign_influencer_contents")\
@@ -579,14 +535,11 @@ class SimpleSupabaseClient:
                 .execute()
             
             if response.data:
-                self._debug_print(f"✅ 캠페인 콘텐츠 조회 성공: {len(response.data)}개")
                 return response.data
             else:
-                self._debug_print("❌ 캠페인 콘텐츠 없음")
                 return []
                 
         except Exception as e:
-            self._debug_print(f"❌ 캠페인 콘텐츠 조회 오류: {str(e)}")
             return []
     
     def create_campaign_influencer_content(self, content_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -596,7 +549,6 @@ class SimpleSupabaseClient:
             if not client:
                 return {"success": False, "message": "데이터베이스 연결 실패"}
             
-            self._debug_print(f"🔍 캠페인 콘텐츠 생성 시도: {content_data.get('content_url')}")
             
             # created_by 필드는 null로 설정하여 데이터베이스 기본값(auth.uid()) 사용
             if "created_by" in content_data:
@@ -605,7 +557,6 @@ class SimpleSupabaseClient:
             response = client.table("campaign_influencer_contents").insert(content_data).execute()
             
             if response.data:
-                self._debug_print(f"✅ 캠페인 콘텐츠 생성 성공: {response.data[0]['id']}")
                 return {
                     "success": True,
                     "data": response.data[0],
@@ -624,12 +575,10 @@ class SimpleSupabaseClient:
             if not client:
                 return {"success": False, "message": "데이터베이스 연결 실패"}
             
-            self._debug_print(f"🔍 캠페인 콘텐츠 업데이트 시도: {content_id}")
             
             response = client.table("campaign_influencer_contents").update(update_data).eq("id", content_id).execute()
             
             if response.data:
-                self._debug_print(f"✅ 캠페인 콘텐츠 업데이트 성공")
                 return {
                     "success": True,
                     "data": response.data[0],
@@ -648,7 +597,6 @@ class SimpleSupabaseClient:
             if not client:
                 return {"success": False, "message": "데이터베이스 연결 실패"}
             
-            self._debug_print(f"🔍 캠페인 콘텐츠 삭제 시도: {content_id}")
             
             response = client.table("campaign_influencer_contents").delete().eq("id", content_id).execute()
             

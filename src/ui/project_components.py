@@ -400,57 +400,40 @@ def render_add_influencer_workflow(campaign_id):
         if not sns_id:
             st.error("SNS ID를 입력해주세요.")
         else:
-            # 인플루언서 검색 (개선된 로직 사용)
-            influencer_info = db_manager.get_influencer_info(platform, sns_id)
+            # 인플루언서 검색 (유연한 검색 로직 사용)
+            if platform == "전체":
+                # 모든 플랫폼에서 검색
+                search_result = search_single_influencer(sns_id)
+            else:
+                # 특정 플랫폼에서 검색
+                search_result = search_single_influencer_by_platform(sns_id, platform)
             
-            if influencer_info["success"] and influencer_info["exists"]:
-                selected_influencer = influencer_info["data"]
+            if search_result:
+                selected_influencer = search_result
                 st.session_state["selected_influencer_for_campaign"] = selected_influencer
-                st.success(f"✅ 인플루언서를 찾았습니다: {selected_influencer.get('influencer_name') or selected_influencer['sns_id']}")
+                st.success(f"✅ 인플루언서를 찾았습니다: {selected_influencer.get('influencer_name') or selected_influencer['sns_id']} ({selected_influencer.get('platform')})")
                 st.rerun()
             else:
-                # 더 자세한 오류 메시지 표시
-                error_message = influencer_info.get("message", "해당 인플루언서를 찾을 수 없습니다.")
-                st.error(error_message)
+                # 더 자세한 오류 메시지와 도움말 제공
+                platform_text = f" ({platform})" if platform != "전체" else ""
+                st.error(f"❌ '{sns_id}'{platform_text}를 찾을 수 없습니다.")
                 
-                # 디버깅 정보 표시
-                if "debug_info" in influencer_info:
-                    with st.expander("🔍 디버깅 정보", expanded=True):
-                        st.json(influencer_info["debug_info"])
-                        
-                        # 추가 디버깅 정보
-                        st.markdown("**📊 상세 디버깅 정보:**")
-                        debug_info = influencer_info["debug_info"]
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.write(f"**원본 SNS ID:** {debug_info.get('original_sns_id')}")
-                            st.write(f"**정리된 SNS ID:** {debug_info.get('clean_sns_id')}")
-                            st.write(f"**플랫폼:** {debug_info.get('platform')}")
-                            st.write(f"**정확한 매칭 시도:** {debug_info.get('exact_match_attempted')}")
-                            st.write(f"**정확한 매칭 결과:** {debug_info.get('exact_match_result')}")
-                        
-                        with col2:
-                            st.write(f"**정리된 매칭 시도:** {debug_info.get('clean_match_attempted')}")
-                            st.write(f"**정리된 매칭 결과:** {debug_info.get('clean_match_result')}")
-                            st.write(f"**대소문자 무시 검색:** {debug_info.get('case_insensitive_search')}")
-                            st.write(f"**대소문자 무시 결과:** {debug_info.get('case_insensitive_result')}")
-                            st.write(f"**부분 매칭 시도:** {debug_info.get('partial_match_attempted')}")
-                            st.write(f"**부분 매칭 결과:** {debug_info.get('partial_match_result')}")
-                        
-                        # 비활성화된 인플루언서 정보
-                        if "inactive_matches" in debug_info and debug_info["inactive_matches"]:
-                            st.warning("**⚠️ 비활성화된 인플루언서에서 일치하는 항목 발견:**")
-                            for inf in debug_info["inactive_matches"]:
-                                st.write(f"- SNS ID: {inf.get('sns_id')}, 이름: {inf.get('influencer_name')}, 활성: {inf.get('active')}")
-                        
-                        # 플랫폼의 모든 인플루언서
-                        if "all_influencers_in_platform" in debug_info:
-                            st.write(f"**📋 해당 플랫폼의 모든 활성 인플루언서 ({len(debug_info['all_influencers_in_platform'])}명):**")
-                            for inf in debug_info["all_influencers_in_platform"][:10]:  # 처음 10개만 표시
-                                st.write(f"- {inf.get('sns_id')} ({inf.get('influencer_name') or '이름 없음'})")
-                            if len(debug_info["all_influencers_in_platform"]) > 10:
-                                st.write(f"... 외 {len(debug_info['all_influencers_in_platform']) - 10}명 더")
+                # 도움말 제공
+                with st.expander("💡 검색 도움말", expanded=False):
+                    st.markdown("""
+                    **검색 팁:**
+                    - SNS ID를 정확히 입력해주세요 (예: `username` 또는 `@username`)
+                    - 플랫폼을 선택하면 해당 플랫폼에서만 검색합니다
+                    - "전체"를 선택하면 모든 플랫폼에서 검색합니다
+                    - 대소문자는 구분하지 않습니다
+                    - 인플루언서 이름으로도 검색할 수 있습니다
+                    - 부분 검색도 지원됩니다
+                    
+                    **문제가 계속되면:**
+                    1. 인플루언서가 먼저 등록되어 있는지 확인하세요
+                    2. 플랫폼이 올바른지 확인하세요
+                    3. SNS ID에 오타가 없는지 확인하세요
+                    """)
     
     # 세션에서 선택된 인플루언서 가져오기
     if "selected_influencer_for_campaign" in st.session_state:

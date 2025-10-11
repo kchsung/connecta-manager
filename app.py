@@ -271,9 +271,9 @@ def render_sidebar():
         st.markdown("### 📋 관리 메뉴")
         
         management_menu_options = {
+            'influencer_management': '👥 인플루언서 관리',
             'campaign_management': '📁 캠페인 관리',
-            'performance_management': '📊 성과 관리',
-            'influencer_management': '👥 인플루언서 관리'
+            'performance_management': '📊 성과 관리'
         }
         
         for page_key, page_title in management_menu_options.items():
