@@ -83,6 +83,8 @@ class SimpleSupabaseClient:
             
             # 개발 모드일 때만 디버깅 메시지 표시
             response = client.table("campaigns").select("*").execute()
+            
+            
             return response.data if response.data else []
         except Exception as e:
             self._handle_error(e, "캠페인 조회")

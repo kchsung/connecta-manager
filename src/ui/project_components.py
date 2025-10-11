@@ -282,10 +282,7 @@ def render_campaign_edit_form(campaign):
                 key=f"edit_desc_{campaign['id']}"
             )
             
-            # 기존 상태값을 안전하게 처리 (canceled -> cancelled 변환)
             current_status = campaign.get('status', 'planned')
-            if current_status == 'canceled':
-                current_status = 'cancelled'
             
             status_options = ["planned", "active", "paused", "completed", "cancelled"]
             try:

@@ -32,6 +32,6 @@ create trigger set_timestamp_campaigns BEFORE
 update on campaigns for EACH row
 execute FUNCTION trigger_set_timestamp ();
 
-create trigger trg_campaign_status_transition BEFORE
-update OF status on campaigns for EACH row
-execute FUNCTION validate_campaign_status_transition ();
+-- create trigger trg_campaign_status_transition BEFORE
+-- update OF status on campaigns for EACH row
+-- execute FUNCTION validate_campaign_status_transition ();

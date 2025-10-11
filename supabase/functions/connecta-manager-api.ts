@@ -270,6 +270,8 @@ async function handleUpdateCampaign(req: Request, supabase: any, userId: string,
       })
     }
 
+    console.log('🔍 Edge Function - 업데이트 데이터:', body)
+    
     const { data, error } = await supabase
       .from('campaigns')
       .update({
