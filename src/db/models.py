@@ -25,7 +25,7 @@ class Campaign(BaseModel):
     campaign_type: str  # seeding, promotion, sales
     start_date: datetime
     end_date: Optional[datetime] = None
-    status: str = "planned"  # planned, active, paused, completed, canceled
+    status: str = "planned"  # planned, active, paused, completed, cancelled
     campaign_instructions: Optional[str] = None  # 캠페인 지시사항
     tags: Optional[str] = None  # 관련 Tag정보(쉼표로 구분된 문자열)
     # created_at, updated_at 필드는 제거 - 데이터베이스에서 자동으로 설정됨

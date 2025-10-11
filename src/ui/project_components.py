@@ -98,14 +98,14 @@ def render_campaign_tab():
                 campaign_description = st.text_area("캠페인 설명", placeholder="캠페인에 대한 상세 설명을 입력하세요")
                 status = st.selectbox(
                     "캠페인 상태",
-                    ["planned", "active", "paused", "completed", "canceled"],
+                    ["planned", "active", "paused", "completed", "cancelled"],
                     key="create_campaign_status",
                     format_func=lambda x: {
                         "planned": "📅 계획됨",
                         "active": "🟢 진행중",
                         "paused": "⏸️ 일시정지",
                         "completed": "✅ 완료",
-                        "canceled": "❌ 취소"
+                        "cancelled": "❌ 취소"
                     }[x]
                 )
                 end_date = st.date_input("캠페인 종료일", value=None)
@@ -170,8 +170,8 @@ def render_campaign_tab():
         # 캠페인 상태 필터
         campaign_status_filter = st.selectbox(
             "캠페인 상태",
-            options=["전체", "planned", "active", "paused", "completed", "canceled"],
-            index=0 if "campaign_status_filter" not in st.session_state else ["전체", "planned", "active", "paused", "completed", "canceled"].index(st.session_state.get("campaign_status_filter", "전체")),
+            options=["전체", "planned", "active", "paused", "completed", "cancelled"],
+            index=0 if "campaign_status_filter" not in st.session_state else ["전체", "planned", "active", "paused", "completed", "cancelled"].index(st.session_state.get("campaign_status_filter", "전체")),
             key="campaign_status_filter",
             help="캠페인 상태로 필터링합니다"
         )
@@ -284,15 +284,15 @@ def render_campaign_edit_form(campaign):
             
             status = st.selectbox(
                 "캠페인 상태",
-                ["planned", "active", "paused", "completed", "canceled"],
-                index=["planned", "active", "paused", "completed", "canceled"].index(campaign.get('status', 'planned')),
+                ["planned", "active", "paused", "completed", "cancelled"],
+                index=["planned", "active", "paused", "completed", "cancelled"].index(campaign.get('status', 'planned')),
                 key=f"edit_status_{campaign['id']}",
                 format_func=lambda x: {
                     "planned": "📅 계획됨",
                     "active": "🟢 진행중",
                     "paused": "⏸️ 일시정지",
                     "completed": "✅ 완료",
-                    "canceled": "❌ 취소"
+                    "cancelled": "❌ 취소"
                 }[x]
             )
             
