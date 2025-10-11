@@ -1295,45 +1295,56 @@ def search_single_influencer(search_term: str):
 def search_single_influencer_by_platform(search_term: str, platform: str):
     """특정 플랫폼에서 단일 인플루언서 검색"""
     try:
-        # 특정 플랫폼의 인플루언서만 조회
-        platform_influencers = db_manager.get_influencers(platform=platform)
+        # Supabase에서 직접 검색 (특정 플랫폼)
+        simple_client_instance = db_manager.get_client()
+        client = simple_client_instance.get_client()
+        
+        if not client:
+            st.error("데이터베이스 연결에 실패했습니다.")
+            return None
         
         # 검색어 정규화 (@ 제거, 공백 제거, 소문자 변환)
         clean_search_term = search_term.replace('@', '').strip().lower()
         
         # 1단계: 정확한 매칭 시도 (원본 검색어)
-        for influencer in platform_influencers:
-            sns_id = influencer.get('sns_id', '').lower()
-            name = (influencer.get('influencer_name', '') or '').lower()
-            search_lower = search_term.lower()
-            
-            if search_lower == sns_id or search_lower == name:
-                return influencer
+        exact_search = client.table("connecta_influencers")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active")\
+            .eq("platform", platform)\
+            .or_(f"sns_id.eq.{search_term},influencer_name.eq.{search_term}")\
+            .execute()
+        
+        if exact_search.data:
+            return exact_search.data[0]
         
         # 2단계: 정리된 검색어로 정확한 매칭
-        for influencer in platform_influencers:
-            sns_id = influencer.get('sns_id', '').replace('@', '').strip().lower()
-            name = (influencer.get('influencer_name', '') or '').strip().lower()
-            
-            if clean_search_term == sns_id or clean_search_term == name:
-                return influencer
+        clean_exact_search = client.table("connecta_influencers")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active")\
+            .eq("platform", platform)\
+            .or_(f"sns_id.eq.{clean_search_term},influencer_name.eq.{clean_search_term}")\
+            .execute()
+        
+        if clean_exact_search.data:
+            return clean_exact_search.data[0]
         
         # 3단계: 부분 매칭 시도 (SNS ID 우선)
-        for influencer in platform_influencers:
-            sns_id = influencer.get('sns_id', '').replace('@', '').strip().lower()
-            name = (influencer.get('influencer_name', '') or '').strip().lower()
-            
-            if clean_search_term in sns_id or clean_search_term in name:
-                return influencer
+        partial_search = client.table("connecta_influencers")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active")\
+            .eq("platform", platform)\
+            .or_(f"sns_id.ilike.%{clean_search_term}%,influencer_name.ilike.%{clean_search_term}%")\
+            .execute()
+        
+        if partial_search.data:
+            return partial_search.data[0]
         
         # 4단계: 원본 검색어로 부분 매칭
-        for influencer in platform_influencers:
-            sns_id = influencer.get('sns_id', '').lower()
-            name = (influencer.get('influencer_name', '') or '').lower()
-            search_lower = search_term.lower()
-            
-            if search_lower in sns_id or search_lower in name:
-                return influencer
+        original_partial_search = client.table("connecta_influencers")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active")\
+            .eq("platform", platform)\
+            .or_(f"sns_id.ilike.%{search_term}%,influencer_name.ilike.%{search_term}%")\
+            .execute()
+        
+        if original_partial_search.data:
+            return original_partial_search.data[0]
         
         return None
     except Exception as e:
