@@ -282,10 +282,21 @@ def render_campaign_edit_form(campaign):
                 key=f"edit_desc_{campaign['id']}"
             )
             
+            # 기존 상태값을 안전하게 처리 (canceled -> cancelled 변환)
+            current_status = campaign.get('status', 'planned')
+            if current_status == 'canceled':
+                current_status = 'cancelled'
+            
+            status_options = ["planned", "active", "paused", "completed", "cancelled"]
+            try:
+                status_index = status_options.index(current_status)
+            except ValueError:
+                status_index = 0  # 기본값으로 'planned' 선택
+            
             status = st.selectbox(
                 "캠페인 상태",
-                ["planned", "active", "paused", "completed", "cancelled"],
-                index=["planned", "active", "paused", "completed", "cancelled"].index(campaign.get('status', 'planned')),
+                status_options,
+                index=status_index,
                 key=f"edit_status_{campaign['id']}",
                 format_func=lambda x: {
                     "planned": "📅 계획됨",
