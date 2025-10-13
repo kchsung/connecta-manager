@@ -660,6 +660,149 @@ class SimpleSupabaseClient:
                 
         except Exception as e:
             return self._handle_error(e, "콘텐츠 삭제")
+    
+    def get_participation_by_campaign_and_influencer(self, campaign_id: str, influencer_id: str) -> Dict[str, Any]:
+        """특정 캠페인과 인플루언서의 참여 정보 조회"""
+        try:
+            client = self.get_client()
+            if not client:
+                return {"success": False, "message": "데이터베이스 연결 실패"}
+            
+            response = client.table("campaign_influencer_participations").select("*").eq("campaign_id", campaign_id).eq("influencer_id", influencer_id).execute()
+            
+            if response.data:
+                return {
+                    "success": True,
+                    "data": response.data[0]
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": "참여 정보를 찾을 수 없습니다."
+                }
+                
+        except Exception as e:
+            return self._handle_error(e, "참여 정보 조회")
+    
+    # 성과 지표 관련 메서드들
+    def create_performance_metric(self, metric_data: Dict[str, Any]) -> Dict[str, Any]:
+        """성과 지표 생성"""
+        try:
+            client = self.get_client()
+            if not client:
+                return {"success": False, "message": "데이터베이스 연결 실패"}
+            
+            # 자동 생성되는 필드들 제거
+            auto_generated_fields = ['id', 'created_at', 'updated_at']
+            for field in auto_generated_fields:
+                if field in metric_data and (metric_data[field] is None or metric_data[field] == ''):
+                    del metric_data[field]
+            
+            response = client.table("performance_metrics").insert(metric_data).execute()
+            
+            if response.data:
+                return {
+                    "success": True,
+                    "data": response.data[0],
+                    "message": "성과 지표가 성공적으로 생성되었습니다."
+                }
+            else:
+                return {"success": False, "message": "성과 지표 생성에 실패했습니다."}
+        except Exception as e:
+            return self._handle_error(e, "성과 지표 생성")
+    
+    def get_performance_metrics_by_influencer(self, influencer_id: str) -> List[Dict[str, Any]]:
+        """인플루언서별 성과 지표 조회"""
+        try:
+            client = self.get_client()
+            if not client:
+                return []
+            
+            # participation_id를 통해 influencer_id와 연결된 성과 지표 조회
+            response = client.table("performance_metrics")\
+                .select("""
+                    *,
+                    campaign_influencer_participations!inner(
+                        id,
+                        influencer_id,
+                        campaign_id,
+                        campaigns!inner(campaign_name)
+                    )
+                """)\
+                .eq("campaign_influencer_participations.influencer_id", influencer_id)\
+                .order("created_at", desc=True)\
+                .execute()
+            
+            if response.data:
+                return response.data
+            else:
+                return []
+        except Exception as e:
+            self._handle_error(e, "성과 지표 조회")
+            return []
+    
+    def get_performance_metrics_by_participation(self, participation_id: str) -> List[Dict[str, Any]]:
+        """참여별 성과 지표 조회"""
+        try:
+            client = self.get_client()
+            if not client:
+                return []
+            
+            response = client.table("performance_metrics")\
+                .select("*")\
+                .eq("participation_id", participation_id)\
+                .order("created_at", desc=True)\
+                .execute()
+            
+            if response.data:
+                return response.data
+            else:
+                return []
+        except Exception as e:
+            self._handle_error(e, "성과 지표 조회")
+            return []
+    
+    def update_performance_metric(self, metric_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
+        """성과 지표 업데이트"""
+        try:
+            client = self.get_client()
+            if not client:
+                return {"success": False, "message": "데이터베이스 연결 실패"}
+            
+            # 자동 생성되는 필드들 제거
+            auto_generated_fields = ['id', 'created_at', 'updated_at']
+            for field in auto_generated_fields:
+                if field in update_data:
+                    del update_data[field]
+            
+            response = client.table("performance_metrics").update(update_data).eq("id", metric_id).execute()
+            
+            if response.data:
+                return {
+                    "success": True,
+                    "data": response.data[0],
+                    "message": "성과 지표가 성공적으로 업데이트되었습니다."
+                }
+            else:
+                return {"success": False, "message": "성과 지표 업데이트에 실패했습니다."}
+        except Exception as e:
+            return self._handle_error(e, "성과 지표 업데이트")
+    
+    def delete_performance_metric(self, metric_id: str) -> Dict[str, Any]:
+        """성과 지표 삭제"""
+        try:
+            client = self.get_client()
+            if not client:
+                return {"success": False, "message": "데이터베이스 연결 실패"}
+            
+            response = client.table("performance_metrics").delete().eq("id", metric_id).execute()
+            
+            return {
+                "success": True,
+                "message": "성과 지표가 성공적으로 삭제되었습니다."
+            }
+        except Exception as e:
+            return self._handle_error(e, "성과 지표 삭제")
 
 # 전역 인스턴스
 simple_client = SimpleSupabaseClient()

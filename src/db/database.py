@@ -159,13 +159,30 @@ class DatabaseManager:
         except Exception as e:
             return self._handle_error(e, "캠페인 참여 업데이트")
     
+    def get_participation_by_campaign_and_influencer(self, campaign_id: str, influencer_id: str) -> Dict[str, Any]:
+        """특정 캠페인과 인플루언서의 참여 정보 조회"""
+        try:
+            result = simple_client.get_participation_by_campaign_and_influencer(campaign_id, influencer_id)
+            return result
+        except Exception as e:
+            return self._handle_error(e, "참여 정보 조회")
+    
     # 성과 지표 관련 메서드들
     def get_campaign_influencer_contents(self, participation_id: str) -> List[Dict[str, Any]]:
         """캠페인 인플루언서 콘텐츠 조회"""
         try:
             return simple_client.get_campaign_influencer_contents(participation_id)
         except Exception as e:
-            return self._handle_error(e, "캠페인 콘텐츠 조회")
+            self._handle_error(e, "캠페인 콘텐츠 조회")
+            return []
+    
+    def get_performance_data_by_participation(self, participation_id: str) -> List[Dict[str, Any]]:
+        """참여별 성과 데이터 조회 (campaign_influencer_contents 테이블 기반)"""
+        try:
+            return simple_client.get_campaign_influencer_contents(participation_id)
+        except Exception as e:
+            self._handle_error(e, "성과 데이터 조회")
+            return []
     
     def create_campaign_influencer_content(self, content_data: Dict[str, Any]) -> Dict[str, Any]:
         """캠페인 인플루언서 콘텐츠 생성"""
@@ -190,8 +207,44 @@ class DatabaseManager:
     
     def create_performance_metric(self, metric: PerformanceMetric) -> Dict[str, Any]:
         """성과 지표 생성"""
-        # TODO: Edge Function에서 campaign-contents 구현 후 연결
-        return {"success": False, "message": "성과 지표 기능은 아직 구현 중입니다."}
+        try:
+            metric_data = metric.dict()
+            result = simple_client.create_performance_metric(metric_data)
+            return result
+        except Exception as e:
+            return self._handle_error(e, "성과 지표 생성")
+    
+    def get_performance_metrics_by_influencer(self, influencer_id: str) -> List[Dict[str, Any]]:
+        """인플루언서별 성과 지표 조회"""
+        try:
+            return simple_client.get_performance_metrics_by_influencer(influencer_id)
+        except Exception as e:
+            self._handle_error(e, "성과 지표 조회")
+            return []
+    
+    def get_performance_metrics_by_participation(self, participation_id: str) -> List[Dict[str, Any]]:
+        """참여별 성과 지표 조회"""
+        try:
+            return simple_client.get_performance_metrics_by_participation(participation_id)
+        except Exception as e:
+            self._handle_error(e, "성과 지표 조회")
+            return []
+    
+    def update_performance_metric(self, metric_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
+        """성과 지표 업데이트"""
+        try:
+            result = simple_client.update_performance_metric(metric_id, update_data)
+            return result
+        except Exception as e:
+            return self._handle_error(e, "성과 지표 업데이트")
+    
+    def delete_performance_metric(self, metric_id: str) -> Dict[str, Any]:
+        """성과 지표 삭제"""
+        try:
+            result = simple_client.delete_performance_metric(metric_id)
+            return result
+        except Exception as e:
+            return self._handle_error(e, "성과 지표 삭제")
     
     def get_user_stats(self) -> Dict[str, Any]:
         """사용자 통계 조회"""

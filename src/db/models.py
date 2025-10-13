@@ -97,7 +97,7 @@ class PerformanceMetric(BaseModel):
     id: Optional[str] = None
     participation_id: str  # campaign_influencer_participations 테이블의 id
     content_link: Optional[str] = None  # 컨텐츠별 성과 입력을 위한 링크
-    metric_type: str  # likes, comments, shares, views, clicks, conversions
+    metric_type: str  # likes, comments, is_rels, views, clicks, conversions
     metric_value: int = 0
     qualitative_evaluation: Optional[str] = None  # 정성평가 (매우 좋음, 좋음, 보통, 나쁨, 매우 나쁨)
     measurement_date: Optional[datetime] = None

@@ -154,7 +154,7 @@ interface CampaignContent {
   qualitative_note?: string
   likes?: number
   comments?: number
-  shares?: number
+  is_rels?: number
   views?: number
   clicks?: number
   conversions?: number
@@ -498,7 +498,7 @@ async function getOverviewStats(supabase: any, userId: string) {
       .select(`
         likes,
         comments,
-        shares,
+        is_rels,
         views,
         clicks,
         conversions,

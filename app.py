@@ -22,12 +22,13 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="streamlit")
 # ── Path ─────────────────────────────────────────────────────
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# 크롤링 컴포넌트 import가 제거되었습니다.
+# 분리된 컴포넌트들 import
 from src.ui.project_components import (
-    render_single_url_crawl, render_batch_url_crawl,
-    render_campaign_management, render_performance_management, render_performance_crawl,
-    render_influencer_management
+    render_single_url_crawl, render_batch_url_crawl
 )
+from src.ui.campaign_components import render_campaign_management
+from src.ui.performance_components import render_performance_management, render_performance_crawl
+from src.ui.influencer_components import render_influencer_management
 
 
 # ── CSS ──────────────────────────────────────────────────────

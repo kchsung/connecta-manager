@@ -16,3 +16,6 @@ CREATE TYPE contact_method AS ENUM ('dm', 'email', 'phone', 'kakao', 'form', 'ot
 
 -- 샘플 상태
 CREATE TYPE sample_status AS ENUM ('요청', '발송준비', '발송완료', '수령');
+
+-- 인플루언서 선호 모드
+CREATE TYPE influencer_pref AS ENUM ('seeding', 'promotion', 'sales');
