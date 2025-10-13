@@ -16,12 +16,12 @@ from .common_functions import (
 def render_influencer_management():
     """인플루언서 관리 메인 컴포넌트"""
     st.subheader("👥 인플루언서 관리")
-    st.markdown("인플루언서 등록과 조회 기능을 제공합니다.")
+    st.markdown("인플루언서 등록과 수정, 조회 기능을 제공합니다.")
     
     # 탭 간 이동 처리 (담당자별 관리에서는 수정 기능이 없으므로 제거)
     
     # 등록, 조회, 담당자별 관리 탭으로 분리 (통계는 별도 메뉴로 분리)
-    tab_names = ["📝 인플루언서 등록", "📋 인플루언서 정보 관리", "👥 담당자별 인플루언서 관리"]
+    tab_names = ["📝 인플루언서 등록", "📋 인플루언서 정보 수정", "👥 담당자별 인플루언서 관리"]
     
     # 기본 탭 인덱스 설정
     default_tab = st.session_state.get("influencer_active_tab", 0)
@@ -811,8 +811,8 @@ def render_manager_influencer_management():
             st.warning("등록된 담당자가 없습니다.")
             return
         
-        # 담당자 선택
-        col1, col2 = st.columns([2, 1])
+        # 필터링 조건
+        col1, col2, col3 = st.columns([2, 2, 1])
         
         with col1:
             selected_manager = st.selectbox(
@@ -823,22 +823,136 @@ def render_manager_influencer_management():
             )
         
         with col2:
+            # 등록날짜 필터링 조건 추가 - 달력 기반
+            st.markdown("**📅 등록날짜 필터**")
+            
+            # 날짜 범위 선택 방식
+            date_filter_type = st.radio(
+                "날짜 필터 방식",
+                ["전체", "기간 선택", "특정일"],
+                key="date_filter_type",
+                horizontal=True,
+                format_func=lambda x: {
+                    "전체": "🌐 전체",
+                    "기간 선택": "📅 기간",
+                    "특정일": "📆 특정일"
+                }[x]
+            )
+            
+            # 날짜 필터링 로직을 위한 변수 초기화
+            date_filter = "전체"
+            start_date = None
+            end_date = None
+            specific_date = None
+            
+            if date_filter_type == "기간 선택":
+                col_start, col_end = st.columns(2)
+                with col_start:
+                    start_date = st.date_input(
+                        "시작일",
+                        value=None,
+                        key="date_filter_start"
+                    )
+                with col_end:
+                    end_date = st.date_input(
+                        "종료일", 
+                        value=None,
+                        key="date_filter_end"
+                    )
+                
+                if start_date and end_date:
+                    if start_date <= end_date:
+                        date_filter = "기간"
+                    else:
+                        st.error("시작일은 종료일보다 이전이어야 합니다.")
+                        date_filter = "전체"
+                elif start_date or end_date:
+                    st.warning("시작일과 종료일을 모두 선택해주세요.")
+                    date_filter = "전체"
+                    
+            elif date_filter_type == "특정일":
+                specific_date = st.date_input(
+                    "선택일",
+                    value=None,
+                    key="date_filter_specific"
+                )
+                if specific_date:
+                    date_filter = "특정일"
+        
+        with col3:
             if st.button("🔄 새로고침", key="manager_refresh"):
                 # 캐시 초기화
                 if "manager_filtered_influencers" in st.session_state:
                     del st.session_state["manager_filtered_influencers"]
                 st.rerun()
         
-        # 선택된 담당자에 따른 인플루언서 필터링
+        # 담당자 필터링
         if selected_manager == "전체":
             filtered_influencers = all_influencers
-            st.info(f"📊 전체 담당자의 인플루언서: {len(filtered_influencers)}명")
         else:
             filtered_influencers = [
                 inf for inf in all_influencers 
                 if inf.get('created_by') and inf.get('created_by').strip() == selected_manager
             ]
-            st.info(f"📊 {selected_manager} 담당자의 인플루언서: {len(filtered_influencers)}명")
+        
+        # 등록날짜 필터링 - 달력 기반
+        if date_filter != "전체":
+            from datetime import datetime, timedelta
+            import pandas as pd
+            
+            # 날짜 필터링 적용
+            date_filtered_influencers = []
+            for inf in filtered_influencers:
+                created_at = inf.get('created_at')
+                if created_at:
+                    try:
+                        # 날짜 파싱
+                        if isinstance(created_at, str):
+                            # ISO 형식 날짜 파싱
+                            if 'T' in created_at:
+                                inf_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                            else:
+                                inf_date = datetime.strptime(created_at, '%Y-%m-%d')
+                        else:
+                            inf_date = created_at
+                        
+                        # 날짜를 date 객체로 변환 (시간 정보 제거)
+                        inf_date_only = inf_date.date()
+                        
+                        # 필터링 조건에 따라 비교
+                        include_influencer = False
+                        
+                        if date_filter == "기간" and start_date and end_date:
+                            # 기간 선택: 시작일과 종료일 사이
+                            include_influencer = start_date <= inf_date_only <= end_date
+                            
+                        elif date_filter == "특정일" and specific_date:
+                            # 특정일: 정확히 해당 날짜
+                            include_influencer = inf_date_only == specific_date
+                        
+                        if include_influencer:
+                            date_filtered_influencers.append(inf)
+                            
+                    except Exception as e:
+                        # 날짜 파싱 실패시 포함하지 않음
+                        continue
+            
+            filtered_influencers = date_filtered_influencers
+        
+        # 결과 표시
+        if selected_manager == "전체":
+            manager_text = "전체 담당자"
+        else:
+            manager_text = f"{selected_manager} 담당자"
+        
+        # 날짜 필터 정보 추가
+        date_info = ""
+        if date_filter == "기간" and start_date and end_date:
+            date_info = f" (등록일: {start_date} ~ {end_date})"
+        elif date_filter == "특정일" and specific_date:
+            date_info = f" (등록일: {specific_date})"
+        
+        st.info(f"📊 {manager_text}의 인플루언서: {len(filtered_influencers)}명{date_info}")
         
         # 최근 등록순으로 정렬 (created_at 기준)
         filtered_influencers.sort(
@@ -858,150 +972,86 @@ def render_manager_influencer_management():
         st.code(traceback.format_exc())
 
 def render_filtered_influencer_list(influencers, selected_manager):
-    """필터링된 인플루언서 리스트 표시"""
-    st.markdown("### 📋 인플루언서 목록")
+    """필터링된 인플루언서 리스트 표시 - 테이블뷰로 변경"""
+    st.markdown("## 📋 인플루언서 목록")
     
-    # 통계 정보 표시
-    total_count = len(influencers)
-    active_count = len([inf for inf in influencers if inf.get('active', True)])
-    inactive_count = total_count - active_count
+    if not influencers:
+        st.warning("표시할 인플루언서가 없습니다.")
+        return
     
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("총 인플루언서", total_count)
-    with col2:
-        st.metric("활성", active_count, delta=f"{active_count/total_count*100:.1f}%" if total_count > 0 else "0%")
-    with col3:
-        st.metric("비활성", inactive_count, delta=f"{inactive_count/total_count*100:.1f}%" if total_count > 0 else "0%")
-    with col4:
-        # 플랫폼별 통계
-        platforms = {}
-        for inf in influencers:
-            platform = inf.get('platform', 'unknown')
-            platforms[platform] = platforms.get(platform, 0) + 1
-        most_platform = max(platforms.items(), key=lambda x: x[1]) if platforms else ("없음", 0)
-        st.metric("주요 플랫폼", f"{most_platform[0]} ({most_platform[1]}명)")
-    
-    st.markdown("---")
-    
-    # 페이지네이션 설정
-    items_per_page = 10
-    total_pages = (total_count + items_per_page - 1) // items_per_page
-    
-    if total_pages > 1:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            page = st.selectbox(
-                "페이지 선택",
-                range(1, total_pages + 1),
-                key="manager_page_select",
-                format_func=lambda x: f"페이지 {x} / {total_pages}"
-            )
-    else:
-        page = 1
-    
-    # 현재 페이지의 인플루언서 표시
-    start_idx = (page - 1) * items_per_page
-    end_idx = start_idx + items_per_page
-    page_influencers = influencers[start_idx:end_idx]
-    
-    # 인플루언서 카드 형태로 표시
-    for i, influencer in enumerate(page_influencers):
-        with st.container():
-            # 플랫폼 아이콘
-            platform_icons = {
-                "instagram": "📸",
-                "youtube": "📺", 
-                "tiktok": "🎵",
-                "twitter": "🐦"
-            }
-            platform_icon = platform_icons.get(influencer.get('platform', ''), "🌐")
-            
-            # 상태 아이콘
-            status_icon = "🟢" if influencer.get('active', True) else "🔴"
-            status_text = "활성" if influencer.get('active', True) else "비활성"
-            
-            # 카드 헤더
-            col1, col2, col3 = st.columns([3, 1, 1])
-            
-            with col1:
-                st.markdown(f"**{platform_icon} {influencer.get('influencer_name', influencer.get('sns_id', 'N/A'))}**")
-                st.caption(f"@{influencer.get('sns_id', 'N/A')} ({influencer.get('platform', 'N/A')})")
-            
-            with col2:
-                st.markdown(f"**{status_icon} {status_text}**")
-                followers_count = influencer.get('followers_count', 0) or 0
-                st.caption(f"팔로워: {followers_count:,}")
-            
-            with col3:
-                st.markdown(f"**👤 {influencer.get('created_by', 'N/A')}**")
-                created_at = influencer.get('created_at', 'N/A')
-                if created_at != 'N/A':
-                    try:
-                        # 날짜 포맷팅
-                        if isinstance(created_at, str):
-                            from datetime import datetime
-                            date_obj = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                            formatted_date = date_obj.strftime('%Y-%m-%d')
-                        else:
-                            formatted_date = str(created_at)[:10]
-                        st.caption(f"등록: {formatted_date}")
-                    except:
-                        st.caption(f"등록: {created_at}")
+    # 테이블 데이터 준비
+    table_data = []
+    for influencer in influencers:
+        # 플랫폼 아이콘
+        platform_icons = {
+            "instagram": "📸",
+            "youtube": "📺", 
+            "tiktok": "🎵",
+            "twitter": "🐦"
+        }
+        platform_icon = platform_icons.get(influencer.get('platform', ''), "🌐")
+        
+        # 상태 아이콘
+        status_icon = "🟢" if influencer.get('active', True) else "🔴"
+        status_text = "활성" if influencer.get('active', True) else "비활성"
+        
+        # 날짜 포맷팅
+        created_at = influencer.get('created_at', 'N/A')
+        formatted_date = "N/A"
+        if created_at != 'N/A':
+            try:
+                if isinstance(created_at, str):
+                    from datetime import datetime
+                    date_obj = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    formatted_date = date_obj.strftime('%Y-%m-%d')
                 else:
-                    st.caption("등록: N/A")
-            
-            # 상세 정보 (확장 가능)
-            with st.expander("📋 상세 정보", expanded=False):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown(f"**카테고리:** {influencer.get('content_category', 'N/A')}")
-                    post_count = influencer.get('post_count', 0) or 0
-                    st.markdown(f"**게시물 수:** {post_count:,}")
-                    price_krw = influencer.get('price_krw', 0) or 0
-                    st.markdown(f"**가격:** {price_krw:,}원" if price_krw > 0 else "**가격:** N/A")
-                    
-                    # 평점 정보
-                    manager_rating = influencer.get('manager_rating')
-                    content_rating = influencer.get('content_rating')
-                    if manager_rating:
-                        st.markdown(f"**매니저 평점:** {'⭐' * manager_rating} ({manager_rating}/5)")
-                    if content_rating:
-                        st.markdown(f"**콘텐츠 평점:** {'⭐' * content_rating} ({content_rating}/5)")
-                
-                with col2:
-                    # 연락처 정보
-                    phone = influencer.get('phone_number')
-                    email = influencer.get('email')
-                    if phone:
-                        st.markdown(f"**전화번호:** {phone}")
-                    if email:
-                        st.markdown(f"**이메일:** {email}")
-                    
-                    # SNS URL
-                    sns_url = influencer.get('sns_url')
-                    if sns_url:
-                        st.markdown(f"**SNS URL:** [{sns_url}]({sns_url})")
-                    
-                    # Owner Comment
-                    owner_comment = influencer.get('owner_comment')
-                    if owner_comment:
-                        st.markdown("**Owner Comment:**")
-                        st.text_area("Owner Comment", value=owner_comment, height=60, disabled=True, key=f"owner_comment_{influencer.get('id')}", label_visibility="collapsed")
-                
-                # 태그 정보
-                tags = influencer.get('tags')
-                if tags:
-                    st.markdown(f"**태그:** {tags}")
-            
-            # 담당자별 관리에서는 액션 버튼 제거 - 목록 정보만 표시
-            
-            st.markdown("---")
+                    formatted_date = str(created_at)[:10]
+            except:
+                formatted_date = str(created_at)
+        
+        # 팔로워 수 포맷팅
+        followers_count = influencer.get('followers_count', 0) or 0
+        followers_display = f"{followers_count:,}" if followers_count > 0 else "N/A"
+        
+        # 가격 포맷팅
+        price_krw = influencer.get('price_krw', 0) or 0
+        price_display = f"{price_krw:,}원" if price_krw > 0 else "N/A"
+        
+        # 평점 정보
+        manager_rating = influencer.get('manager_rating')
+        content_rating = influencer.get('content_rating')
+        manager_rating_display = f"{manager_rating}/5" if manager_rating else "N/A"
+        content_rating_display = f"{content_rating}/5" if content_rating else "N/A"
+        
+        table_data.append({
+            "플랫폼": f"{platform_icon} {influencer.get('platform', 'N/A')}",
+            "이름": influencer.get('influencer_name', influencer.get('sns_id', 'N/A')),
+            "SNS ID": influencer.get('sns_id', 'N/A'),
+            "상태": f"{status_icon} {status_text}",
+            "팔로워": followers_display,
+            "카테고리": influencer.get('content_category', 'N/A'),
+            "가격": price_display,
+            "매니저평점": manager_rating_display,
+            "콘텐츠평점": content_rating_display,
+            "담당자": influencer.get('created_by', 'N/A'),
+            "등록일": formatted_date,
+            "SNS URL": influencer.get('sns_url', 'N/A'),
+            "Owner Comment": influencer.get('owner_comment', 'N/A')[:50] + "..." if influencer.get('owner_comment') and len(str(influencer.get('owner_comment'))) > 50 else influencer.get('owner_comment', 'N/A')
+        })
     
-    # 페이지네이션 정보
-    if total_pages > 1:
-        st.markdown(f"**페이지 {page} / {total_pages}** (총 {total_count}명 중 {start_idx + 1}-{min(end_idx, total_count)}번째 표시)")
+    # DataFrame으로 변환
+    df = pd.DataFrame(table_data)
+    
+    # 테이블 표시 (스크롤 가능)
+    st.dataframe(
+        df,
+        use_container_width=True,
+        height=600,  # 고정 높이로 스크롤 가능하게 설정
+        hide_index=True
+    )
+    
+    # 총 개수 표시
+    st.caption(f"총 {len(influencers)}명의 인플루언서가 표시됩니다.")
 
 def render_influencer_tab():
     """인플루언서 탭 - 기존 함수 유지 (호환성)"""
