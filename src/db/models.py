@@ -54,7 +54,7 @@ class Influencer(BaseModel):
     preferred_mode: Optional[str] = None  # influencer_pref enum
     price_krw: Optional[float] = None
     tags: Optional[str] = None  # text field
-    # created_by 필드는 제거 - 데이터베이스에서 자동으로 설정됨
+    created_by: Optional[str] = None  # 등록자 정보
     # created_at, updated_at 필드는 제거 - 데이터베이스에서 자동으로 설정됨
     active: Optional[bool] = True
     post_count: Optional[int] = 0

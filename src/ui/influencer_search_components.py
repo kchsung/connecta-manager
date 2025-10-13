@@ -32,7 +32,7 @@ def render_influencer_search_and_filter():
             )
         
         with col2:
-            search_term = st.text_input("SNS ID 또는 이름", placeholder="정확한 SNS ID 또는 이름 입력", key="influencer_search_input")
+            search_term = st.text_input("SNS ID 또는 이름", placeholder="정확한 SNS ID 또는 이름 입력", key="influencer_search_input", help="등록자 검색")
         
         search_clicked = st.form_submit_button("🔍 검색", type="primary")
     

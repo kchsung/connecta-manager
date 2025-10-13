@@ -21,7 +21,7 @@ create table public.connecta_influencers (
   preferred_mode public.influencer_pref null,
   price_krw numeric(14, 2) null,
   tags text null,
-  created_by uuid null default auth.uid (),
+  created_by text null default auth.uid (),
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
   active boolean not null default true,

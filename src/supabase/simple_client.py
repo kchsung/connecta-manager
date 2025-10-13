@@ -105,7 +105,6 @@ class SimpleSupabaseClient:
             )
             
             # created_by 필드는 null로 설정하여 데이터베이스 기본값(auth.uid()) 사용
-            # UUID 형식이 아닌 문자열을 전달하면 오류가 발생하므로 null 사용
             if "created_by" in campaign_data:
                 del campaign_data["created_by"]  # 필드를 완전히 제거
             
@@ -239,7 +238,7 @@ class SimpleSupabaseClient:
                 st.secrets.get("dev_mode", False)
             )
             
-            # created_by 필드는 모델에서 제거되어 데이터베이스 기본값(auth.uid()) 사용
+            # created_by 필드는 사용자가 입력한 값 또는 데이터베이스 기본값(auth.uid()) 사용
             
             response = client.table("connecta_influencers").insert(influencer_data).execute()
             

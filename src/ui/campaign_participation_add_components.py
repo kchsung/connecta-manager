@@ -49,7 +49,7 @@ def render_add_influencer_workflow(campaign_id):
 def render_influencer_search_section():
     """인플루언서 검색 섹션"""
     # 검색 섹션
-    search_term = st.text_input("인플루언서 검색", placeholder="SNS ID 또는 이름을 입력하세요", key="add_influencer_search")
+    search_term = st.text_input("인플루언서 검색", placeholder="SNS ID 또는 이름을 입력하세요", key="add_influencer_search", help="등록자 검색")
     search_platform = st.selectbox("플랫폼", ["전체", "instagram", "youtube", "tiktok", "twitter"], key="add_influencer_platform")
     
     if st.button("🔍 검색", key="search_influencer_for_add"):
