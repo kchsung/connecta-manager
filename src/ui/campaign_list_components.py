@@ -216,3 +216,5 @@ def render_campaign_edit_form(campaign):
                     st.rerun()
                 else:
                     st.error(f"캠페인 삭제 실패: {result['message']}")
+
+

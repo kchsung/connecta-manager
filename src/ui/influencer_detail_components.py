@@ -404,3 +404,5 @@ def render_influencer_detail_form(influencer):
                 del st.session_state[key]
         
         st.rerun()
+
+

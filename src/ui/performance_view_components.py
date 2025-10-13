@@ -324,3 +324,5 @@ def render_performance_detail_modal():
     if st.button("❌ 닫기", key=f"close_performance_detail_{influencer['id']}"):
         st.session_state.pop("viewing_performance", None)
         st.rerun()
+
+
