@@ -11,13 +11,14 @@ from .common_functions import (
     search_single_influencer, 
     search_single_influencer_by_platform
 )
+# 통계 기능은 별도 메뉴로 분리됨
 
 def render_influencer_management():
     """인플루언서 관리 메인 컴포넌트"""
     st.subheader("👥 인플루언서 관리")
     st.markdown("인플루언서 등록과 조회 기능을 제공합니다.")
     
-    # 등록과 조회 탭으로 분리
+    # 등록, 조회 탭으로 분리 (통계는 별도 메뉴로 분리)
     tab1, tab2 = st.tabs(["📝 인플루언서 등록", "📋 인플루언서 정보 관리"])
     
     with tab1:

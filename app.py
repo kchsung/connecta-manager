@@ -29,6 +29,7 @@ from src.ui.project_components import (
 from src.ui.campaign_components import render_campaign_management
 from src.ui.performance_components import render_performance_management, render_performance_crawl
 from src.ui.influencer_components import render_influencer_management
+from src.ui.influencer_statistics_management_components import render_influencer_statistics_management
 
 
 # ── CSS ──────────────────────────────────────────────────────
@@ -273,6 +274,7 @@ def render_sidebar():
         
         management_menu_options = {
             'influencer_management': '👥 인플루언서 관리',
+            'influencer_analysis': '📊 인플루언서 분석',
             'campaign_management': '📁 캠페인 관리',
             'performance_management': '📊 성과 관리'
         }
@@ -315,6 +317,8 @@ def render_main_content():
         render_performance_management()
     elif current_page == 'influencer_management':
         render_influencer_management()
+    elif current_page == 'influencer_analysis':
+        render_influencer_statistics_management()
     else:
         # 기본값으로 캠페인 관리 표시
         render_campaign_management()
