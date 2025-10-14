@@ -854,6 +854,10 @@ def render_manager_influencer_management():
                 # 캐시 초기화
                 if "manager_filtered_influencers" in st.session_state:
                     del st.session_state["manager_filtered_influencers"]
+                if "campaign_participation_cache" in st.session_state:
+                    del st.session_state["campaign_participation_cache"]
+                if "all_participation_influencer_ids" in st.session_state:
+                    del st.session_state["all_participation_influencer_ids"]
                 st.rerun()
         
         # 담당자 필터링 (먼저 적용)
@@ -882,15 +886,57 @@ def render_manager_influencer_management():
             
             filtered_influencers = search_filtered_influencers
         
-        # 날짜 필터링 섹션을 별도로 분리
+        # 통합 필터링 섹션 (한 줄로 압축)
         st.markdown("---")
-        st.markdown("### 📅 날짜 필터링")
-        col1, col2, col3 = st.columns([1, 1, 1])
+        st.markdown("### 🎯 고급 필터링")
+        
+        # 한 줄에 모든 필터링 옵션 배치
+        col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 2])
         
         with col1:
-            # 날짜 범위 선택 방식
+            # 캠페인 참여 필터 옵션 (가로 배치)
+            campaign_filter_type = st.radio(
+                "캠페인 참여",
+                ["전체", "참여한 인플루언서", "참여하지 않은 인플루언서", "특정 캠페인"],
+                key="campaign_filter_type",
+                horizontal=True,
+                format_func=lambda x: {
+                    "전체": "🌐 전체",
+                    "참여한 인플루언서": "✅ 참여",
+                    "참여하지 않은 인플루언서": "❌ 미참여",
+                    "특정 캠페인": "🎯 특정"
+                }[x]
+            )
+        
+        with col2:
+            selected_campaign = None
+            if campaign_filter_type == "특정 캠페인":
+                # 캠페인 목록 조회
+                try:
+                    campaigns = db_manager.get_campaigns()
+                    if campaigns:
+                        campaign_options = ["캠페인 선택"] + [f"{camp['campaign_name']} (ID: {camp['id']})" for camp in campaigns]
+                        selected_campaign_option = st.selectbox(
+                            "캠페인 선택",
+                            campaign_options,
+                            key="campaign_filter_select"
+                        )
+                        
+                        if selected_campaign_option != "캠페인 선택":
+                            # 캠페인 ID 추출
+                            campaign_id = selected_campaign_option.split("(ID: ")[1].split(")")[0]
+                            selected_campaign = campaign_id
+                    else:
+                        st.warning("등록된 캠페인이 없습니다.")
+                except Exception as e:
+                    st.error(f"캠페인 목록 조회 중 오류: {e}")
+            else:
+                st.empty()  # 빈 공간 유지
+        
+        with col3:
+            # 날짜 필터 방식
             date_filter_type = st.radio(
-                "날짜 필터 방식",
+                "날짜 필터",
                 ["전체", "기간 선택", "특정일"],
                 key="date_filter_type",
                 horizontal=True,
@@ -901,7 +947,7 @@ def render_manager_influencer_management():
                 }[x]
             )
         
-        with col2:
+        with col4:
             # 날짜 필터링 로직을 위한 변수 초기화
             date_filter = "전체"
             start_date = None
@@ -909,42 +955,92 @@ def render_manager_influencer_management():
             specific_date = None
             
             if date_filter_type == "기간 선택":
-                col_start, col_end = st.columns(2)
-                with col_start:
-                    start_date = st.date_input(
-                        "시작일",
-                        value=None,
-                        key="date_filter_start"
-                    )
-                with col_end:
-                    end_date = st.date_input(
-                        "종료일", 
-                        value=None,
-                        key="date_filter_end"
-                    )
-                
-                if start_date and end_date:
-                    if start_date <= end_date:
-                        date_filter = "기간"
-                    else:
-                        st.error("시작일은 종료일보다 이전이어야 합니다.")
-                        date_filter = "전체"
-                elif start_date or end_date:
-                    st.warning("시작일과 종료일을 모두 선택해주세요.")
-                    date_filter = "전체"
-                    
+                start_date = st.date_input(
+                    "시작일",
+                    value=None,
+                    key="date_filter_start"
+                )
             elif date_filter_type == "특정일":
                 specific_date = st.date_input(
                     "선택일",
                     value=None,
                     key="date_filter_specific"
                 )
-                if specific_date:
-                    date_filter = "특정일"
+            else:
+                st.empty()  # 빈 공간 유지
         
-        with col3:
-            # 빈 공간 (필요시 추가 기능 배치)
-            pass
+        with col5:
+            if date_filter_type == "기간 선택":
+                end_date = st.date_input(
+                    "종료일", 
+                    value=None,
+                    key="date_filter_end"
+                )
+            else:
+                st.empty()  # 빈 공간 유지
+        
+        # 캠페인 참여 필터링 적용
+        if campaign_filter_type != "전체":
+            try:
+                # 캠페인 참여 정보 캐시 확인
+                participation_cache_key = "all_participation_influencer_ids"
+                if participation_cache_key not in st.session_state:
+                    # 모든 캠페인에 참여한 인플루언서 ID 목록 조회
+                    participated_influencer_ids = db_manager.get_all_participated_influencer_ids()
+                    st.session_state[participation_cache_key] = participated_influencer_ids
+                
+                participated_influencer_ids = st.session_state[participation_cache_key]
+                
+                # 특정 캠페인의 참여자 ID 목록 (필요한 경우에만)
+                specific_campaign_participant_ids = set()
+                if campaign_filter_type == "특정 캠페인" and selected_campaign:
+                    specific_participations = db_manager.get_all_campaign_participations(selected_campaign)
+                    for participation in specific_participations:
+                        influencer_id = participation.get('influencer_id')
+                        if influencer_id:
+                            specific_campaign_participant_ids.add(influencer_id)
+                
+                # 필터링 적용
+                campaign_filtered_influencers = []
+                for inf in filtered_influencers:
+                    influencer_id = inf.get('id')
+                    
+                    include_influencer = False
+                    
+                    if campaign_filter_type == "참여한 인플루언서":
+                        # campaign_influencer_participations 테이블의 influencer_id와 매칭
+                        include_influencer = influencer_id in participated_influencer_ids
+                    elif campaign_filter_type == "참여하지 않은 인플루언서":
+                        # campaign_influencer_participations 테이블에 없는 influencer_id
+                        include_influencer = influencer_id not in participated_influencer_ids
+                    elif campaign_filter_type == "특정 캠페인" and selected_campaign:
+                        # 특정 캠페인의 campaign_influencer_participations에 있는 influencer_id
+                        include_influencer = influencer_id in specific_campaign_participant_ids
+                    
+                    if include_influencer:
+                        campaign_filtered_influencers.append(inf)
+                
+                filtered_influencers = campaign_filtered_influencers
+                
+            except Exception as e:
+                st.error(f"캠페인 참여 필터링 중 오류: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+        
+        # 날짜 필터링 로직 처리
+        if date_filter_type == "기간 선택":
+            if start_date and end_date:
+                if start_date <= end_date:
+                    date_filter = "기간"
+                else:
+                    st.error("시작일은 종료일보다 이전이어야 합니다.")
+                    date_filter = "전체"
+            elif start_date or end_date:
+                st.warning("시작일과 종료일을 모두 선택해주세요.")
+                date_filter = "전체"
+        elif date_filter_type == "특정일":
+            if specific_date:
+                date_filter = "특정일"
         
         # 등록날짜 필터링 - 달력 기반
         if date_filter != "전체":
@@ -1001,6 +1097,25 @@ def render_manager_influencer_management():
         if search_term and search_term.strip():
             search_info = f" (검색어: '{search_term.strip()}')"
         
+        # 캠페인 참여 필터 정보 추가
+        campaign_info = ""
+        if campaign_filter_type == "참여한 인플루언서":
+            campaign_info = " (캠페인 참여자)"
+        elif campaign_filter_type == "참여하지 않은 인플루언서":
+            campaign_info = " (캠페인 미참여자)"
+        elif campaign_filter_type == "특정 캠페인" and selected_campaign:
+            # 캠페인 이름 가져오기
+            try:
+                campaigns = db_manager.get_campaigns()
+                campaign_name = "알 수 없는 캠페인"
+                for camp in campaigns:
+                    if camp['id'] == selected_campaign:
+                        campaign_name = camp['campaign_name']
+                        break
+                campaign_info = f" ({campaign_name} 참여자)"
+            except:
+                campaign_info = f" (캠페인 ID: {selected_campaign} 참여자)"
+        
         # 날짜 필터 정보 추가
         date_info = ""
         if date_filter == "기간" and start_date and end_date:
@@ -1008,7 +1123,7 @@ def render_manager_influencer_management():
         elif date_filter == "특정일" and specific_date:
             date_info = f" (등록일: {specific_date})"
         
-        st.info(f"📊 {manager_text}의 인플루언서: {len(filtered_influencers)}명{search_info}{date_info}")
+        st.info(f"📊 {manager_text}의 인플루언서: {len(filtered_influencers)}명{search_info}{campaign_info}{date_info}")
         
         # 최근 등록순으로 정렬 (created_at 기준)
         filtered_influencers.sort(
@@ -1058,6 +1173,41 @@ def render_filtered_influencer_list(influencers, selected_manager):
         # DM 응답 정보
         dm_reply = influencer.get('dm_reply', '')
         
+        # 캠페인 참여 정보 조회 (캐시 사용)
+        campaign_participation_info = ""
+        try:
+            # 캠페인 참여 정보 캐시 확인
+            cache_key = "campaign_participation_cache"
+            if cache_key not in st.session_state:
+                # 캐시가 없으면 생성
+                campaigns = db_manager.get_campaigns()
+                participation_cache = {}
+                
+                for campaign in campaigns:
+                    participations = db_manager.get_all_campaign_participations(campaign['id'])
+                    for participation in participations:
+                        influencer_id = participation.get('influencer_id')
+                        if influencer_id:
+                            if influencer_id not in participation_cache:
+                                participation_cache[influencer_id] = []
+                            participation_cache[influencer_id].append(campaign['campaign_name'])
+                
+                st.session_state[cache_key] = participation_cache
+            
+            # 캐시에서 참여 정보 조회
+            participation_cache = st.session_state[cache_key]
+            influencer_id = influencer.get('id')
+            participated_campaigns = participation_cache.get(influencer_id, [])
+            
+            if participated_campaigns:
+                campaign_participation_info = ", ".join(participated_campaigns[:3])  # 최대 3개만 표시
+                if len(participated_campaigns) > 3:
+                    campaign_participation_info += f" 외 {len(participated_campaigns) - 3}개"
+            else:
+                campaign_participation_info = "참여 없음"
+        except:
+            campaign_participation_info = "조회 실패"
+        
         table_data.append({
             "ID": influencer.get('id'),  # 숨겨진 ID 필드
             "플랫폼": influencer.get('platform', 'instagram'),
@@ -1071,6 +1221,7 @@ def render_filtered_influencer_list(influencers, selected_manager):
             "콘텐츠평점": influencer.get('content_rating', 3) or 3,
             "담당자": influencer.get('created_by', ''),
             "등록일": formatted_date,
+            "캠페인 참여": campaign_participation_info,
             "SNS URL": influencer.get('sns_url', ''),
             "Owner Comment": owner_comment,
             "DM 응답정보": dm_reply
@@ -1144,6 +1295,11 @@ def render_filtered_influencer_list(influencers, selected_manager):
             disabled=True,
             help="등록 날짜 (읽기 전용)",
         ),
+        "캠페인 참여": st.column_config.TextColumn(
+            "캠페인 참여",
+            disabled=True,
+            help="참여한 캠페인 목록 (읽기 전용)",
+        ),
         "SNS URL": st.column_config.TextColumn(
             "SNS URL",
             help="SNS 프로필 URL",
@@ -1167,35 +1323,77 @@ def render_filtered_influencer_list(influencers, selected_manager):
         use_container_width=True,
         height=600,
         column_config=column_config,
-        disabled=["ID", "등록일"],  # 수정 불가능한 컬럼
+        disabled=["ID", "등록일", "캠페인 참여"],  # 수정 불가능한 컬럼
         hide_index=True,
         key="influencer_editor"
     )
     
     # 편집된 데이터가 있는지 확인하고 저장
-    if not edited_df.equals(df):
-        st.markdown("---")
-        st.markdown("### 💾 변경사항 저장")
+    st.markdown("---")
+    st.markdown("### 💾 변경사항 저장")
+    
+    # 변경사항 감지 (더 정확한 방법)
+    changes_made = False
+    try:
+        # DataFrame 비교를 위한 정확한 방법
+        if not edited_df.equals(df):
+            # 각 행과 열을 비교하여 실제 변경사항 확인
+            for idx in range(len(df)):
+                for col in df.columns:
+                    if col not in ["ID", "등록일", "캠페인 참여"]:  # 비교에서 제외할 컬럼
+                        original_val = str(df.iloc[idx][col])
+                        edited_val = str(edited_df.iloc[idx][col])
+                        if original_val != edited_val:
+                            changes_made = True
+                            break
+                if changes_made:
+                    break
+    except Exception as e:
+        # 비교 실패 시 기본적으로 변경사항이 있다고 가정
+        changes_made = True
+        st.warning(f"변경사항 감지 중 오류: {e}")
+    
+    if changes_made:
+        # 변경된 항목 수 표시
+        changed_items = 0
+        for idx in range(len(df)):
+            for col in df.columns:
+                if col not in ["ID", "등록일", "캠페인 참여"]:
+                    original_val = str(df.iloc[idx][col])
+                    edited_val = str(edited_df.iloc[idx][col])
+                    if original_val != edited_val:
+                        changed_items += 1
         
-        # 변경된 행 찾기
-        changes_made = False
-        for idx, (original_row, edited_row) in enumerate(zip(df.itertuples(), edited_df.itertuples())):
-            if original_row != edited_row:
-                changes_made = True
-                break
+        st.success(f"📝 테이블에서 {changed_items}개의 변경사항이 감지되었습니다!")
         
-        if changes_made:
-            col1, col2 = st.columns([1, 1])
-            
-            with col1:
-                if st.button("💾 변경사항 저장", type="primary", key="save_changes"):
-                    save_edited_influencers(df, edited_df)
-            
-            with col2:
-                if st.button("🔄 변경사항 취소", key="cancel_changes"):
-                    st.rerun()
-        else:
-            st.info("변경된 내용이 없습니다.")
+        # 변경사항 미리보기
+        with st.expander("🔍 변경사항 미리보기", expanded=False):
+            for idx in range(len(df)):
+                row_changes = []
+                for col in df.columns:
+                    if col not in ["ID", "등록일", "캠페인 참여"]:
+                        original_val = str(df.iloc[idx][col])
+                        edited_val = str(edited_df.iloc[idx][col])
+                        if original_val != edited_val:
+                            row_changes.append(f"**{col}**: '{original_val}' → '{edited_val}'")
+                
+                if row_changes:
+                    influencer_name = edited_df.iloc[idx]["이름"]
+                    st.write(f"**{influencer_name}**:")
+                    for change in row_changes:
+                        st.write(f"  - {change}")
+        
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            if st.button("💾 변경사항 저장", type="primary", key="save_changes"):
+                save_edited_influencers(df, edited_df)
+        
+        with col2:
+            if st.button("🔄 변경사항 취소", key="cancel_changes"):
+                st.rerun()
+    else:
+        st.info("변경된 내용이 없습니다. 테이블에서 데이터를 편집하면 저장 버튼이 나타납니다.")
     
     # 상세 편집 안내 메시지
     st.markdown("---")
@@ -1217,8 +1415,8 @@ def save_edited_influencers(original_df, edited_df):
             original_row = original_df.iloc[idx]
             edited_row = edited_df.iloc[idx]
             
-            # 변경사항이 있는지 확인 (ID 제외)
-            comparison_columns = [col for col in original_df.columns if col != "ID"]
+            # 변경사항이 있는지 확인 (ID, 등록일, 캠페인 참여 제외)
+            comparison_columns = [col for col in original_df.columns if col not in ["ID", "등록일", "캠페인 참여"]]
             has_changes = False
             
             for col in comparison_columns:
@@ -1256,7 +1454,28 @@ def save_edited_influencers(original_df, edited_df):
         
         # 결과 표시
         if updated_count > 0:
-            st.success(f"✅ {updated_count}명의 인플루언서 정보가 업데이트되었습니다!")
+            st.success(f"✅ {updated_count}명의 인플루언서 정보가 성공적으로 업데이트되었습니다!")
+            
+            # 업데이트된 인플루언서 목록 표시
+            with st.expander("📋 업데이트된 인플루언서 목록", expanded=False):
+                updated_influencers = []
+                for idx in range(len(original_df)):
+                    original_row = original_df.iloc[idx]
+                    edited_row = edited_df.iloc[idx]
+                    
+                    # 변경사항이 있는지 확인
+                    has_changes = False
+                    for col in original_df.columns:
+                        if col not in ["ID", "등록일", "캠페인 참여"]:
+                            if str(original_row[col]) != str(edited_row[col]):
+                                has_changes = True
+                                break
+                    
+                    if has_changes:
+                        updated_influencers.append(edited_row["이름"])
+                
+                for name in updated_influencers:
+                    st.write(f"• {name}")
         
         if error_count > 0:
             st.error(f"❌ {error_count}명의 인플루언서 업데이트에 실패했습니다.")
@@ -1267,6 +1486,10 @@ def save_edited_influencers(original_df, edited_df):
                 del st.session_state["influencers_data"]
             if "manager_filtered_influencers" in st.session_state:
                 del st.session_state["manager_filtered_influencers"]
+            if "campaign_participation_cache" in st.session_state:
+                del st.session_state["campaign_participation_cache"]
+            if "all_participation_influencer_ids" in st.session_state:
+                del st.session_state["all_participation_influencer_ids"]
             
             # 페이지 새로고침
             st.rerun()

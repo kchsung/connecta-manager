@@ -43,24 +43,20 @@ def render_performance_crawl():
 
 
 def render_performance_management():
-    """성과 관리 메인 컴포넌트 - 탭별 컴포넌트를 import하여 사용"""
+    """성과 관리 메인 컴포넌트 - 성과조회와 리포트 탭만 사용"""
     st.subheader("📈 성과 관리")
     st.markdown("캠페인별 성과를 확인하고 인플루언서의 성과를 관리합니다.")
 
     # 탭별 컴포넌트 import
     from .performance_view_components import render_performance_view_tab
-    from .performance_input_components import render_performance_input_tab
     from .performance_report_components import render_performance_report_tab
 
-    tab1, tab2, tab3 = st.tabs(["📊 성과 조회", "✏️ 성과 입력", "📋 리포트"])
+    tab1, tab2 = st.tabs(["📊 성과 조회", "📋 리포트"])
 
     with tab1:
         render_performance_view_tab()
 
     with tab2:
-        render_performance_input_tab()
-
-    with tab3:
         render_performance_report_tab()
 
 

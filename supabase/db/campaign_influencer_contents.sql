@@ -11,6 +11,7 @@ create table public.campaign_influencer_contents (
   views integer not null default 0,
   clicks integer not null default 0,
   conversions integer not null default 0,
+  is_rels integer not null default 0,
   created_by uuid null default auth.uid (),
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),

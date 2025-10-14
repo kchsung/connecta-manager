@@ -34,154 +34,206 @@ def render_participation_list():
         if not participations:
             st.info("이 캠페인에 참여한 인플루언서가 없습니다.")
         else:
-            # 좌우 분할 레이아웃
-            col1, col2 = st.columns([1, 1])
-            
-            with col1:
-                st.markdown("#### 📋 참여 인플루언서 목록")
-                render_participation_list_table(participations)
-            
-            with col2:
-                st.markdown("#### ✏️ 인플루언서 편집")
-                render_participation_edit_section(participations)
+            # 단일 레이아웃으로 변경
+            st.markdown("#### 📋 참여 인플루언서 목록 (편집 가능)")
+            render_participation_list_table(participations)
 
 def render_participation_list_table(participations):
-    """참여 인플루언서 목록 테이블"""
-    # 참여 인플루언서 목록을 테이블로 표시
+    """참여 인플루언서 목록 테이블 (편집 가능)"""
+    # 참여 인플루언서 목록을 편집 가능한 테이블로 표시
     participation_data = []
     for participation in participations:
         participation_data.append({
-            "인플루언서": participation.get('influencer_name', participation.get('sns_id', 'N/A')),
-            "플랫폼": participation.get('platform', 'N/A'),
-            "SNS ID": participation.get('sns_id', 'N/A'),
-            "샘플 상태": format_sample_status(participation.get('sample_status', '요청')),
-            "업로드 완료": "✅" if participation.get('content_uploaded', False) else "❌",
-            "비용": f"{participation.get('cost_krw', 0):,.0f}원" if participation.get('cost_krw') else "0원",
+            "ID": participation.get('id'),  # 숨겨진 ID 필드
+            "인플루언서": participation.get('influencer_name', participation.get('sns_id', '')),
+            "플랫폼": participation.get('platform', 'instagram'),
+            "SNS ID": participation.get('sns_id', ''),
+            "샘플 상태": participation.get('sample_status', '요청'),
+            "업로드 완료": participation.get('content_uploaded', False),
+            "비용": participation.get('cost_krw', 0) or 0,
+            "매니저코멘트": participation.get('manager_comment', ''),
+            "인플루언서요청사항": participation.get('influencer_requests', ''),
+            "인플루언서피드백": participation.get('influencer_feedback', ''),
+            "메모": participation.get('memo', ''),
             "참여일": participation.get('created_at', '')[:10] if participation.get('created_at') else "N/A"
         })
     
     if participation_data:
         df = pd.DataFrame(participation_data)
-        # 높이를 조정하여 15개 행이 보이도록 설정 (대략 600px)
-        st.dataframe(df, use_container_width=True, hide_index=True, height=600)
+        
+        # 컬럼 설정
+        column_config = {
+            "ID": st.column_config.NumberColumn("ID", disabled=True, help="참여 인플루언서 고유 ID"),
+            "인플루언서": st.column_config.TextColumn(
+                "인플루언서",
+                help="인플루언서 이름 (읽기 전용)",
+                disabled=True,
+            ),
+            "플랫폼": st.column_config.TextColumn(
+                "플랫폼",
+                help="SNS 플랫폼 (읽기 전용)",
+                disabled=True,
+            ),
+            "SNS ID": st.column_config.TextColumn(
+                "SNS ID", 
+                help="SNS 계정 ID (읽기 전용)",
+                disabled=True,
+            ),
+            "샘플 상태": st.column_config.SelectboxColumn(
+                "샘플 상태",
+                help="샘플 발송 상태",
+                options=["요청", "발송준비", "발송완료", "수령"],
+            ),
+            "업로드 완료": st.column_config.CheckboxColumn(
+                "업로드 완료",
+                help="콘텐츠 업로드 완료 여부",
+            ),
+            "비용": st.column_config.NumberColumn(
+                "비용 (원)",
+                help="협찬 비용",
+                min_value=0,
+                format="%d원",
+            ),
+            "매니저코멘트": st.column_config.TextColumn(
+                "매니저코멘트",
+                help="매니저 코멘트",
+                max_chars=500,
+            ),
+            "인플루언서요청사항": st.column_config.TextColumn(
+                "인플루언서요청사항",
+                help="인플루언서 요청사항",
+                max_chars=500,
+            ),
+            "인플루언서피드백": st.column_config.TextColumn(
+                "인플루언서피드백",
+                help="인플루언서 피드백",
+                max_chars=500,
+            ),
+            "메모": st.column_config.TextColumn(
+                "메모",
+                help="기타 메모",
+                max_chars=500,
+            ),
+            "참여일": st.column_config.TextColumn(
+                "참여일",
+                disabled=True,
+                help="참여 등록일 (읽기 전용)",
+            ),
+        }
+        
+        # 편집 가능한 테이블 표시
+        edited_df = st.data_editor(
+            df,
+            use_container_width=True,
+            height=600,
+            column_config=column_config,
+            disabled=["ID", "인플루언서", "플랫폼", "SNS ID", "참여일"],  # 수정 불가능한 컬럼
+            hide_index=True,
+            key="participation_editor"
+        )
+        
+        # 편집된 데이터가 있는지 확인하고 저장
+        if not edited_df.equals(df):
+            st.markdown("---")
+            st.markdown("### 💾 변경사항 저장")
+            st.info("📝 테이블에서 변경사항이 감지되었습니다. 저장 버튼을 클릭하여 데이터베이스를 업데이트하세요.")
+            
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                if st.button("💾 변경사항 저장", type="primary", key="save_participation_changes"):
+                    save_edited_participations(df, edited_df)
+            
+            with col2:
+                if st.button("🔄 변경사항 취소", key="cancel_participation_changes"):
+                    st.rerun()
+        else:
+            # 항상 저장 버튼을 표시 (편의를 위해)
+            st.markdown("---")
+            st.markdown("### 💾 데이터 관리")
+            st.info("💡 테이블에서 정보를 편집한 후 저장 버튼을 클릭하세요.")
+            
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                if st.button("💾 현재 데이터 저장", type="primary", key="save_current_participation_data"):
+                    save_edited_participations(df, edited_df)
+            
+            with col2:
+                if st.button("🔄 새로고침", key="refresh_participation_data"):
+                    st.rerun()
+        
+        # 총 개수 표시 및 편집 안내
+        st.caption(f"총 {len(participations)}명의 참여 인플루언서가 표시됩니다.")
+        st.info("💡 **편집 가능한 필드**: 샘플 상태, 업로드 완료, 비용, 매니저코멘트, 인플루언서요청사항, 인플루언서피드백, 메모  \n📖 **읽기 전용 필드**: 인플루언서, 플랫폼, SNS ID, 참여일")
     else:
         st.info("표시할 참여 인플루언서가 없습니다.")
 
-def render_participation_edit_section(participations):
-    """참여 인플루언서 편집 섹션"""
-    if not participations:
-        st.info("편집할 참여 인플루언서가 없습니다.")
-        return
-    
-    # 편집할 참여 인플루언서 선택 (SNS ID 포함)
-    participation_options = {}
-    for p in participations:
-        influencer_name = p.get('influencer_name', 'N/A')
-        sns_id = p.get('sns_id', 'N/A')
-        platform = p.get('platform', 'N/A')
-        display_name = f"{influencer_name} (@{sns_id}) ({platform})"
-        participation_options[display_name] = p
-    
-    selected_participation_name = st.selectbox(
-        "편집할 참여 인플루언서를 선택하세요",
-        list(participation_options.keys()),
-        key="participation_edit_select"
-    )
-    
-    if selected_participation_name:
-        selected_participation = participation_options[selected_participation_name]
-        render_participation_edit_form(selected_participation)
-
-def render_participation_edit_form(participation):
-    """참여 인플루언서 편집 폼"""
-    influencer_name = participation.get('influencer_name', 'N/A')
-    sns_id = participation.get('sns_id', 'N/A')
-    platform = participation.get('platform', 'N/A')
-    st.markdown(f"**편집 대상:** {influencer_name} (@{sns_id}) ({platform})")
-    
-    with st.form(f"edit_participation_form_{participation.get('id', 'unknown')}"):
-        # 데이터베이스 스키마에 맞는 필드들
-        col1, col2 = st.columns(2)
+def save_edited_participations(original_df, edited_df):
+    """편집된 참여 인플루언서 데이터를 저장"""
+    try:
+        # 변경된 행들을 찾아서 업데이트
+        updated_count = 0
+        error_count = 0
+        total_changes = 0
         
-        with col1:
-            manager_comment = st.text_area(
-                "매니저 코멘트", 
-                value=participation.get('manager_comment', ''),
-                key=f"edit_manager_comment_{participation.get('id', 'unknown')}"
-            )
-            influencer_requests = st.text_area(
-                "인플루언서 요청사항", 
-                value=participation.get('influencer_requests', ''),
-                key=f"edit_influencer_requests_{participation.get('id', 'unknown')}"
-            )
-            memo = st.text_area(
-                "메모", 
-                value=participation.get('memo', ''),
-                key=f"edit_memo_{participation.get('id', 'unknown')}"
-            )
-        
-        with col2:
-            sample_status = st.selectbox(
-                "샘플 상태",
-                ["요청", "발송준비", "발송완료", "수령"],
-                index=["요청", "발송준비", "발송완료", "수령"].index(participation.get('sample_status', '요청')),
-                key=f"edit_sample_status_{participation.get('id', 'unknown')}",
-                format_func=lambda x: {
-                    "요청": "📋 요청",
-                    "발송준비": "📦 발송준비",
-                    "발송완료": "🚚 발송완료",
-                    "수령": "✅ 수령"
-                }[x]
-            )
-            influencer_feedback = st.text_area(
-                "인플루언서 피드백", 
-                value=participation.get('influencer_feedback', ''),
-                key=f"edit_influencer_feedback_{participation.get('id', 'unknown')}"
-            )
-            content_uploaded = st.checkbox(
-                "콘텐츠 업로드 완료", 
-                value=participation.get('content_uploaded', False),
-                key=f"edit_content_uploaded_{participation.get('id', 'unknown')}"
-            )
-            cost_krw = st.number_input(
-                "비용 (원)", 
-                min_value=0.0, 
-                value=float(participation.get('cost_krw', 0) or 0),
-                step=1000.0,
-                key=f"edit_cost_krw_{participation.get('id', 'unknown')}"
-            )
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.form_submit_button("💾 저장", type="primary"):
+        # DataFrame을 인덱스 기반으로 비교
+        for idx in range(len(original_df)):
+            original_row = original_df.iloc[idx]
+            edited_row = edited_df.iloc[idx]
+            
+            # 변경사항이 있는지 확인 (읽기 전용 컬럼 제외)
+            readonly_columns = ["ID", "인플루언서", "플랫폼", "SNS ID", "참여일"]
+            comparison_columns = [col for col in original_df.columns if col not in readonly_columns]
+            has_changes = False
+            
+            for col in comparison_columns:
+                if str(original_row[col]) != str(edited_row[col]):
+                    has_changes = True
+                    total_changes += 1
+                    break
+            
+            if has_changes:
+                participation_id = edited_row["ID"]
+                
+                # 업데이트할 데이터 준비 (NumPy 타입을 Python 기본 타입으로 변환)
+                # 참고: influencer_name, platform, sns_id는 connecta_influencers 테이블에 있으므로 업데이트 불가
                 update_data = {
-                    'manager_comment': manager_comment,
-                    'influencer_requests': influencer_requests,
-                    'memo': memo,
-                    'sample_status': sample_status,
-                    'influencer_feedback': influencer_feedback,
-                    'content_uploaded': content_uploaded,
-                    'cost_krw': cost_krw
+                    'sample_status': str(edited_row["샘플 상태"]),
+                    'content_uploaded': bool(edited_row["업로드 완료"]),
+                    'cost_krw': int(edited_row["비용"]) if edited_row["비용"] is not None else 0,
+                    'manager_comment': str(edited_row["매니저코멘트"]) if edited_row["매니저코멘트"] else None,
+                    'influencer_requests': str(edited_row["인플루언서요청사항"]) if edited_row["인플루언서요청사항"] else None,
+                    'influencer_feedback': str(edited_row["인플루언서피드백"]) if edited_row["인플루언서피드백"] else None,
+                    'memo': str(edited_row["메모"]) if edited_row["메모"] else None
                 }
                 
-                result = db_manager.update_campaign_participation(participation.get('id', ''), update_data)
+                # 데이터베이스 업데이트
+                result = db_manager.update_campaign_participation(participation_id, update_data)
                 if result["success"]:
-                    st.success("참여 정보가 업데이트되었습니다!")
-                    # 캐시 초기화
-                    if "participations_cache" in st.session_state:
-                        del st.session_state["participations_cache"]
-                    st.rerun()
+                    updated_count += 1
                 else:
-                    st.error(f"참여 정보 업데이트 실패: {result['message']}")
+                    error_count += 1
+                    st.error(f"❌ ID {participation_id} 업데이트 실패: {result['message']}")
         
-        with col2:
-            if st.form_submit_button("🗑️ 제거", type="secondary"):
-                result = db_manager.delete_campaign_participation(participation.get('id', ''))
-                if result["success"]:
-                    st.success("인플루언서가 캠페인에서 제거되었습니다!")
-                    # 캐시 초기화
-                    if "participations_cache" in st.session_state:
-                        del st.session_state["participations_cache"]
-                    st.rerun()
-                else:
-                    st.error(f"인플루언서 제거 실패: {result['message']}")
+        # 결과 표시
+        if total_changes == 0:
+            st.info("💡 변경된 내용이 없습니다. 테이블에서 정보를 편집한 후 다시 저장해주세요.")
+        elif updated_count > 0:
+            st.success(f"✅ {updated_count}명의 참여 인플루언서 정보가 업데이트되었습니다!")
+        
+        if error_count > 0:
+            st.error(f"❌ {error_count}명의 참여 인플루언서 업데이트에 실패했습니다.")
+        
+        if updated_count > 0:
+            # 캐시 초기화
+            if "participations_cache" in st.session_state:
+                del st.session_state["participations_cache"]
+            
+            # 페이지 새로고침
+            st.rerun()
+            
+    except Exception as e:
+        st.error(f"데이터 저장 중 오류가 발생했습니다: {e}")
+        import traceback
+        st.code(traceback.format_exc())

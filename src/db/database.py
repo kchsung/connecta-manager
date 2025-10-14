@@ -134,6 +134,28 @@ class DatabaseManager:
             self._handle_error(e, "캠페인 참여자 조회")
             return []
     
+    def get_all_participated_influencer_ids(self) -> set:
+        """모든 캠페인에 참여한 인플루언서 ID 목록 조회"""
+        try:
+            # 모든 캠페인 참여 정보를 한 번에 조회
+            campaigns = self.get_campaigns()
+            all_participations = []
+            for campaign in campaigns:
+                participations = self.get_all_campaign_participations(campaign['id'])
+                all_participations.extend(participations)
+            
+            # 참여한 인플루언서 ID 목록 추출
+            participated_influencer_ids = set()
+            for participation in all_participations:
+                influencer_id = participation.get('influencer_id')
+                if influencer_id:
+                    participated_influencer_ids.add(influencer_id)
+            
+            return participated_influencer_ids
+        except Exception as e:
+            self._handle_error(e, "참여 인플루언서 ID 조회")
+            return set()
+    
     def add_influencer_to_campaign(self, participation: CampaignInfluencerParticipation) -> Dict[str, Any]:
         """캠페인에 인플루언서 추가"""
         try:
