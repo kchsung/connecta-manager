@@ -21,7 +21,7 @@ def render_influencer_management():
     # 탭 간 이동 처리 (담당자별 관리에서는 수정 기능이 없으므로 제거)
     
     # 등록, 조회, 담당자별 관리 탭으로 분리 (통계는 별도 메뉴로 분리)
-    tab_names = ["📝 인플루언서 등록", "📋 인플루언서 정보 수정", "👥 담당자별 인플루언서 관리"]
+    tab_names = ["📝 인플루언서 등록", "📋 인플루언서 정보 수정", "👥 인플루언서 조회"]
     
     # 기본 탭 인덱스 설정
     default_tab = st.session_state.get("influencer_active_tab", 0)
@@ -759,6 +759,10 @@ def render_influencer_edit_form(influencer):
                         # 캐시 초기화
                         if "influencers_data" in st.session_state:
                             del st.session_state["influencers_data"]
+                        if "manager_filtered_influencers" in st.session_state:
+                            del st.session_state["manager_filtered_influencers"]
+                        
+                        
                         st.rerun()
                     else:
                         st.error(f"업데이트 실패: {result['message']}")
@@ -791,6 +795,10 @@ def render_influencer_edit_form(influencer):
                     # 캐시 초기화
                     if "influencers_data" in st.session_state:
                         del st.session_state["influencers_data"]
+                    if "manager_filtered_influencers" in st.session_state:
+                        del st.session_state["manager_filtered_influencers"]
+                    
+                    
                     st.rerun()
                 else:
                     st.error(f"삭제 실패: {result['message']}")
@@ -801,7 +809,7 @@ def render_influencer_edit_form(influencer):
 
 def render_manager_influencer_management():
     """담당자별 인플루언서 관리 탭"""
-    st.subheader("👥 담당자별 인플루언서 관리")
+    st.subheader("👥 인플루언서 조회")
     st.markdown("담당자별로 인플루언서를 필터링하고 조회합니다.")
     
     # 모든 인플루언서에서 담당자 목록 가져오기
@@ -833,9 +841,53 @@ def render_manager_influencer_management():
             )
         
         with col2:
-            # 등록날짜 필터링 조건 추가 - 달력 기반
-            st.markdown("**📅 등록날짜 필터**")
+            # 검색 필터링 기능 추가
+            search_term = st.text_input(
+                "🔍 SNS ID 또는 이름으로 검색",
+                placeholder="SNS ID 또는 이름 입력",
+                key="manager_search_input",
+                help="인플루언서의 SNS ID 또는 이름으로 검색할 수 있습니다"
+            )
+        
+        with col3:
+            if st.button("🔄 새로고침", key="manager_refresh"):
+                # 캐시 초기화
+                if "manager_filtered_influencers" in st.session_state:
+                    del st.session_state["manager_filtered_influencers"]
+                st.rerun()
+        
+        # 담당자 필터링 (먼저 적용)
+        if selected_manager == "전체":
+            filtered_influencers = all_influencers
+        else:
+            filtered_influencers = [
+                inf for inf in all_influencers 
+                if inf.get('created_by') and inf.get('created_by').strip() == selected_manager
+            ]
+        
+        # 검색 필터링 적용
+        if search_term and search_term.strip():
+            search_term_clean = search_term.strip().lower()
+            search_filtered_influencers = []
             
+            for inf in filtered_influencers:
+                sns_id = (inf.get('sns_id', '') or '').lower()
+                influencer_name = (inf.get('influencer_name', '') or '').lower()
+                
+                # SNS ID나 이름에 검색어가 포함되어 있는지 확인
+                if (search_term_clean in sns_id or 
+                    search_term_clean in influencer_name or
+                    search_term_clean.replace('@', '') in sns_id.replace('@', '')):
+                    search_filtered_influencers.append(inf)
+            
+            filtered_influencers = search_filtered_influencers
+        
+        # 날짜 필터링 섹션을 별도로 분리
+        st.markdown("---")
+        st.markdown("### 📅 날짜 필터링")
+        col1, col2, col3 = st.columns([1, 1, 1])
+        
+        with col1:
             # 날짜 범위 선택 방식
             date_filter_type = st.radio(
                 "날짜 필터 방식",
@@ -848,7 +900,8 @@ def render_manager_influencer_management():
                     "특정일": "📆 특정일"
                 }[x]
             )
-            
+        
+        with col2:
             # 날짜 필터링 로직을 위한 변수 초기화
             date_filter = "전체"
             start_date = None
@@ -890,20 +943,8 @@ def render_manager_influencer_management():
                     date_filter = "특정일"
         
         with col3:
-            if st.button("🔄 새로고침", key="manager_refresh"):
-                # 캐시 초기화
-                if "manager_filtered_influencers" in st.session_state:
-                    del st.session_state["manager_filtered_influencers"]
-                st.rerun()
-        
-        # 담당자 필터링
-        if selected_manager == "전체":
-            filtered_influencers = all_influencers
-        else:
-            filtered_influencers = [
-                inf for inf in all_influencers 
-                if inf.get('created_by') and inf.get('created_by').strip() == selected_manager
-            ]
+            # 빈 공간 (필요시 추가 기능 배치)
+            pass
         
         # 등록날짜 필터링 - 달력 기반
         if date_filter != "전체":
@@ -955,6 +996,11 @@ def render_manager_influencer_management():
         else:
             manager_text = f"{selected_manager} 담당자"
         
+        # 검색 필터 정보 추가
+        search_info = ""
+        if search_term and search_term.strip():
+            search_info = f" (검색어: '{search_term.strip()}')"
+        
         # 날짜 필터 정보 추가
         date_info = ""
         if date_filter == "기간" and start_date and end_date:
@@ -962,7 +1008,7 @@ def render_manager_influencer_management():
         elif date_filter == "특정일" and specific_date:
             date_info = f" (등록일: {specific_date})"
         
-        st.info(f"📊 {manager_text}의 인플루언서: {len(filtered_influencers)}명{date_info}")
+        st.info(f"📊 {manager_text}의 인플루언서: {len(filtered_influencers)}명{search_info}{date_info}")
         
         # 최근 등록순으로 정렬 (created_at 기준)
         filtered_influencers.sort(
@@ -982,29 +1028,16 @@ def render_manager_influencer_management():
         st.code(traceback.format_exc())
 
 def render_filtered_influencer_list(influencers, selected_manager):
-    """필터링된 인플루언서 리스트 표시 - 테이블뷰로 변경"""
-    st.markdown("## 📋 인플루언서 목록")
+    """필터링된 인플루언서 리스트 표시 - 편집 가능한 테이블뷰로 변경"""
+    st.markdown("## 📋 인플루언서 목록 (편집 가능)")
     
     if not influencers:
         st.warning("표시할 인플루언서가 없습니다.")
         return
     
-    # 테이블 데이터 준비
+    # 테이블 데이터 준비 (편집 가능한 형태로)
     table_data = []
     for influencer in influencers:
-        # 플랫폼 아이콘
-        platform_icons = {
-            "instagram": "📸",
-            "youtube": "📺", 
-            "tiktok": "🎵",
-            "twitter": "🐦"
-        }
-        platform_icon = platform_icons.get(influencer.get('platform', ''), "🌐")
-        
-        # 상태 아이콘
-        status_icon = "🟢" if influencer.get('active', True) else "🔴"
-        status_text = "활성" if influencer.get('active', True) else "비활성"
-        
         # 날짜 포맷팅
         created_at = influencer.get('created_at', 'N/A')
         formatted_date = "N/A"
@@ -1019,49 +1052,229 @@ def render_filtered_influencer_list(influencers, selected_manager):
             except:
                 formatted_date = str(created_at)
         
-        # 팔로워 수 포맷팅
-        followers_count = influencer.get('followers_count', 0) or 0
-        followers_display = f"{followers_count:,}" if followers_count > 0 else "N/A"
+        # Owner Comment
+        owner_comment = influencer.get('owner_comment', '')
         
-        # 가격 포맷팅
-        price_krw = influencer.get('price_krw', 0) or 0
-        price_display = f"{price_krw:,}원" if price_krw > 0 else "N/A"
-        
-        # 평점 정보
-        manager_rating = influencer.get('manager_rating')
-        content_rating = influencer.get('content_rating')
-        manager_rating_display = f"{manager_rating}/5" if manager_rating else "N/A"
-        content_rating_display = f"{content_rating}/5" if content_rating else "N/A"
+        # DM 응답 정보
+        dm_reply = influencer.get('dm_reply', '')
         
         table_data.append({
-            "플랫폼": f"{platform_icon} {influencer.get('platform', 'N/A')}",
-            "이름": influencer.get('influencer_name', influencer.get('sns_id', 'N/A')),
-            "SNS ID": influencer.get('sns_id', 'N/A'),
-            "상태": f"{status_icon} {status_text}",
-            "팔로워": followers_display,
-            "카테고리": influencer.get('content_category', 'N/A'),
-            "가격": price_display,
-            "매니저평점": manager_rating_display,
-            "콘텐츠평점": content_rating_display,
-            "담당자": influencer.get('created_by', 'N/A'),
+            "ID": influencer.get('id'),  # 숨겨진 ID 필드
+            "플랫폼": influencer.get('platform', 'instagram'),
+            "이름": influencer.get('influencer_name', influencer.get('sns_id', '')),
+            "SNS ID": influencer.get('sns_id', ''),
+            "상태": influencer.get('active', True),
+            "팔로워": influencer.get('followers_count', 0) or 0,
+            "카테고리": influencer.get('content_category', '일반'),
+            "가격": influencer.get('price_krw', 0) or 0,
+            "매니저평점": influencer.get('manager_rating', 3) or 3,
+            "콘텐츠평점": influencer.get('content_rating', 3) or 3,
+            "담당자": influencer.get('created_by', ''),
             "등록일": formatted_date,
-            "SNS URL": influencer.get('sns_url', 'N/A'),
-            "Owner Comment": influencer.get('owner_comment', 'N/A')[:50] + "..." if influencer.get('owner_comment') and len(str(influencer.get('owner_comment'))) > 50 else influencer.get('owner_comment', 'N/A')
+            "SNS URL": influencer.get('sns_url', ''),
+            "Owner Comment": owner_comment,
+            "DM 응답정보": dm_reply
         })
     
     # DataFrame으로 변환
     df = pd.DataFrame(table_data)
     
-    # 테이블 표시 (스크롤 가능)
-    st.dataframe(
+    # 컬럼 설정
+    column_config = {
+        "ID": st.column_config.NumberColumn("ID", disabled=True, help="인플루언서 고유 ID"),
+        "플랫폼": st.column_config.SelectboxColumn(
+            "플랫폼",
+            help="SNS 플랫폼을 선택하세요",
+            options=["instagram", "youtube", "tiktok", "twitter"],
+            required=True,
+        ),
+        "이름": st.column_config.TextColumn(
+            "이름",
+            help="인플루언서 이름 또는 별칭",
+            max_chars=100,
+        ),
+        "SNS ID": st.column_config.TextColumn(
+            "SNS ID", 
+            help="SNS 계정 ID",
+            max_chars=50,
+            required=True,
+        ),
+        "상태": st.column_config.CheckboxColumn(
+            "활성 상태",
+            help="인플루언서 활성/비활성 상태",
+        ),
+        "팔로워": st.column_config.NumberColumn(
+            "팔로워 수",
+            help="팔로워 수를 입력하세요",
+            min_value=0,
+            format="%d",
+        ),
+        "카테고리": st.column_config.SelectboxColumn(
+            "카테고리",
+            help="콘텐츠 카테고리",
+            options=["일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"],
+        ),
+        "가격": st.column_config.NumberColumn(
+            "가격 (원)",
+            help="협찬 가격을 입력하세요",
+            min_value=0,
+            format="%d원",
+        ),
+        "매니저평점": st.column_config.NumberColumn(
+            "매니저 평점",
+            help="1-5점 사이로 입력하세요",
+            min_value=1,
+            max_value=5,
+            step=1,
+        ),
+        "콘텐츠평점": st.column_config.NumberColumn(
+            "콘텐츠 평점",
+            help="1-5점 사이로 입력하세요", 
+            min_value=1,
+            max_value=5,
+            step=1,
+        ),
+        "담당자": st.column_config.TextColumn(
+            "담당자",
+            help="담당자 이름",
+            max_chars=50,
+        ),
+        "등록일": st.column_config.TextColumn(
+            "등록일",
+            disabled=True,
+            help="등록 날짜 (읽기 전용)",
+        ),
+        "SNS URL": st.column_config.TextColumn(
+            "SNS URL",
+            help="SNS 프로필 URL",
+            max_chars=200,
+        ),
+        "Owner Comment": st.column_config.TextColumn(
+            "Owner Comment",
+            help="담당자 코멘트 (상세 편집은 별도 버튼 사용)",
+            max_chars=500,
+        ),
+        "DM 응답정보": st.column_config.TextColumn(
+            "DM 응답정보",
+            help="인플루언서의 DM 응답 내용",
+            max_chars=500,
+        ),
+    }
+    
+    # 편집 가능한 테이블 표시
+    edited_df = st.data_editor(
         df,
         use_container_width=True,
-        height=600,  # 고정 높이로 스크롤 가능하게 설정
-        hide_index=True
+        height=600,
+        column_config=column_config,
+        disabled=["ID", "등록일"],  # 수정 불가능한 컬럼
+        hide_index=True,
+        key="influencer_editor"
     )
     
+    # 편집된 데이터가 있는지 확인하고 저장
+    if not edited_df.equals(df):
+        st.markdown("---")
+        st.markdown("### 💾 변경사항 저장")
+        
+        # 변경된 행 찾기
+        changes_made = False
+        for idx, (original_row, edited_row) in enumerate(zip(df.itertuples(), edited_df.itertuples())):
+            if original_row != edited_row:
+                changes_made = True
+                break
+        
+        if changes_made:
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                if st.button("💾 변경사항 저장", type="primary", key="save_changes"):
+                    save_edited_influencers(df, edited_df)
+            
+            with col2:
+                if st.button("🔄 변경사항 취소", key="cancel_changes"):
+                    st.rerun()
+        else:
+            st.info("변경된 내용이 없습니다.")
+    
+    # 상세 편집 안내 메시지
+    st.markdown("---")
+    st.markdown("### 💡 편집 안내")
+    st.info("📝 **간단한 정보**: 위 테이블에서 직접 편집 가능  \n📋 **상세 정보**: '인플루언서 정보 수정' 탭에서 개별 검색 후 편집 가능")
+    
     # 총 개수 표시
-    st.caption(f"총 {len(influencers)}명의 인플루언서가 표시됩니다.")
+    st.caption(f"총 {len(influencers)}명의 인플루언서가 표시됩니다. (편집 가능)")
+
+def save_edited_influencers(original_df, edited_df):
+    """편집된 인플루언서 데이터를 저장"""
+    try:
+        # 변경된 행들을 찾아서 업데이트
+        updated_count = 0
+        error_count = 0
+        
+        # DataFrame을 인덱스 기반으로 비교
+        for idx in range(len(original_df)):
+            original_row = original_df.iloc[idx]
+            edited_row = edited_df.iloc[idx]
+            
+            # 변경사항이 있는지 확인 (ID 제외)
+            comparison_columns = [col for col in original_df.columns if col != "ID"]
+            has_changes = False
+            
+            for col in comparison_columns:
+                if str(original_row[col]) != str(edited_row[col]):
+                    has_changes = True
+                    break
+            
+            if has_changes:
+                influencer_id = edited_row["ID"]
+                
+                # 업데이트할 데이터 준비 (NumPy 타입을 Python 기본 타입으로 변환)
+                update_data = {
+                    'platform': str(edited_row["플랫폼"]),
+                    'sns_id': str(edited_row["SNS ID"]),
+                    'influencer_name': str(edited_row["이름"]) if edited_row["이름"] else str(edited_row["SNS ID"]),
+                    'active': bool(edited_row["상태"]),
+                    'followers_count': int(edited_row["팔로워"]) if edited_row["팔로워"] is not None else 0,
+                    'content_category': str(edited_row["카테고리"]),
+                    'price_krw': int(edited_row["가격"]) if edited_row["가격"] is not None else 0,
+                    'manager_rating': int(edited_row["매니저평점"]) if edited_row["매니저평점"] is not None else None,
+                    'content_rating': int(edited_row["콘텐츠평점"]) if edited_row["콘텐츠평점"] is not None else None,
+                    'created_by': str(edited_row["담당자"]).strip() if edited_row["담당자"] and str(edited_row["담당자"]).strip() else None,
+                    'sns_url': str(edited_row["SNS URL"]) if edited_row["SNS URL"] else None,
+                    'owner_comment': str(edited_row["Owner Comment"]) if edited_row["Owner Comment"] else None,
+                    'dm_reply': str(edited_row["DM 응답정보"]) if edited_row["DM 응답정보"] else None
+                }
+                
+                # 데이터베이스 업데이트
+                result = db_manager.update_influencer(influencer_id, update_data)
+                if result["success"]:
+                    updated_count += 1
+                else:
+                    error_count += 1
+                    st.error(f"❌ ID {influencer_id} 업데이트 실패: {result['message']}")
+        
+        # 결과 표시
+        if updated_count > 0:
+            st.success(f"✅ {updated_count}명의 인플루언서 정보가 업데이트되었습니다!")
+        
+        if error_count > 0:
+            st.error(f"❌ {error_count}명의 인플루언서 업데이트에 실패했습니다.")
+        
+        if updated_count > 0:
+            # 캐시 초기화
+            if "influencers_data" in st.session_state:
+                del st.session_state["influencers_data"]
+            if "manager_filtered_influencers" in st.session_state:
+                del st.session_state["manager_filtered_influencers"]
+            
+            # 페이지 새로고침
+            st.rerun()
+            
+    except Exception as e:
+        st.error(f"데이터 저장 중 오류가 발생했습니다: {e}")
+        import traceback
+        st.code(traceback.format_exc())
 
 def render_influencer_tab():
     """인플루언서 탭 - 기존 함수 유지 (호환성)"""
