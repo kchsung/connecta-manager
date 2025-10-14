@@ -696,6 +696,15 @@ def render_influencer_edit_form(influencer):
             key=f"edit_shipping_{influencer['id']}"
         )
         
+        # DM 응답 정보
+        st.markdown("#### 💬 DM 응답 정보")
+        dm_reply = st.text_area(
+            "DM 응답 내용", 
+            value=influencer.get('dm_reply', ''),
+            key=f"edit_dm_reply_{influencer['id']}",
+            help="인플루언서의 DM 응답 내용을 기록하세요"
+        )
+        
         # 태그 정보
         tags = st.text_input(
             "태그 (쉼표로 구분)", 
@@ -736,6 +745,7 @@ def render_influencer_edit_form(influencer):
                         'contact_method': selected_contact_method_db,
                         'preferred_mode': selected_preferred_mode_db,
                         'shipping_address': shipping_address,
+                        'dm_reply': dm_reply,
                         'tags': tags,
                         'created_by': created_by if created_by.strip() else None
                     }

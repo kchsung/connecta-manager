@@ -73,7 +73,7 @@ def search_single_influencer(search_term: str):
         
         # 1단계: 정확한 매칭 시도 (원본 검색어)
         exact_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
             .or_(f"sns_id.eq.{search_term},influencer_name.eq.{search_term}")\
             .execute()
         
@@ -86,7 +86,7 @@ def search_single_influencer(search_term: str):
         
         # 2단계: 정리된 검색어로 정확한 매칭
         clean_exact_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
             .or_(f"sns_id.eq.{clean_search_term},influencer_name.eq.{clean_search_term}")\
             .execute()
         
@@ -99,7 +99,7 @@ def search_single_influencer(search_term: str):
         
         # 3단계: 부분 매칭 시도 (SNS ID 우선)
         partial_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
             .or_(f"sns_id.ilike.%{clean_search_term}%,influencer_name.ilike.%{clean_search_term}%")\
             .execute()
         
@@ -112,7 +112,7 @@ def search_single_influencer(search_term: str):
         
         # 4단계: 원본 검색어로 부분 매칭
         original_partial_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
             .or_(f"sns_id.ilike.%{search_term}%,influencer_name.ilike.%{search_term}%")\
             .execute()
         
@@ -162,7 +162,7 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
         
         # 1단계: 정확한 매칭 시도 (원본 검색어)
         exact_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
             .eq("platform", platform)\
             .or_(f"sns_id.eq.{search_term},influencer_name.eq.{search_term}")\
             .execute()
@@ -176,7 +176,7 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
         
         # 2단계: 정리된 검색어로 정확한 매칭
         clean_exact_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
             .eq("platform", platform)\
             .or_(f"sns_id.eq.{clean_search_term},influencer_name.eq.{clean_search_term}")\
             .execute()
@@ -190,7 +190,7 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
         
         # 3단계: 부분 매칭 시도 (SNS ID 우선)
         partial_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
             .eq("platform", platform)\
             .or_(f"sns_id.ilike.%{clean_search_term}%,influencer_name.ilike.%{clean_search_term}%")\
             .execute()
@@ -204,7 +204,7 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
         
         # 4단계: 원본 검색어로 부분 매칭
         original_partial_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by")\
+            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
             .eq("platform", platform)\
             .or_(f"sns_id.ilike.%{search_term}%,influencer_name.ilike.%{search_term}%")\
             .execute()

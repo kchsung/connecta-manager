@@ -61,6 +61,7 @@ class Influencer(BaseModel):
     profile_text: Optional[str] = None
     profile_image_url: Optional[str] = None
     first_crawled: Optional[bool] = False
+    dm_reply: Optional[str] = None
 
 class CampaignInfluencer(BaseModel):
     """캠페인-인플루언서 연결 데이터 모델"""
