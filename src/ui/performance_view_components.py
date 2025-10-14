@@ -269,6 +269,7 @@ def render_performance_view_tab():
                 "인플루언서": participation.get("influencer_name") or participation.get("sns_id", "N/A"),
                 "플랫폼": participation.get("platform", "N/A"),
                 "SNS ID": participation.get("sns_id", "N/A"),
+                "팔로워 수": participation.get("followers_count", 0),
                 "참여 상태": format_participation_status(participation.get("status", "assigned")),
                 "샘플 상태": participation.get("sample_status", "요청"),
                 "업로드 완료": "✅" if participation.get("content_uploaded", False) else "❌",
@@ -287,7 +288,7 @@ def render_performance_view_tab():
         df = pd.DataFrame(performance_data)
         
         # 숫자형 컬럼들을 명시적으로 정수형으로 변환
-        numeric_columns = ['조회수', '좋아요', '댓글', '콘텐츠 수']
+        numeric_columns = ['팔로워 수', '조회수', '좋아요', '댓글', '콘텐츠 수']
         for col in numeric_columns:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
@@ -300,6 +301,7 @@ def render_performance_view_tab():
             "인플루언서": st.column_config.TextColumn("인플루언서", disabled=True),
             "플랫폼": st.column_config.TextColumn("플랫폼", disabled=True),
             "SNS ID": st.column_config.TextColumn("SNS ID", disabled=True),
+            "팔로워 수": st.column_config.NumberColumn("팔로워 수", disabled=True, help="인플루언서의 팔로워 수"),
             "참여 상태": st.column_config.TextColumn("참여 상태", disabled=True),
             "샘플 상태": st.column_config.TextColumn("샘플 상태", disabled=True),
             "업로드 완료": st.column_config.TextColumn("업로드 완료", disabled=True),

@@ -215,7 +215,6 @@ def render_performance_metrics_analysis(campaign_data):
                         "좋아요": likes,
                         "댓글": comments,
                         "조회수": views,
-                        "공유": shares,
                         "참여율": engagement_rate,
                         "업로드일": content.get("posted_at", "N/A")
                     })
@@ -244,18 +243,16 @@ def render_performance_metrics_analysis(campaign_data):
         - **좋아요**: 해당 캠페인의 모든 콘텐츠 좋아요 수의 합계
         - **댓글**: 해당 캠페인의 모든 콘텐츠 댓글 수의 합계
         - **조회수**: 해당 캠페인의 모든 콘텐츠 조회수(views)의 합계
-        - **공유**: 해당 캠페인의 모든 콘텐츠 공유 수의 합계
-        - **참여율**: (총 좋아요 + 총 댓글 + 총 공유) / 총 조회수 × 100
+        - **참여율**: (총 좋아요 + 총 댓글) / 총 조회수 × 100
         
-        *참여율 = (좋아요 + 댓글 + 공유) / 조회수 × 100*
+        *참여율 = (좋아요 + 댓글) / 조회수 × 100*
         """)
     
     # 캠페인별 총합 계산
     summary_metrics = df_performance.groupby("캠페인").agg({
         "좋아요": "sum",
         "댓글": "sum", 
-        "조회수": "sum",
-        "공유": "sum"
+        "조회수": "sum"
     }).round(2)
     
     # 참여율을 총합 기반으로 재계산
@@ -263,11 +260,10 @@ def render_performance_metrics_analysis(campaign_data):
     for campaign in summary_metrics.index:
         total_likes = summary_metrics.loc[campaign, "좋아요"]
         total_comments = summary_metrics.loc[campaign, "댓글"]
-        total_shares = summary_metrics.loc[campaign, "공유"]
         total_views = summary_metrics.loc[campaign, "조회수"]
         
         if total_views > 0:
-            engagement_rate = round((total_likes + total_comments + total_shares) / total_views * 100, 2)
+            engagement_rate = round((total_likes + total_comments) / total_views * 100, 2)
             summary_metrics.loc[campaign, "참여율"] = engagement_rate
     
     # 참여율을 퍼센트 형식으로 표시
@@ -311,17 +307,16 @@ def render_performance_metrics_analysis(campaign_data):
         - **좋아요**: 해당 플랫폼의 모든 콘텐츠 좋아요 수의 합계
         - **댓글**: 해당 플랫폼의 모든 콘텐츠 댓글 수의 합계  
         - **조회수**: 해당 플랫폼의 모든 콘텐츠 조회수(views)의 합계
-        - **참여율**: (총 좋아요 + 총 댓글 + 총 공유) / 총 조회수 × 100
+        - **참여율**: (총 좋아요 + 총 댓글) / 총 조회수 × 100
         
-        *참여율 = (좋아요 + 댓글 + 공유) / 조회수 × 100*
+        *참여율 = (좋아요 + 댓글) / 조회수 × 100*
         """)
     
     # 플랫폼별 총합 계산
     platform_performance = df_performance.groupby("플랫폼").agg({
         "좋아요": "sum",
         "댓글": "sum",
-        "조회수": "sum",
-        "공유": "sum"
+        "조회수": "sum"
     }).round(2)
     
     # 참여율을 총합 기반으로 재계산
@@ -329,11 +324,10 @@ def render_performance_metrics_analysis(campaign_data):
     for platform in platform_performance.index:
         total_likes = platform_performance.loc[platform, "좋아요"]
         total_comments = platform_performance.loc[platform, "댓글"]
-        total_shares = platform_performance.loc[platform, "공유"]
         total_views = platform_performance.loc[platform, "조회수"]
         
         if total_views > 0:
-            engagement_rate = round((total_likes + total_comments + total_shares) / total_views * 100, 2)
+            engagement_rate = round((total_likes + total_comments) / total_views * 100, 2)
             platform_performance.loc[platform, "참여율"] = engagement_rate
     
     # 참여율을 퍼센트 형식으로 표시
@@ -369,16 +363,16 @@ def render_influencer_analysis(campaign_data):
                 total_views = sum(content.get("views", 0) for content in contents)
                 total_shares = sum(content.get("shares", 0) for content in contents)
                 
-                # 참여율 계산: (총 좋아요 + 총 댓글 + 총 공유) / 총 조회수 × 100
+                # 참여율 계산: (총 좋아요 + 총 댓글) / 총 조회수 × 100
                 avg_engagement = 0
                 if total_views > 0:
-                    avg_engagement = round((total_likes + total_comments + total_shares) / total_views * 100, 2)
+                    avg_engagement = round((total_likes + total_comments) / total_views * 100, 2)
                 
                 influencer_data.append({
                     "캠페인": campaign["campaign_name"],
                     "인플루언서": participation.get("influencer_name", "N/A"),
                     "플랫폼": participation.get("platform", "N/A"),
-                    "팔로워": participation.get("follower_count", 0),
+                    "팔로워": participation.get("followers_count", 0),
                     "총 좋아요": total_likes,
                     "총 댓글": total_comments,
                     "총 조회수": total_views,
@@ -434,16 +428,47 @@ def render_influencer_analysis(campaign_data):
     
     # 팔로워 수 vs 성과 상관관계
     st.markdown("##### 📊 팔로워 수 vs 성과 상관관계")
-    fig_scatter = px.scatter(
+    
+    # 3개의 상관관계 차트를 2행으로 배치
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # 팔로워 수 vs 좋아요 상관관계
+        fig_likes = px.scatter(
+            df_influencers, 
+            x="팔로워", 
+            y="총 좋아요", 
+            size="평균 참여율",
+            color="플랫폼",
+            hover_data=["인플루언서", "캠페인"],
+            title="팔로워 수 vs 좋아요 수 상관관계"
+        )
+        st.plotly_chart(fig_likes, use_container_width=True)
+    
+    with col2:
+        # 팔로워 수 vs 댓글 상관관계
+        fig_comments = px.scatter(
+            df_influencers, 
+            x="팔로워", 
+            y="총 댓글", 
+            size="평균 참여율",
+            color="플랫폼",
+            hover_data=["인플루언서", "캠페인"],
+            title="팔로워 수 vs 댓글 수 상관관계"
+        )
+        st.plotly_chart(fig_comments, use_container_width=True)
+    
+    # 팔로워 수 vs 조회수 상관관계 (전체 너비)
+    fig_views = px.scatter(
         df_influencers, 
         x="팔로워", 
-        y="총 좋아요", 
+        y="총 조회수", 
         size="평균 참여율",
         color="플랫폼",
         hover_data=["인플루언서", "캠페인"],
-        title="팔로워 수 vs 좋아요 수 상관관계"
+        title="팔로워 수 vs 조회수 상관관계"
     )
-    st.plotly_chart(fig_scatter, use_container_width=True)
+    st.plotly_chart(fig_views, use_container_width=True)
 
 
 def render_trend_analysis(campaign_data):
@@ -465,10 +490,10 @@ def render_trend_analysis(campaign_data):
                         shares = content.get("shares", 0)
                         views = content.get("views", 0)
                         
-                        # 참여율 계산: (좋아요 + 댓글 + 공유) / 조회수 × 100
+                        # 참여율 계산: (좋아요 + 댓글) / 조회수 × 100
                         engagement_rate = 0
                         if views > 0:
-                            engagement_rate = round((likes + comments + shares) / views * 100, 2)
+                            engagement_rate = round((likes + comments) / views * 100, 2)
                         
                         trend_data.append({
                             "날짜": pd.to_datetime(upload_date).date(),
@@ -614,12 +639,10 @@ def render_roi_analysis(campaign_data):
                     total_views += content.get("views", 0)
                     content_count += 1
             
-            # 참여율 계산: (총 좋아요 + 총 댓글 + 총 공유) / 총 조회수 × 100
-            total_shares = sum(content.get("shares", 0) for participation in participations 
-                             for content in db_manager.get_campaign_influencer_contents(participation["id"]))
+            # 참여율 계산: (총 좋아요 + 총 댓글) / 총 조회수 × 100
             avg_engagement = 0
             if total_views > 0:
-                avg_engagement = round((total_likes + total_comments + total_shares) / total_views * 100, 2)
+                avg_engagement = round((total_likes + total_comments) / total_views * 100, 2)
             
             # ROI 지표 계산
             cost_per_like = round(total_cost / total_likes, 2) if total_likes > 0 else 0
@@ -667,7 +690,7 @@ def render_roi_analysis(campaign_data):
         - **총 콘텐츠**: 해당 캠페인에서 생성된 총 콘텐츠 수
         - **총 비용**: 해당 캠페인의 모든 인플루언서 비용 합계 (원)
         - **총 좋아요/댓글/조회수**: 해당 캠페인의 모든 콘텐츠 성과 합계
-        - **평균 참여율**: (총 좋아요 + 총 댓글 + 총 공유) / 총 조회수 × 100
+        - **평균 참여율**: (총 좋아요 + 총 댓글) / 총 조회수 × 100
         - **좋아요/인플루언서**: 총 좋아요 수 ÷ 참여 인플루언서 수
         - **조회수/인플루언서**: 총 조회수 ÷ 참여 인플루언서 수
         - **좋아요당 비용**: 총 비용 ÷ 총 좋아요 수
@@ -765,7 +788,7 @@ def render_roi_analysis(campaign_data):
         **비용 효율성 점수 = (비용 효율성 × 0.4) + (평균 참여율 × 0.6)**
         
         - **비용 효율성**: 1000원당 좋아요 수 (좋아요당 비용의 역수)
-        - **평균 참여율**: (총 좋아요 + 총 댓글 + 총 공유) / 총 조회수 × 100
+        - **평균 참여율**: (총 좋아요 + 총 댓글) / 총 조회수 × 100
         - **비용 효율성 가중치**: 40%
         - **참여율 가중치**: 60%
         
@@ -937,10 +960,10 @@ def get_performance_metrics_data(campaign_data):
                     shares = content.get("shares", 0)
                     views = content.get("views", 0)
                     
-                    # 참여율 계산: (좋아요 + 댓글 + 공유) / 조회수 × 100
+                    # 참여율 계산: (좋아요 + 댓글) / 조회수 × 100
                     engagement_rate = 0
                     if views > 0:
-                        engagement_rate = round((likes + comments + shares) / views * 100, 2)
+                        engagement_rate = round((likes + comments) / views * 100, 2)
                     
                     data.append({
                         "캠페인": campaign["campaign_name"],
@@ -949,7 +972,6 @@ def get_performance_metrics_data(campaign_data):
                         "좋아요": likes,
                         "댓글": comments,
                         "조회수": views,
-                        "공유": shares,
                         "참여율": engagement_rate,
                         "업로드일": content.get("posted_at", "N/A")
                     })
@@ -971,16 +993,16 @@ def get_influencer_analysis_data(campaign_data):
                 total_views = sum(content.get("views", 0) for content in contents)
                 total_shares = sum(content.get("shares", 0) for content in contents)
                 
-                # 참여율 계산: (총 좋아요 + 총 댓글 + 총 공유) / 총 조회수 × 100
+                # 참여율 계산: (총 좋아요 + 총 댓글) / 총 조회수 × 100
                 avg_engagement = 0
                 if total_views > 0:
-                    avg_engagement = round((total_likes + total_comments + total_shares) / total_views * 100, 2)
+                    avg_engagement = round((total_likes + total_comments) / total_views * 100, 2)
                 
                 data.append({
                     "캠페인": campaign["campaign_name"],
                     "인플루언서": participation.get("influencer_name", "N/A"),
                     "플랫폼": participation.get("platform", "N/A"),
-                    "팔로워": participation.get("follower_count", 0),
+                    "팔로워": participation.get("followers_count", 0),
                     "총 좋아요": total_likes,
                     "총 댓글": total_comments,
                     "총 조회수": total_views,
