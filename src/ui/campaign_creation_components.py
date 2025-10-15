@@ -46,13 +46,9 @@ def render_campaign_creation():
             )
             end_date = st.date_input("캠페인 종료날짜", value=None)
         
-        # 예산 정보
-        st.markdown("#### 💰 예산 정보")
-        col3, col4 = st.columns(2)
-        with col3:
-            budget = st.number_input("캠페인 예산 (원)", min_value=0, value=0, step=10000)
-        with col4:
-            target_reach = st.number_input("목표 도달률", min_value=0, max_value=100, value=0, step=1)
+        # 태그 정보
+        st.markdown("#### 🏷️ 태그 정보")
+        tags = st.text_input("태그 (쉼표로 구분)", placeholder="예: 뷰티, 시딩, 2024")
         
         if st.form_submit_button("캠페인 생성", type="primary"):
             if not campaign_name:
@@ -67,8 +63,7 @@ def render_campaign_creation():
                     'start_date': start_date,
                     'end_date': end_date,
                     'status': status,
-                    'budget': budget,
-                    'target_reach': target_reach
+                    'tags': tags
                 }
                 
                 validation = validate_campaign_data(campaign_data)
@@ -76,16 +71,19 @@ def render_campaign_creation():
                     for error in validation["errors"]:
                         st.error(error)
                 else:
+                    # date 객체를 datetime 객체로 변환
+                    start_datetime = datetime.combine(start_date, datetime.min.time()) if start_date else None
+                    end_datetime = datetime.combine(end_date, datetime.min.time()) if end_date else None
+                    
                     campaign = Campaign(
                         campaign_name=campaign_name,
                         campaign_type=campaign_type,
                         campaign_description=campaign_description,
                         campaign_instructions=campaign_instructions,
-                        start_date=start_date,
-                        end_date=end_date,
+                        start_date=start_datetime,
+                        end_date=end_datetime,
                         status=status,
-                        budget=budget,
-                        target_reach=target_reach
+                        tags=tags
                     )
                     
                     result = db_manager.create_campaign(campaign)

@@ -52,7 +52,13 @@ class DatabaseManager:
     def create_campaign(self, campaign: Campaign) -> Dict[str, Any]:
         """새 캠페인 생성"""
         try:
+            # datetime 객체를 ISO 형식 문자열로 변환
             campaign_data = campaign.dict()
+            if 'start_date' in campaign_data and campaign_data['start_date']:
+                campaign_data['start_date'] = campaign_data['start_date'].isoformat()
+            if 'end_date' in campaign_data and campaign_data['end_date']:
+                campaign_data['end_date'] = campaign_data['end_date'].isoformat()
+            
             result = simple_client.create_campaign(campaign_data)
             return result
         except Exception as e:
