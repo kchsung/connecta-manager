@@ -176,6 +176,32 @@ def render_influencer_registration_form():
             help="홍길동"
         )
         
+        # 연락방법 선택
+        contact_method_mapping = {
+            'dm': 'DM',
+            'email': '이메일', 
+            'phone': '전화',
+            'kakao': '카카오톡',
+            'form': '폼',
+            'other': '기타'
+        }
+        contact_method_options = list(contact_method_mapping.values())
+        contact_method_db_values = list(contact_method_mapping.keys())
+        
+        contact_method = st.selectbox(
+            "연락 방법",
+            contact_method_options,
+            key="create_contact_method"
+        )
+        
+        # 연락방법 추가정보 필드 (언제나 표시)
+        contacts_method_etc = st.text_input(
+            "연락방법 추가정보",
+            placeholder="연락방법에 대한 추가 상세 정보를 입력해주세요",
+            key="create_contacts_method_etc",
+            help="예: 특별한 연락 방법, 추가 연락처 정보 등"
+        )
+        
         # Owner Comment와 Content Category 추가
         owner_comment = st.text_area("Owner Comment", placeholder="인플루언서에 대한 담당자 코멘트")
         
@@ -207,11 +233,16 @@ def render_influencer_registration_form():
                 # 별칭이 비어있으면 SNS ID를 사용
                 final_influencer_name = influencer_name.strip() if influencer_name else sns_id
                 
+                # 선택된 연락방법을 데이터베이스 값으로 변환
+                selected_contact_method_db = contact_method_db_values[contact_method_options.index(contact_method)]
+                
                 influencer = Influencer(
                     platform=platform,
                     sns_id=sns_id,
                     influencer_name=final_influencer_name,
                     sns_url=sns_url,
+                    contact_method=selected_contact_method_db,
+                    contacts_method_etc=contacts_method_etc,
                     owner_comment=owner_comment,
                     content_category=content_category,
                     followers_count=followers_count,
@@ -308,11 +339,14 @@ def render_influencer_search_for_inquiry():
                     
                     # 새로운 인플루언서 선택
                     st.session_state.selected_influencer = search_result
+                    st.session_state.search_success = True  # 검색 성공 플래그
                     active_status = "활성" if search_result.get('active', True) else "비활성"
                     st.success(f"✅ 인플루언서를 찾았습니다: {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')}) [{active_status}]")
                     
                     # 검색 결과를 좌측에 표시
                     render_influencer_search_result(search_result)
+                    
+                    # 즉시 리렌더링하여 우측 수정 폼이 활성화되도록 함
                     st.rerun()
             else:
                 # 더 자세한 오류 메시지와 도움말 제공
@@ -485,7 +519,7 @@ def render_influencer_detail_view():
     st.subheader("✏️ 인플루언서 정보 수정")
     
     # 선택된 인플루언서가 있는지 확인
-    if 'selected_influencer' in st.session_state:
+    if 'selected_influencer' in st.session_state and st.session_state.get('search_success', False):
         influencer = st.session_state.selected_influencer
         render_influencer_edit_form(influencer)
     else:
@@ -640,6 +674,7 @@ def render_influencer_edit_form(influencer):
                 value=influencer.get('phone_number', ''),
                 key=f"edit_phone_{influencer['id']}"
             )
+            
             # 데이터베이스 enum 값과 매핑
             contact_method_mapping = {
                 'dm': 'DM',
@@ -688,6 +723,14 @@ def render_influencer_edit_form(influencer):
                 preferred_mode_options,
                 index=preferred_mode_index,
                 key=f"edit_preferred_mode_{influencer['id']}"
+            )
+            
+            # 연락방법 추가정보 필드 (언제나 표시)
+            contacts_method_etc = st.text_input(
+                "연락방법 추가정보",
+                value=influencer.get('contacts_method_etc', ''),
+                key=f"edit_contacts_method_etc_{influencer['id']}",
+                help="연락방법에 대한 추가 상세 정보를 입력해주세요"
             )
         
         shipping_address = st.text_area(
@@ -743,6 +786,7 @@ def render_influencer_edit_form(influencer):
                         'content_rating': content_rating,
                         'phone_number': phone_number,
                         'contact_method': selected_contact_method_db,
+                        'contacts_method_etc': contacts_method_etc,
                         'preferred_mode': selected_preferred_mode_db,
                         'shipping_address': shipping_address,
                         'dm_reply': dm_reply,

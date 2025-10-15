@@ -68,59 +68,18 @@ def search_single_influencer(search_term: str):
                 "data": None
             }
         
-        # 검색어 정규화 (@ 제거, 공백 제거, 소문자 변환)
-        clean_search_term = search_term.replace('@', '').strip().lower()
-        
-        # 1단계: 정확한 매칭 시도 (원본 검색어)
-        exact_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
-            .or_(f"sns_id.eq.{search_term},influencer_name.eq.{search_term}")\
+        # 서버 코드와 동일한 검색 로직 사용
+        search_response = client.table("connecta_influencers")\
+            .select("*")\
+            .order("created_at", desc=True)\
+            .or_(f"influencer_name.ilike.%{search_term}%,sns_id.ilike.%{search_term}%")\
             .execute()
         
-        if exact_search.data:
+        if search_response.data:
             return {
                 "success": True,
-                "message": f"✅ 검색 결과: {len(exact_search.data)}명의 인플루언서를 찾았습니다.",
-                "data": exact_search.data
-            }
-        
-        # 2단계: 정리된 검색어로 정확한 매칭
-        clean_exact_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
-            .or_(f"sns_id.eq.{clean_search_term},influencer_name.eq.{clean_search_term}")\
-            .execute()
-        
-        if clean_exact_search.data:
-            return {
-                "success": True,
-                "message": f"✅ 검색 결과: {len(clean_exact_search.data)}명의 인플루언서를 찾았습니다.",
-                "data": clean_exact_search.data
-            }
-        
-        # 3단계: 부분 매칭 시도 (SNS ID 우선)
-        partial_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
-            .or_(f"sns_id.ilike.%{clean_search_term}%,influencer_name.ilike.%{clean_search_term}%")\
-            .execute()
-        
-        if partial_search.data:
-            return {
-                "success": True,
-                "message": f"✅ 검색 결과: {len(partial_search.data)}명의 인플루언서를 찾았습니다.",
-                "data": partial_search.data
-            }
-        
-        # 4단계: 원본 검색어로 부분 매칭
-        original_partial_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
-            .or_(f"sns_id.ilike.%{search_term}%,influencer_name.ilike.%{search_term}%")\
-            .execute()
-        
-        if original_partial_search.data:
-            return {
-                "success": True,
-                "message": f"✅ 검색 결과: {len(original_partial_search.data)}명의 인플루언서를 찾았습니다.",
-                "data": original_partial_search.data
+                "message": f"✅ 검색 결과: {len(search_response.data)}명의 인플루언서를 찾았습니다.",
+                "data": search_response.data
             }
         
         return {
@@ -157,63 +116,19 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
                 "data": None
             }
         
-        # 검색어 정규화 (@ 제거, 공백 제거, 소문자 변환)
-        clean_search_term = search_term.replace('@', '').strip().lower()
-        
-        # 1단계: 정확한 매칭 시도 (원본 검색어)
-        exact_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
+        # 서버 코드와 동일한 검색 로직 사용 (플랫폼 필터 포함)
+        search_response = client.table("connecta_influencers")\
+            .select("*")\
+            .order("created_at", desc=True)\
             .eq("platform", platform)\
-            .or_(f"sns_id.eq.{search_term},influencer_name.eq.{search_term}")\
+            .or_(f"influencer_name.ilike.%{search_term}%,sns_id.ilike.%{search_term}%")\
             .execute()
         
-        if exact_search.data:
+        if search_response.data:
             return {
                 "success": True,
-                "message": f"✅ {platform}에서 {len(exact_search.data)}명의 인플루언서를 찾았습니다.",
-                "data": exact_search.data
-            }
-        
-        # 2단계: 정리된 검색어로 정확한 매칭
-        clean_exact_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
-            .eq("platform", platform)\
-            .or_(f"sns_id.eq.{clean_search_term},influencer_name.eq.{clean_search_term}")\
-            .execute()
-        
-        if clean_exact_search.data:
-            return {
-                "success": True,
-                "message": f"✅ {platform}에서 {len(clean_exact_search.data)}명의 인플루언서를 찾았습니다.",
-                "data": clean_exact_search.data
-            }
-        
-        # 3단계: 부분 매칭 시도 (SNS ID 우선)
-        partial_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
-            .eq("platform", platform)\
-            .or_(f"sns_id.ilike.%{clean_search_term}%,influencer_name.ilike.%{clean_search_term}%")\
-            .execute()
-        
-        if partial_search.data:
-            return {
-                "success": True,
-                "message": f"✅ {platform}에서 {len(partial_search.data)}명의 인플루언서를 찾았습니다.",
-                "data": partial_search.data
-            }
-        
-        # 4단계: 원본 검색어로 부분 매칭
-        original_partial_search = client.table("connecta_influencers")\
-            .select("id, sns_id, influencer_name, platform, content_category, followers_count, post_count, sns_url, owner_comment, profile_text, tags, contact_method, preferred_mode, phone_number, shipping_address, price_krw, manager_rating, content_rating, created_at, updated_at, active, created_by, dm_reply")\
-            .eq("platform", platform)\
-            .or_(f"sns_id.ilike.%{search_term}%,influencer_name.ilike.%{search_term}%")\
-            .execute()
-        
-        if original_partial_search.data:
-            return {
-                "success": True,
-                "message": f"✅ {platform}에서 {len(original_partial_search.data)}명의 인플루언서를 찾았습니다.",
-                "data": original_partial_search.data
+                "message": f"✅ {platform}에서 {len(search_response.data)}명의 인플루언서를 찾았습니다.",
+                "data": search_response.data
             }
         
         return {
@@ -241,7 +156,12 @@ def render_influencer_info_inline(influencer):
     with col2:
         st.markdown(f"**팔로워:** {influencer.get('followers_count', 0):,}명")
         st.markdown(f"**카테고리:** {influencer.get('content_category', 'N/A')}")
-        st.markdown(f"**연락방법:** {influencer.get('contact_method', 'N/A')}")
+        contact_method = influencer.get('contact_method', 'N/A')
+        contacts_method_etc = influencer.get('contacts_method_etc', '')
+        if contact_method == 'other' and contacts_method_etc:
+            st.markdown(f"**연락방법:** 기타 ({contacts_method_etc})")
+        else:
+            st.markdown(f"**연락방법:** {contact_method}")
     
     with col3:
         st.markdown(f"**평점:** {influencer.get('manager_rating', 'N/A')}/5")

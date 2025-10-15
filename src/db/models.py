@@ -43,7 +43,8 @@ class Influencer(BaseModel):
     influencer_name: Optional[str] = ""
     sns_id: str
     sns_url: str
-    contact_method: Optional[str] = "dm"  # dm, email, phone, kakao
+    contact_method: Optional[str] = "dm"  # dm, email, phone, kakao, form, other
+    contacts_method_etc: Optional[str] = None  # 연락방법이 'other'일 때 추가 정보
     followers_count: Optional[int] = 0
     phone_number: Optional[str] = None
     kakao_channel_id: Optional[str] = None

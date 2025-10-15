@@ -6,6 +6,7 @@ create table public.connecta_influencers (
   sns_id text not null,
   sns_url text not null,
   contact_method public.contact_method not null default 'dm'::contact_method,
+  contact_method_etc text null,
   followers_count bigint not null default 0,
   phone_number text null,
   kakao_channel_id text null,

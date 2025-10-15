@@ -80,6 +80,7 @@ def render_influencer_detail_form(influencer):
         
         # Contact Method
         contact_method = influencer.get('contact_method', 'dm')
+        contact_method_etc = influencer.get('contact_method_etc', '')
         contact_method_display = {
             "dm": "💬 DM",
             "email": "📧 이메일",
@@ -88,7 +89,11 @@ def render_influencer_detail_form(influencer):
             "form": "📝 폼",
             "other": "🔧 기타"
         }.get(contact_method, f"🔧 {contact_method}")
-        st.markdown(f"**📱 연락 방식:** {contact_method_display}")
+        
+        if contact_method == 'other' and contact_method_etc:
+            st.markdown(f"**📱 연락 방식:** {contact_method_display} ({contact_method_etc})")
+        else:
+            st.markdown(f"**📱 연락 방식:** {contact_method_display}")
     
     # 배송 정보
     st.markdown("### 📦 배송 정보")
@@ -211,6 +216,15 @@ def render_influencer_detail_form(influencer):
                         "other": "🔧 기타"
                     }[x]
                 )
+            
+            with col2:
+                # 연락방법 추가정보 필드 (언제나 표시)
+                contacts_method_etc = st.text_input(
+                    "📝 연락방법 추가정보",
+                    value=influencer.get('contacts_method_etc', ''),
+                    key=f"edit_contacts_method_etc_{influencer['id']}",
+                    help="연락방법에 대한 추가 상세 정보를 입력해주세요"
+                )
                 
                 # Preferred Mode (enum: seeding, promotion, sales)
                 preferred_mode_options = ["seeding", "promotion", "sales"]
@@ -224,8 +238,7 @@ def render_influencer_detail_form(influencer):
                         "sales": "💰 세일즈"
                     }[x]
                 )
-            
-            with col2:
+                
                 # Price KRW
                 new_price_krw = st.number_input(
                     "💰 Price (KRW)", 
@@ -343,6 +356,7 @@ def render_influencer_detail_form(influencer):
                         "content_category": new_content_category,
                         "tags": actual_tags,
                         "contact_method": new_contact_method,
+                        "contacts_method_etc": contacts_method_etc,
                         "preferred_mode": new_preferred_mode,
                         "price_krw": float(new_price_krw) if new_price_krw and new_price_krw > 0 else None,
                         "manager_rating": int(new_manager_rating) if new_manager_rating and new_manager_rating.isdigit() else None,

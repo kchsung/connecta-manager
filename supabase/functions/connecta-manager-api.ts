@@ -102,7 +102,8 @@ interface Influencer {
   influencer_name?: string
   sns_id: string
   sns_url: string
-  contact_method: 'dm' | 'email' | 'phone' | 'kakao'
+  contact_method: 'dm' | 'email' | 'phone' | 'kakao' | 'form' | 'other'
+  contacts_method_etc?: string
   followers_count?: number
   phone_number?: string
   kakao_channel_id?: string
@@ -464,6 +465,96 @@ async function handleCreateInfluencer(req: Request, supabase: any, userId: strin
       success: false,
       error: 'Internal server error',
       message: '인플루언서 생성 중 오류가 발생했습니다.'
+    })
+  }
+}
+
+async function handleUpdateInfluencer(req: Request, supabase: any, userId: string, influencerId: string) {
+  try {
+    const body = await req.json()
+    const updateData: Partial<Influencer> = {
+      ...body,
+      updated_at: new Date().toISOString()
+    }
+
+    // 필수 필드 검증
+    if (!updateData.platform || !updateData.sns_id || !updateData.sns_url) {
+      return createCorsResponse(400, {
+        success: false,
+        error: 'Missing required fields',
+        message: '필수 필드가 누락되었습니다.'
+      })
+    }
+
+    // 기존 인플루언서 존재 확인
+    const { data: existingInfluencer, error: fetchError } = await supabase
+      .from('connecta_influencers')
+      .select('id, created_by')
+      .eq('id', influencerId)
+      .single()
+
+    if (fetchError || !existingInfluencer) {
+      return createCorsResponse(404, {
+        success: false,
+        error: 'Influencer not found',
+        message: '인플루언서를 찾을 수 없습니다.'
+      })
+    }
+
+    // 권한 확인 (생성자이거나 관리자)
+    if (existingInfluencer.created_by !== userId) {
+      return createCorsResponse(403, {
+        success: false,
+        error: 'Forbidden',
+        message: '인플루언서를 수정할 권한이 없습니다.'
+      })
+    }
+
+    // 중복 확인 (같은 플랫폼과 SNS ID 조합)
+    const { data: duplicateInfluencer } = await supabase
+      .from('connecta_influencers')
+      .select('id')
+      .eq('platform', updateData.platform)
+      .eq('sns_id', updateData.sns_id)
+      .neq('id', influencerId)
+      .single()
+
+    if (duplicateInfluencer) {
+      return createCorsResponse(409, {
+        success: false,
+        error: 'Duplicate influencer',
+        message: '이미 존재하는 인플루언서입니다.'
+      })
+    }
+
+    // 인플루언서 업데이트
+    const { data, error } = await supabase
+      .from('connecta_influencers')
+      .update(updateData)
+      .eq('id', influencerId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Database error:', error)
+      return createCorsResponse(500, {
+        success: false,
+        error: 'Database error',
+        message: '인플루언서 업데이트 중 오류가 발생했습니다.'
+      })
+    }
+
+    return createCorsResponse(200, {
+      success: true,
+      data,
+      message: '인플루언서가 성공적으로 업데이트되었습니다.'
+    })
+  } catch (error) {
+    console.error('Update influencer error:', error)
+    return createCorsResponse(500, {
+      success: false,
+      error: 'Internal server error',
+      message: '인플루언서 업데이트 중 오류가 발생했습니다.'
     })
   }
 }
@@ -903,6 +994,15 @@ serve(async (req) => {
             return await handleGetInfluencers(supabase, user.id, id, platform, search)
           case 'POST':
             return await handleCreateInfluencer(req, supabase, user.id)
+          case 'PUT':
+            if (!id) {
+              return createCorsResponse(400, {
+                success: false,
+                error: 'Missing influencer ID',
+                message: '인플루언서 ID가 필요합니다.'
+              })
+            }
+            return await handleUpdateInfluencer(req, supabase, user.id, id)
           default:
             return createCorsResponse(405, {
               success: false,
