@@ -162,10 +162,9 @@ class DatabaseManager:
             self._handle_error(e, "참여 인플루언서 ID 조회")
             return set()
     
-    def add_influencer_to_campaign(self, participation: CampaignInfluencerParticipation) -> Dict[str, Any]:
+    def add_influencer_to_campaign(self, participation_data: Dict[str, Any]) -> Dict[str, Any]:
         """캠페인에 인플루언서 추가"""
         try:
-            participation_data = participation.dict()
             result = simple_client.create_campaign_participation(participation_data)
             return result
         except Exception as e:

@@ -30,9 +30,9 @@ def render_participation_add():
         st.markdown(f"**선택된 캠페인:** {selected_campaign.get('campaign_name', 'N/A')} ({format_campaign_type(selected_campaign.get('campaign_type', ''))})")
         
         # 인플루언서 추가 워크플로우
-        render_add_influencer_workflow(selected_campaign.get('id', ''))
+        render_add_influencer_workflow(selected_campaign)
 
-def render_add_influencer_workflow(campaign_id):
+def render_add_influencer_workflow(selected_campaign):
     """인플루언서 추가 워크플로우"""
    
     # 좌우 분할 레이아웃
@@ -44,7 +44,7 @@ def render_add_influencer_workflow(campaign_id):
     
     with col2:
         st.markdown("##### 📝 인플루언서 추가 정보")
-        render_influencer_add_form(campaign_id)
+        render_influencer_add_form(selected_campaign)
 
 def render_influencer_search_section():
     """인플루언서 검색 섹션"""
@@ -118,7 +118,7 @@ def render_influencer_search_card(search_result):
         
         st.markdown("</div>", unsafe_allow_html=True)
 
-def render_influencer_add_form(campaign_id):
+def render_influencer_add_form(selected_campaign):
     """인플루언서 추가 폼"""
     if 'add_influencer_search_result' not in st.session_state:
         st.info("좌측에서 인플루언서를 검색해주세요.")
@@ -126,6 +126,12 @@ def render_influencer_add_form(campaign_id):
     
     search_result = st.session_state.add_influencer_search_result
     st.markdown(f"**선택된 인플루언서:** {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')})")
+    
+    # campaign_id 안전하게 추출
+    if isinstance(selected_campaign, dict):
+        campaign_id = selected_campaign.get('id', '')
+    else:
+        campaign_id = str(selected_campaign)
     
     # 기존 참여 정보 조회
     existing_participation = None
@@ -202,40 +208,95 @@ def render_influencer_add_form(campaign_id):
             button_text = "➕ 인플루언서 추가"
             button_type = "primary"
         
-        if st.form_submit_button(button_text, type=button_type):
-            # 데이터베이스 스키마에 맞는 필드로 참여 정보 생성
-            participation_data = {
-                'campaign_id': campaign_id,
-                'influencer_id': search_result['id'],
-                'manager_comment': manager_comment,
-                'influencer_requests': influencer_requests,
-                'memo': memo,
-                'sample_status': sample_status,
-                'influencer_feedback': influencer_feedback,
-                'content_uploaded': content_uploaded,
-                'cost_krw': cost_krw,
-                'content_links': existing_participation.get('content_links', []) if existing_participation else []  # 기존 링크 유지
-            }
-            
+        # 버튼들을 컬럼으로 배치
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            if st.form_submit_button(button_text, type=button_type):
+                # campaign_id 안전하게 추출 (이미 위에서 추출했지만 다시 확인)
+                if isinstance(selected_campaign, dict):
+                    campaign_id = selected_campaign.get('id', '')
+                else:
+                    campaign_id = str(selected_campaign)
+                
+                # influencer_id도 안전하게 추출
+                influencer_id = search_result.get('id', '')
+                
+                # 데이터베이스 스키마에 맞는 필드로 참여 정보 생성
+                participation_data = {
+                    'campaign_id': campaign_id,
+                    'influencer_id': influencer_id,
+                    'manager_comment': manager_comment,
+                    'influencer_requests': influencer_requests,
+                    'memo': memo,
+                    'sample_status': sample_status,
+                    'influencer_feedback': influencer_feedback,
+                    'content_uploaded': content_uploaded,
+                    'cost_krw': cost_krw,
+                    'content_links': existing_participation.get('content_links', []) if existing_participation else []  # 기존 링크 유지
+                }
+                
+                
+                if existing_participation:
+                    # 기존 참여 정보 업데이트
+                    result = db_manager.update_campaign_participation(existing_participation['id'], participation_data)
+                    if result["success"]:
+                        st.success("참여 정보가 업데이트되었습니다!")
+                    else:
+                        st.error(f"참여 정보 업데이트 실패: {result['message']}")
+                else:
+                    # 새 참여 정보 추가
+                    result = db_manager.add_influencer_to_campaign(participation_data)
+                    if result["success"]:
+                        st.success("인플루언서가 캠페인에 추가되었습니다!")
+                    else:
+                        st.error(f"인플루언서 추가 실패: {result['message']}")
+                
+                # 성공 시 세션 상태 초기화 및 캐시 초기화
+                if result.get("success"):
+                    if 'add_influencer_search_result' in st.session_state:
+                        del st.session_state['add_influencer_search_result']
+                    if "participations_cache" in st.session_state:
+                        del st.session_state["participations_cache"]
+                    st.rerun()
+        
+        with col2:
+            # 기존 참여 정보가 있을 때만 삭제 버튼 표시
             if existing_participation:
-                # 기존 참여 정보 업데이트
-                result = db_manager.update_campaign_participation(existing_participation['id'], participation_data)
+                if st.form_submit_button("🗑️ 참여 삭제", type="secondary"):
+                    # 삭제 확인을 위한 세션 상태 설정
+                    st.session_state[f"confirm_delete_participation_{existing_participation['id']}"] = True
+                    st.rerun()
+    
+    # 삭제 확인 다이얼로그 (폼 외부에 위치)
+    if existing_participation and st.session_state.get(f"confirm_delete_participation_{existing_participation['id']}", False):
+        st.markdown("---")
+        st.warning("⚠️ **정말로 이 인플루언서의 캠페인 참여를 삭제하시겠습니까?**")
+        st.markdown(f"**삭제할 인플루언서:** {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')})")
+        st.markdown(f"**캠페인:** {selected_campaign.get('campaign_name', 'N/A')}")
+        
+        col1, col2, col3 = st.columns([1, 1, 2])
+        
+        with col1:
+            if st.button("✅ 삭제 확인", type="primary", key=f"delete_confirm_{existing_participation['id']}"):
+                # 실제 삭제 실행
+                result = db_manager.remove_influencer_from_campaign(existing_participation['id'])
                 if result["success"]:
-                    st.success("참여 정보가 업데이트되었습니다!")
+                    st.success("인플루언서의 캠페인 참여가 삭제되었습니다!")
+                    # 세션 상태 정리
+                    del st.session_state[f"confirm_delete_participation_{existing_participation['id']}"]
+                    if 'add_influencer_search_result' in st.session_state:
+                        del st.session_state['add_influencer_search_result']
+                    if "participations_cache" in st.session_state:
+                        del st.session_state["participations_cache"]
+                    st.rerun()
                 else:
-                    st.error(f"참여 정보 업데이트 실패: {result['message']}")
-            else:
-                # 새 참여 정보 추가
-                result = db_manager.add_influencer_to_campaign(participation_data)
-                if result["success"]:
-                    st.success("인플루언서가 캠페인에 추가되었습니다!")
-                else:
-                    st.error(f"인플루언서 추가 실패: {result['message']}")
-            
-            # 성공 시 세션 상태 초기화 및 캐시 초기화
-            if result.get("success"):
-                if 'add_influencer_search_result' in st.session_state:
-                    del st.session_state['add_influencer_search_result']
-                if "participations_cache" in st.session_state:
-                    del st.session_state["participations_cache"]
+                    st.error(f"삭제 실패: {result['message']}")
+        
+        with col2:
+            if st.button("❌ 취소", key=f"delete_cancel_{existing_participation['id']}"):
+                del st.session_state[f"confirm_delete_participation_{existing_participation['id']}"]
                 st.rerun()
+        
+        with col3:
+            st.empty()  # 빈 공간

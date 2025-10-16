@@ -481,6 +481,31 @@ class SimpleSupabaseClient:
                 if field in participation_data and (participation_data[field] is None or participation_data[field] == ''):
                     del participation_data[field]
             
+            # created_by 필드는 null로 설정하여 데이터베이스 기본값(auth.uid()) 사용
+            if "created_by" in participation_data:
+                del participation_data["created_by"]
+            
+            # campaign_id와 influencer_id가 문자열인지 확인하고 강제 변환
+            if 'campaign_id' in participation_data:
+                campaign_id = participation_data['campaign_id']
+                if isinstance(campaign_id, dict):
+                    # 딕셔너리인 경우 id 필드 추출
+                    campaign_id = campaign_id.get('id', '')
+                elif not isinstance(campaign_id, str):
+                    # 문자열이 아닌 경우 문자열로 변환
+                    campaign_id = str(campaign_id)
+                participation_data['campaign_id'] = campaign_id
+            
+            if 'influencer_id' in participation_data:
+                influencer_id = participation_data['influencer_id']
+                if isinstance(influencer_id, dict):
+                    # 딕셔너리인 경우 id 필드 추출
+                    influencer_id = influencer_id.get('id', '')
+                elif not isinstance(influencer_id, str):
+                    # 문자열이 아닌 경우 문자열로 변환
+                    influencer_id = str(influencer_id)
+                participation_data['influencer_id'] = influencer_id
+            
             # sample_status 값 검증 (DB enum 값과 일치하는지 확인)
             if 'sample_status' in participation_data:
                 valid_statuses = ['요청', '발송준비', '발송완료', '수령']
@@ -522,6 +547,10 @@ class SimpleSupabaseClient:
             for field in auto_generated_fields:
                 if field in update_data:
                     del update_data[field]
+            
+            # created_by 필드는 업데이트하지 않음 (기존 값 유지)
+            if "created_by" in update_data:
+                del update_data["created_by"]
             
             # sample_status 값 검증 (DB enum 값과 일치하는지 확인)
             if 'sample_status' in update_data:
