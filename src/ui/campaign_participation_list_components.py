@@ -124,7 +124,7 @@ def render_participation_list_table(participations):
         # 편집 가능한 테이블 표시
         edited_df = st.data_editor(
             df,
-            use_container_width=True,
+            width='stretch',
             height=600,
             column_config=column_config,
             disabled=["ID", "인플루언서", "플랫폼", "SNS ID", "참여일"],  # 수정 불가능한 컬럼

@@ -288,7 +288,7 @@ def render_sidebar():
             if st.button(
                 page_title, 
                 key=f"menu_{page_key}",
-                use_container_width=True,
+                width='stretch',
                 type="primary" if st.session_state.current_page == page_key else "secondary"
             ):
                 st.session_state.current_page = page_key

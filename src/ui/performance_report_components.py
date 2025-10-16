@@ -105,19 +105,19 @@ def render_comprehensive_dashboard(campaign_data):
 
     if participation_counts:
         df_participations = pd.DataFrame(participation_counts)
-        st.dataframe(df_participations, use_container_width=True, hide_index=True)
+        st.dataframe(df_participations, width='stretch', hide_index=True)
 
         colc1, colc2 = st.columns(2)
         with colc1:
             fig_participations = px.bar(
                 df_participations, x="캠페인", y="참여 인플루언서 수", title="캠페인별 참여 인플루언서 수", color="유형"
             )
-            st.plotly_chart(fig_participations, use_container_width=True)
+            st.plotly_chart(fig_participations, width='stretch')
         with colc2:
             fig_completion = px.bar(
                 df_participations, x="캠페인", y="업로드 완료", title="캠페인별 업로드 완료 수", color="유형"
             )
-            st.plotly_chart(fig_completion, use_container_width=True)
+            st.plotly_chart(fig_completion, width='stretch')
 
     # 플랫폼별 분석
     st.markdown("#### 📱 플랫폼별 분석")
@@ -148,17 +148,17 @@ def render_comprehensive_dashboard(campaign_data):
                 for platform, data in platform_data.items()
             ]
         )
-        st.dataframe(platform_df, use_container_width=True, hide_index=True)
+        st.dataframe(platform_df, width='stretch', hide_index=True)
 
         colp1, colp2 = st.columns(2)
         with colp1:
             fig_platform = px.pie(platform_df, values="참여 수", names="플랫폼", title="플랫폼별 참여 비율")
-            st.plotly_chart(fig_platform, use_container_width=True)
+            st.plotly_chart(fig_platform, width='stretch')
         with colp2:
             fig_platform_completion = px.bar(
                 platform_df, x="플랫폼", y="업로드 완료", title="플랫폼별 업로드 완료 수"
             )
-            st.plotly_chart(fig_platform_completion, use_container_width=True)
+            st.plotly_chart(fig_platform_completion, width='stretch')
 
     # 요약 통계
     st.markdown("#### 📈 요약 통계")
@@ -270,7 +270,7 @@ def render_performance_metrics_analysis(campaign_data):
     summary_metrics_display = summary_metrics.copy()
     summary_metrics_display["참여율"] = summary_metrics_display["참여율"].apply(lambda x: f"{x:.2f}%")
     
-    st.dataframe(summary_metrics_display, use_container_width=True)
+    st.dataframe(summary_metrics_display, width='stretch')
     
     # 성과 지표 시각화
     col1, col2 = st.columns(2)
@@ -281,7 +281,7 @@ def render_performance_metrics_analysis(campaign_data):
             y="좋아요", 
             title="캠페인별 총 좋아요 수"
         )
-        st.plotly_chart(fig_likes, use_container_width=True)
+        st.plotly_chart(fig_likes, width='stretch')
     
     with col2:
         fig_engagement = px.bar(
@@ -290,7 +290,7 @@ def render_performance_metrics_analysis(campaign_data):
             y="참여율", 
             title="캠페인별 평균 참여율"
         )
-        st.plotly_chart(fig_engagement, use_container_width=True)
+        st.plotly_chart(fig_engagement, width='stretch')
     
     # 플랫폼별 성과 비교
     col_title, col_help = st.columns([4, 1])
@@ -334,7 +334,7 @@ def render_performance_metrics_analysis(campaign_data):
     platform_performance_display = platform_performance.copy()
     platform_performance_display["참여율"] = platform_performance_display["참여율"].apply(lambda x: f"{x:.2f}%")
     
-    st.dataframe(platform_performance_display, use_container_width=True)
+    st.dataframe(platform_performance_display, width='stretch')
     
     # 플랫폼별 성과 시각화
     fig_platform_metrics = px.bar(
@@ -344,7 +344,7 @@ def render_performance_metrics_analysis(campaign_data):
         title="플랫폼별 총 성과 지표",
         barmode="group"
     )
-    st.plotly_chart(fig_platform_metrics, use_container_width=True)
+    st.plotly_chart(fig_platform_metrics, width='stretch')
 
 
 def render_influencer_analysis(campaign_data):
@@ -396,13 +396,13 @@ def render_influencer_analysis(campaign_data):
     top_likes = df_influencers.nlargest(10, "총 좋아요")[["인플루언서", "캠페인", "플랫폼", "총 좋아요", "평균 참여율"]].copy()
     top_likes["평균 참여율"] = top_likes["평균 참여율"].apply(lambda x: f"{x:.2f}%")
     st.markdown("**좋아요 수 TOP 10**")
-    st.dataframe(top_likes, use_container_width=True, hide_index=True)
+    st.dataframe(top_likes, width='stretch', hide_index=True)
     
     # 참여율 기준 랭킹
     top_engagement = df_influencers.nlargest(10, "평균 참여율")[["인플루언서", "캠페인", "플랫폼", "평균 참여율", "총 좋아요"]].copy()
     top_engagement["평균 참여율"] = top_engagement["평균 참여율"].apply(lambda x: f"{x:.2f}%")
     st.markdown("**참여율 TOP 10**")
-    st.dataframe(top_engagement, use_container_width=True, hide_index=True)
+    st.dataframe(top_engagement, width='stretch', hide_index=True)
     
     # 인플루언서별 성과 시각화
     col1, col2 = st.columns(2)
@@ -414,7 +414,7 @@ def render_influencer_analysis(campaign_data):
             title="TOP 5 인플루언서 좋아요 수",
             color="플랫폼"
         )
-        st.plotly_chart(fig_influencer_likes, use_container_width=True)
+        st.plotly_chart(fig_influencer_likes, width='stretch')
     
     with col2:
         fig_influencer_engagement = px.bar(
@@ -424,7 +424,7 @@ def render_influencer_analysis(campaign_data):
             title="TOP 5 인플루언서 참여율",
             color="플랫폼"
         )
-        st.plotly_chart(fig_influencer_engagement, use_container_width=True)
+        st.plotly_chart(fig_influencer_engagement, width='stretch')
     
     # 팔로워 수 vs 성과 상관관계
     st.markdown("##### 📊 팔로워 수 vs 성과 상관관계")
@@ -443,7 +443,7 @@ def render_influencer_analysis(campaign_data):
             hover_data=["인플루언서", "캠페인"],
             title="팔로워 수 vs 좋아요 수 상관관계"
         )
-        st.plotly_chart(fig_likes, use_container_width=True)
+        st.plotly_chart(fig_likes, width='stretch')
     
     with col2:
         # 팔로워 수 vs 댓글 상관관계
@@ -456,7 +456,7 @@ def render_influencer_analysis(campaign_data):
             hover_data=["인플루언서", "캠페인"],
             title="팔로워 수 vs 댓글 수 상관관계"
         )
-        st.plotly_chart(fig_comments, use_container_width=True)
+        st.plotly_chart(fig_comments, width='stretch')
     
     # 팔로워 수 vs 조회수 상관관계 (전체 너비)
     fig_views = px.scatter(
@@ -468,7 +468,7 @@ def render_influencer_analysis(campaign_data):
         hover_data=["인플루언서", "캠페인"],
         title="팔로워 수 vs 조회수 상관관계"
     )
-    st.plotly_chart(fig_views, use_container_width=True)
+    st.plotly_chart(fig_views, width='stretch')
 
 
 def render_trend_analysis(campaign_data):
@@ -527,7 +527,7 @@ def render_trend_analysis(campaign_data):
     # 일별 성과 데이터 테이블 표시
     daily_trend_display = daily_trend.copy()
     daily_trend_display["참여율"] = daily_trend_display["참여율"].apply(lambda x: f"{x:.2f}%")
-    st.dataframe(daily_trend_display, use_container_width=True, hide_index=True)
+    st.dataframe(daily_trend_display, width='stretch', hide_index=True)
     
     # 개별 지표별 트렌드 차트
     col1, col2 = st.columns(2)
@@ -543,7 +543,7 @@ def render_trend_analysis(campaign_data):
             line_shape='spline'
         )
         fig_likes.update_traces(line_color='red', marker_color='red')
-        st.plotly_chart(fig_likes, use_container_width=True)
+        st.plotly_chart(fig_likes, width='stretch')
         
         # 댓글 트렌드
         fig_comments = px.line(
@@ -555,7 +555,7 @@ def render_trend_analysis(campaign_data):
             line_shape='spline'
         )
         fig_comments.update_traces(line_color='blue', marker_color='blue')
-        st.plotly_chart(fig_comments, use_container_width=True)
+        st.plotly_chart(fig_comments, width='stretch')
     
     with col2:
         # 조회수 트렌드
@@ -568,7 +568,7 @@ def render_trend_analysis(campaign_data):
             line_shape='spline'
         )
         fig_views.update_traces(line_color='green', marker_color='green')
-        st.plotly_chart(fig_views, use_container_width=True)
+        st.plotly_chart(fig_views, width='stretch')
         
         # 참여율 트렌드
         fig_engagement = px.line(
@@ -580,7 +580,7 @@ def render_trend_analysis(campaign_data):
             line_shape='spline'
         )
         fig_engagement.update_traces(line_color='orange', marker_color='orange')
-        st.plotly_chart(fig_engagement, use_container_width=True)
+        st.plotly_chart(fig_engagement, width='stretch')
     
     # 통합 트렌드 차트 (좋아요, 댓글, 조회수)
     st.markdown("##### 📊 통합 성과 트렌드")
@@ -596,7 +596,7 @@ def render_trend_analysis(campaign_data):
         yaxis_title="수량",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
-    st.plotly_chart(fig_combined, use_container_width=True)
+    st.plotly_chart(fig_combined, width='stretch')
     
     # 캠페인별 트렌드 비교
     st.markdown("##### 📊 캠페인별 트렌드 비교")
@@ -609,7 +609,7 @@ def render_trend_analysis(campaign_data):
         color="캠페인",
         title="캠페인별 좋아요 수 트렌드"
     )
-    st.plotly_chart(fig_campaign_trend, use_container_width=True)
+    st.plotly_chart(fig_campaign_trend, width='stretch')
 
 
 def render_roi_analysis(campaign_data):
@@ -702,7 +702,7 @@ def render_roi_analysis(campaign_data):
     df_roi_display = df_roi.copy()
     df_roi_display["평균 참여율"] = df_roi_display["평균 참여율"].apply(lambda x: f"{x:.2f}%")
     
-    st.dataframe(df_roi_display, use_container_width=True, hide_index=True)
+    st.dataframe(df_roi_display, width='stretch', hide_index=True)
     
     # ROI 시각화
     col1, col2 = st.columns(2)
@@ -713,7 +713,7 @@ def render_roi_analysis(campaign_data):
             y="좋아요/인플루언서", 
             title="인플루언서당 평균 좋아요 수"
         )
-        st.plotly_chart(fig_roi_likes, use_container_width=True)
+        st.plotly_chart(fig_roi_likes, width='stretch')
     
     with col2:
         fig_roi_views = px.bar(
@@ -722,7 +722,7 @@ def render_roi_analysis(campaign_data):
             y="조회수/인플루언서", 
             title="인플루언서당 평균 조회수"
         )
-        st.plotly_chart(fig_roi_views, use_container_width=True)
+        st.plotly_chart(fig_roi_views, width='stretch')
     
     # 비용 관련 시각화
     st.markdown("##### 💰 비용 효율성 분석")
@@ -743,7 +743,7 @@ def render_roi_analysis(campaign_data):
             title="캠페인별 총 비용",
             labels={"총_비용_숫자": "총 비용 (원)"}
         )
-        st.plotly_chart(fig_cost_total, use_container_width=True)
+        st.plotly_chart(fig_cost_total, width='stretch')
         
         fig_cost_per_like = px.bar(
             df_roi_viz, 
@@ -752,7 +752,7 @@ def render_roi_analysis(campaign_data):
             title="좋아요당 비용",
             labels={"좋아요당_비용_숫자": "좋아요당 비용 (원)"}
         )
-        st.plotly_chart(fig_cost_per_like, use_container_width=True)
+        st.plotly_chart(fig_cost_per_like, width='stretch')
     
     with col4:
         fig_cost_per_view = px.bar(
@@ -762,7 +762,7 @@ def render_roi_analysis(campaign_data):
             title="조회수당 비용",
             labels={"조회수당_비용_숫자": "조회수당 비용 (원)"}
         )
-        st.plotly_chart(fig_cost_per_view, use_container_width=True)
+        st.plotly_chart(fig_cost_per_view, width='stretch')
         
         fig_cost_per_influencer = px.bar(
             df_roi_viz, 
@@ -771,7 +771,7 @@ def render_roi_analysis(campaign_data):
             title="인플루언서당 비용",
             labels={"인플루언서당_비용_숫자": "인플루언서당 비용 (원)"}
         )
-        st.plotly_chart(fig_cost_per_influencer, use_container_width=True)
+        st.plotly_chart(fig_cost_per_influencer, width='stretch')
     
     # 효율성 분석
     col_title, col_help = st.columns([4, 1])
@@ -818,7 +818,7 @@ def render_roi_analysis(campaign_data):
     efficiency_display["좋아요당_비용_숫자"] = efficiency_display["좋아요당_비용_숫자"].apply(lambda x: f"{x:,.0f}원")
     efficiency_display.columns = ["캠페인", "비용 효율성 점수", "좋아요/인플루언서", "조회수/인플루언서", "평균 참여율", "좋아요당 비용"]
     
-    st.dataframe(efficiency_display, use_container_width=True, hide_index=True)
+    st.dataframe(efficiency_display, width='stretch', hide_index=True)
     
     fig_efficiency = px.bar(
         efficiency_data, 
@@ -826,7 +826,7 @@ def render_roi_analysis(campaign_data):
         y="비용_효율성_점수", 
         title="캠페인 비용 효율성 점수 (높을수록 효율적)"
     )
-    st.plotly_chart(fig_efficiency, use_container_width=True)
+    st.plotly_chart(fig_efficiency, width='stretch')
 
 
 def render_export_section(campaign_data, report_type):

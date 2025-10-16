@@ -52,7 +52,7 @@ def render_campaign_list():
     
     if campaign_data:
         df = pd.DataFrame(campaign_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width='stretch', hide_index=True)
         
         # 캠페인 선택 및 편집
         st.markdown("### ✏️ 캠페인 편집")

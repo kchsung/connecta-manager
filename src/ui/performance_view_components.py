@@ -323,7 +323,7 @@ def render_performance_view_tab():
         edited_df = st.data_editor(
             df,
             column_config=column_config,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             key="performance_data_editor"
         )
@@ -422,7 +422,7 @@ def render_performance_detail_modal():
                 }
             )
         df_history = pd.DataFrame(history_data)
-        st.dataframe(df_history, use_container_width=True, hide_index=True)
+        st.dataframe(df_history, width='stretch', hide_index=True)
 
     if st.button("❌ 닫기", key=f"close_performance_detail_{influencer['id']}"):
         st.session_state.pop("viewing_performance", None)
