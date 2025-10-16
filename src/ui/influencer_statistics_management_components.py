@@ -124,7 +124,7 @@ def render_overall_statistics():
                     labels={'x': '팔로워 수 구간', 'y': '인플루언서 수'}
                 )
                 fig.update_layout(showlegend=False)
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             
             with col2:
                 st.markdown("#### 팔로워 수 히스토그램")
@@ -135,7 +135,7 @@ def render_overall_statistics():
                     title="팔로워 수 히스토그램",
                     labels={'팔로워수': '팔로워 수', 'count': '인플루언서 수'}
                 )
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
         
         # 등록일별 추이
         st.markdown("#### 등록일별 인플루언서 추가 추이")
@@ -185,7 +185,7 @@ def render_overall_statistics():
             fig.update_yaxes(title_text="누적 인플루언서 수", secondary_y=True)
             fig.update_layout(title_text="인플루언서 등록 추이")
             
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("등록일 정보가 없습니다.")
         
@@ -255,7 +255,7 @@ def render_category_analysis():
                 names='카테고리',
                 title="카테고리별 인플루언서 분포"
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         with col2:
             st.markdown("#### 카테고리별 평균 팔로워 수")
@@ -266,7 +266,7 @@ def render_category_analysis():
                 title="카테고리별 평균 팔로워 수"
             )
             fig.update_xaxes(tickangle=45)
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         # 상세 분석 테이블
         st.markdown("#### 카테고리별 상세 분석")
@@ -281,7 +281,7 @@ def render_category_analysis():
         
         st.dataframe(
             display_df,
-            width='stretch',
+            use_container_width=True,
             hide_index=True
         )
         
@@ -362,7 +362,7 @@ def render_platform_analysis():
                 names='플랫폼_표시',
                 title="플랫폼별 인플루언서 분포"
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         with col2:
             st.markdown("#### 플랫폼별 평균 팔로워 수")
@@ -372,7 +372,7 @@ def render_platform_analysis():
                 y='평균 팔로워 수',
                 title="플랫폼별 평균 팔로워 수"
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         # 플랫폼별 카테고리 분포
         st.markdown("#### 플랫폼별 카테고리 분포")
@@ -397,7 +397,7 @@ def render_platform_analysis():
                 title="플랫폼별 카테고리 분포",
                 barmode='stack'
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         # 상세 분석 테이블
         st.markdown("#### 플랫폼별 상세 분석")
@@ -415,7 +415,7 @@ def render_platform_analysis():
         
         st.dataframe(
             display_df,
-            width='stretch',
+            use_container_width=True,
             hide_index=True
         )
         
@@ -457,7 +457,7 @@ def render_rating_analysis():
                     labels={'x': '평점', 'y': '인플루언서 수'}
                 )
                 fig.update_layout(showlegend=False)
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("매니저 평점 데이터가 없습니다.")
         
@@ -474,7 +474,7 @@ def render_rating_analysis():
                     labels={'x': '평점', 'y': '인플루언서 수'}
                 )
                 fig.update_layout(showlegend=False)
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("콘텐츠 평점 데이터가 없습니다.")
         
@@ -543,7 +543,7 @@ def render_rating_analysis():
                 
                 st.dataframe(
                     pd.DataFrame(display_data),
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True
                 )
         

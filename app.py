@@ -24,6 +24,10 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="streamlit
 import logging
 logging.getLogger("streamlit").setLevel(logging.ERROR)
 
+# Streamlit Cloud 호환성을 위한 경고 필터 추가
+warnings.filterwarnings("ignore", message=".*use_container_width.*")
+warnings.filterwarnings("ignore", message=".*Please replace.*use_container_width.*")
+
 # ── Path ─────────────────────────────────────────────────────
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -288,7 +292,7 @@ def render_sidebar():
             if st.button(
                 page_title, 
                 key=f"menu_{page_key}",
-                width='stretch',
+                use_container_width=True,
                 type="primary" if st.session_state.current_page == page_key else "secondary"
             ):
                 st.session_state.current_page = page_key
