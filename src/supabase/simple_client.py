@@ -399,9 +399,6 @@ class SimpleSupabaseClient:
             result = query.order('created_at', desc=True).range(offset, offset + page_size - 1).execute()
             
             if result.data:
-                # 데이터 구조 디버깅
-                print(f"🔍 참여 데이터 구조 (첫 번째 항목): {result.data[0] if result.data else 'None'}")
-                
                 # 데이터 평면화
                 flattened_data = []
                 for item in result.data:

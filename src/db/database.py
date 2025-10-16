@@ -16,7 +16,7 @@ class DatabaseManager:
     def _handle_error(self, error: Exception, operation: str) -> Dict[str, Any]:
         """에러 처리 공통 함수"""
         error_msg = str(error)
-        print(f"데이터베이스 오류 ({operation}): {error_msg}")
+        # 로그 출력 제거 (성능 최적화)
         
         # 중복 제약조건 오류 감지
         if "duplicate key value violates unique constraint" in error_msg and "uq_platform_sns" in error_msg:

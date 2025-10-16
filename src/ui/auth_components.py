@@ -23,7 +23,8 @@ def render_login_form() -> Dict[str, Any]:
                 
             if result["success"]:
                 st.success(result["message"])
-                st.rerun()
+                st.session_state.auth_success = True  # 인증 성공 플래그
+                # 리렌더링 없이 상태 기반 UI 업데이트
             else:
                 st.error(result["message"])
             
@@ -95,7 +96,8 @@ def render_auth_sidebar():
                 result = supabase_auth.sign_out()
                 if result["success"]:
                     st.success(result["message"])
-                    st.rerun()
+                    st.session_state.password_reset_success = True  # 비밀번호 재설정 성공 플래그
+                    # 리렌더링 없이 상태 기반 UI 업데이트
                 else:
                     st.error(result["message"])
         else:

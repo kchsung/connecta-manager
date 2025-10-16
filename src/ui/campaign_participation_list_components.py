@@ -146,7 +146,8 @@ def render_participation_list_table(participations):
             
             with col2:
                 if st.button("🔄 변경사항 취소", key="cancel_participation_changes"):
-                    st.rerun()
+                    st.session_state.participation_changes_cancelled = True  # 참여 변경사항 취소 플래그
+                    # 리렌더링 없이 상태 기반 UI 업데이트
         else:
             # 항상 저장 버튼을 표시 (편의를 위해)
             st.markdown("---")
@@ -161,7 +162,8 @@ def render_participation_list_table(participations):
             
             with col2:
                 if st.button("🔄 새로고침", key="refresh_participation_data"):
-                    st.rerun()
+                    st.session_state.participation_data_refresh_requested = True  # 참여 데이터 새로고침 요청 플래그
+                    # 리렌더링 없이 상태 기반 UI 업데이트
         
         # 총 개수 표시 및 편집 안내
         st.caption(f"총 {len(participations)}명의 참여 인플루언서가 표시됩니다.")
@@ -231,7 +233,7 @@ def save_edited_participations(original_df, edited_df):
                 del st.session_state["participations_cache"]
             
             # 페이지 새로고침
-            st.rerun()
+            st.session_state.participation_bulk_update_completed = True  # 참여 대량 업데이트 완료 플래그
             
     except Exception as e:
         st.error(f"데이터 저장 중 오류가 발생했습니다: {e}")

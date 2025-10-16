@@ -92,7 +92,8 @@ def render_campaign_creation():
                         # 캐시 초기화
                         if "campaigns_cache" in st.session_state:
                             del st.session_state["campaigns_cache"]
-                        st.rerun()
+                        st.session_state.campaign_created = True  # 캠페인 생성 완료 플래그
+                        # 리렌더링 없이 상태 기반 UI 업데이트
                     else:
                         st.error(f"캠페인 생성 실패: {result['message']}")
 

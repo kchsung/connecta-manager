@@ -23,7 +23,8 @@ class SupabaseAuth:
                     refresh_token=st.session_state.get('refresh_token', '')
                 )
             except Exception as e:
-                print(f"토큰 설정 실패: {e}")
+                # 토큰 설정 실패 (로그 출력 제거)
+                pass
         
         return self.client
     
@@ -198,7 +199,8 @@ class SupabaseAuth:
                     )
                 return True
         except Exception as e:
-            print(f"세션 확인 실패: {e}")
+            # 세션 확인 실패 (로그 출력 제거)
+            pass
         
         # 저장된 토큰으로 세션 복원 시도
         return self._try_restore_session()
@@ -223,7 +225,7 @@ class SupabaseAuth:
                 )
                 return True
         except Exception as e:
-            print(f"세션 갱신 실패: {e}")
+            # 세션 갱신 실패 (로그 출력 제거)
             # 갱신 실패 시 토큰 제거
             self._clear_token_from_browser()
             if 'user' in st.session_state:
@@ -250,7 +252,7 @@ class SupabaseAuth:
                 st.session_state.authenticated = True
                 return True
         except Exception as e:
-            print(f"세션 복원 실패: {e}")
+            # 세션 복원 실패 (로그 출력 제거)
             # 복원 실패 시 토큰 제거
             self._clear_token_from_browser()
         

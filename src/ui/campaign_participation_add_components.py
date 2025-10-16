@@ -258,7 +258,8 @@ def render_influencer_add_form(selected_campaign):
                         del st.session_state['add_influencer_search_result']
                     if "participations_cache" in st.session_state:
                         del st.session_state["participations_cache"]
-                    st.rerun()
+                    st.session_state.participation_added = True  # 참여 추가 완료 플래그
+                    # 리렌더링 없이 상태 기반 UI 업데이트
         
         with col2:
             # 기존 참여 정보가 있을 때만 삭제 버튼 표시
@@ -266,7 +267,7 @@ def render_influencer_add_form(selected_campaign):
                 if st.form_submit_button("🗑️ 참여 삭제", type="secondary"):
                     # 삭제 확인을 위한 세션 상태 설정
                     st.session_state[f"confirm_delete_participation_{existing_participation['id']}"] = True
-                    st.rerun()
+                    # 리렌더링 없이 상태 기반 UI 업데이트
     
     # 삭제 확인 다이얼로그 (폼 외부에 위치)
     if existing_participation and st.session_state.get(f"confirm_delete_participation_{existing_participation['id']}", False):
@@ -289,14 +290,15 @@ def render_influencer_add_form(selected_campaign):
                         del st.session_state['add_influencer_search_result']
                     if "participations_cache" in st.session_state:
                         del st.session_state["participations_cache"]
-                    st.rerun()
+                    st.session_state.participation_deleted = True  # 참여 삭제 완료 플래그
+                    # 리렌더링 없이 상태 기반 UI 업데이트
                 else:
                     st.error(f"삭제 실패: {result['message']}")
         
         with col2:
             if st.button("❌ 취소", key=f"delete_cancel_{existing_participation['id']}"):
                 del st.session_state[f"confirm_delete_participation_{existing_participation['id']}"]
-                st.rerun()
+                # 리렌더링 없이 상태 기반 UI 업데이트
         
         with col3:
             st.empty()  # 빈 공간

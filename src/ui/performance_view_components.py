@@ -25,8 +25,9 @@ def render_performance_view_tab():
         ):
             st.session_state.pop("campaigns_cache", None)
             st.session_state.pop("participations_cache", None)
+            st.session_state.performance_refresh_requested = True  # 성과 새로고침 요청 플래그
             st.success("캠페인 목록을 새로고침했습니다!")
-            st.rerun()
+            # 리렌더링 없이 상태 기반 UI 업데이트
     with col2:
         st.caption("캠페인 목록을 새로고침하거나 아래 테이블에서 성과 데이터를 직접 편집할 수 있습니다.")
 
@@ -336,7 +337,8 @@ def render_performance_view_tab():
             if st.button("🔄 새로고침", key="refresh_performance_data"):
                 st.session_state.pop("campaigns_cache", None)
                 st.session_state.pop("participations_cache", None)
-                st.rerun()
+                st.session_state.performance_data_refresh_requested = True  # 성과 데이터 새로고침 요청 플래그
+                # 리렌더링 없이 상태 기반 UI 업데이트
         with col3:
             st.caption("변경사항을 저장하거나 데이터를 새로고침할 수 있습니다.")
             
@@ -424,7 +426,8 @@ def render_performance_detail_modal():
 
     if st.button("❌ 닫기", key=f"close_performance_detail_{influencer['id']}"):
         st.session_state.pop("viewing_performance", None)
-        st.rerun()
+        st.session_state.performance_detail_closed = True  # 성과 상세보기 닫기 플래그
+        # 리렌더링 없이 상태 기반 UI 업데이트
 
 
 
@@ -561,7 +564,8 @@ def save_performance_changes(original_df, edited_df, participation_mapping):
             # 캐시 클리어하여 최신 데이터 반영
             st.session_state.pop("campaigns_cache", None)
             st.session_state.pop("participations_cache", None)
-            st.rerun()
+            st.session_state.performance_save_completed = True  # 성과 저장 완료 플래그
+            # 리렌더링 없이 상태 기반 UI 업데이트
         else:
             st.info("변경된 데이터가 없습니다.")
             

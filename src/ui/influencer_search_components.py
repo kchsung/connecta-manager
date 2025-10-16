@@ -77,7 +77,8 @@ def render_influencer_search_and_filter():
                     st.session_state.selected_influencer = search_result
                     active_status = "활성" if search_result.get('active', True) else "비활성"
                     st.success(f"✅ 인플루언서를 찾았습니다: {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')}) [{active_status}]")
-                    st.rerun()
+                    st.session_state.search_result_updated = True  # 검색 결과 업데이트 플래그
+                    # 리렌더링 없이 상태 기반 UI 업데이트
                 else:
                     st.error(f"❌ '{search_term}'을(를) 찾을 수 없습니다.")
             else:
@@ -236,7 +237,8 @@ def render_influencer_search_and_filter():
             if key.startswith("filtered_influencers_"):
                 del st.session_state[key]
         st.success("필터가 적용되었습니다!")
-        st.rerun()
+        st.session_state.filter_applied = True  # 필터 적용 완료 플래그
+        # 리렌더링 없이 상태 기반 UI 업데이트
     
     # 인플루언서 목록 표시 (페이징)
     render_influencer_list_with_pagination()
@@ -303,7 +305,8 @@ def render_influencer_list_with_pagination():
         
         if selected_page != current_page:
             st.session_state.influencer_current_page = selected_page
-            st.rerun()
+            st.session_state.page_changed = True  # 페이지 변경 플래그
+            # 리렌더링 없이 상태 기반 UI 업데이트
     
     # 현재 페이지의 인플루언서 표시
     start_idx = current_page * items_per_page
@@ -377,12 +380,14 @@ def render_influencer_list_item(influencer, index):
             
             # 새로운 인플루언서 선택
             st.session_state.selected_influencer = influencer
-            st.rerun()
+            st.session_state.influencer_selected = True  # 인플루언서 선택 플래그
+            # 리렌더링 없이 상태 기반 UI 업데이트
         
         # 편집 버튼
         if st.button("✏️", key=f"edit_{influencer['id']}_{index}", help="편집"):
             st.session_state.editing_influencer = influencer
-            st.rerun()
+            st.session_state.editing_mode_activated = True  # 편집 모드 활성화 플래그
+            # 리렌더링 없이 상태 기반 UI 업데이트
         
         # 삭제 버튼
         if st.button("🗑️", key=f"delete_inf_{influencer['id']}_{index}", help="삭제"):
@@ -407,7 +412,8 @@ def render_influencer_list_item(influencer, index):
                 for key in list(st.session_state.keys()):
                     if key.startswith("filtered_influencers_"):
                         del st.session_state[key]
-                st.rerun()
+                st.session_state.influencer_deleted_from_search = True  # 검색에서 인플루언서 삭제 완료 플래그
+                # 리렌더링 없이 상태 기반 UI 업데이트
             else:
                 st.error(f"삭제 실패: {result['message']}")
 

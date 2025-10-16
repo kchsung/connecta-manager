@@ -31,15 +31,15 @@ function handleOptions() {
 // 인증 헤더에서 JWT 토큰 추출
 function getAuthToken(request: Request): string | null {
   const authHeader = request.headers.get('Authorization')
-  console.log('🔍 Authorization header:', authHeader ? 'Present' : 'Missing')
+  // Authorization header 확인 (로그 출력 제거)
   
   if (!authHeader) {
-    console.log('❌ No Authorization header found')
+    // No Authorization header found (로그 출력 제거)
     return null
   }
   
   const token = authHeader.replace('Bearer ', '')
-  console.log('🔑 Token extracted:', token ? `${token.substring(0, 20)}...` : 'Empty')
+  // Token extracted (로그 출력 제거)
   return token
 }
 
@@ -271,7 +271,7 @@ async function handleUpdateCampaign(req: Request, supabase: any, userId: string,
       })
     }
 
-    console.log('🔍 Edge Function - 업데이트 데이터:', body)
+    // Edge Function - 업데이트 데이터 (로그 출력 제거)
     
     const { data, error } = await supabase
       .from('campaigns')
@@ -661,11 +661,7 @@ async function handleGetParticipations(
   campaignId?: string | null
 ) {
   try {
-    console.log('🔍 참여 조회 파라미터:', {
-      userId,
-      participationId,
-      campaignId
-    })
+    // 참여 조회 파라미터 (로그 출력 제거)
     
     let query = supabase
       .from('campaign_influencer_participations')
@@ -689,11 +685,7 @@ async function handleGetParticipations(
 
     const { data, error } = await query
 
-    console.log('🔍 쿼리 결과:', {
-      dataCount: data?.length || 0,
-      error: error?.message || null,
-      data: data?.slice(0, 2) || [] // 처음 2개만 로그
-    })
+    // 쿼리 결과 (로그 출력 제거)
 
     if (error) {
       console.error('Database error:', error)
@@ -945,8 +937,7 @@ serve(async (req) => {
     const search = url.searchParams.get('search')
     const type = url.searchParams.get('type') || 'overview'
     
-    console.log('🔍 API 요청 정보:', {
-      path,
+    // API 요청 정보 (로그 출력 제거)
       action,
       method: req.method,
       id,

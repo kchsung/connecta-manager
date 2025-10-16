@@ -18,6 +18,11 @@ os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="streamlit")
 warnings.filterwarnings("ignore", category=FutureWarning, module="streamlit")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="streamlit")
+
+# Streamlit 로그 레벨 설정 (터미널 출력 최소화)
+import logging
+logging.getLogger("streamlit").setLevel(logging.ERROR)
 
 # ── Path ─────────────────────────────────────────────────────
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -287,7 +292,8 @@ def render_sidebar():
                 type="primary" if st.session_state.current_page == page_key else "secondary"
             ):
                 st.session_state.current_page = page_key
-                st.rerun()
+                st.session_state.page_changed = True  # 페이지 변경 플래그
+                # 리렌더링 없이 상태 기반 UI 업데이트
         
         st.markdown("---")
         

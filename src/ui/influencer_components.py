@@ -258,7 +258,8 @@ def render_influencer_registration_form():
                     # 검색 결과 초기화
                     if "registration_search_result" in st.session_state:
                         del st.session_state["registration_search_result"]
-                    st.rerun()
+                    st.session_state.registration_completed = True  # 등록 완료 플래그
+                    # 리렌더링 없이 상태 기반 UI 업데이트
                 else:
                     st.error(f"인플루언서 등록 실패: {result['message']}")
 
@@ -340,14 +341,14 @@ def render_influencer_search_for_inquiry():
                     # 새로운 인플루언서 선택
                     st.session_state.selected_influencer = search_result
                     st.session_state.search_success = True  # 검색 성공 플래그
+                    st.session_state.search_updated = True  # 검색 업데이트 플래그
                     active_status = "활성" if search_result.get('active', True) else "비활성"
                     st.success(f"✅ 인플루언서를 찾았습니다: {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')}) [{active_status}]")
                     
                     # 검색 결과를 좌측에 표시
                     render_influencer_search_result(search_result)
                     
-                    # 즉시 리렌더링하여 우측 수정 폼이 활성화되도록 함
-                    st.rerun()
+                    # 리렌더링 없이 상태 기반 UI 업데이트
             else:
                 # 더 자세한 오류 메시지와 도움말 제공
                 platform_text = f" ({search_platform})" if search_platform != "전체" else ""
@@ -800,14 +801,14 @@ def render_influencer_edit_form(influencer):
                         st.success("인플루언서 정보가 업데이트되었습니다!")
                         # 세션 상태 업데이트
                         st.session_state.selected_influencer.update(update_data)
+                        st.session_state.influencer_updated = True  # 업데이트 완료 플래그
                         # 캐시 초기화
                         if "influencers_data" in st.session_state:
                             del st.session_state["influencers_data"]
                         if "manager_filtered_influencers" in st.session_state:
                             del st.session_state["manager_filtered_influencers"]
                         
-                        
-                        st.rerun()
+                        # 리렌더링 없이 상태 기반 UI 업데이트
                     else:
                         st.error(f"업데이트 실패: {result['message']}")
         
@@ -815,14 +816,15 @@ def render_influencer_edit_form(influencer):
             if st.form_submit_button("🗑️ 삭제", type="secondary"):
                 # 삭제 확인
                 st.session_state[f"confirm_delete_{influencer['id']}"] = True
-                st.rerun()
+                # 리렌더링 없이 상태 기반 UI 업데이트
         
         with col3:
             if st.form_submit_button("🔄 새로고침"):
                 # 세션 상태 초기화
                 if 'selected_influencer' in st.session_state:
                     del st.session_state.selected_influencer
-                st.rerun()
+                st.session_state.refresh_requested = True  # 새로고침 요청 플래그
+                # 리렌더링 없이 상태 기반 UI 업데이트
     
     # 삭제 확인 다이얼로그
     if st.session_state.get(f"confirm_delete_{influencer['id']}", False):
@@ -836,20 +838,20 @@ def render_influencer_edit_form(influencer):
                     # 세션 상태 정리
                     del st.session_state.selected_influencer
                     del st.session_state[f"confirm_delete_{influencer['id']}"]
+                    st.session_state.influencer_deleted = True  # 삭제 완료 플래그
                     # 캐시 초기화
                     if "influencers_data" in st.session_state:
                         del st.session_state["influencers_data"]
                     if "manager_filtered_influencers" in st.session_state:
                         del st.session_state["manager_filtered_influencers"]
                     
-                    
-                    st.rerun()
+                    # 리렌더링 없이 상태 기반 UI 업데이트
                 else:
                     st.error(f"삭제 실패: {result['message']}")
         with col2:
             if st.button("❌ 취소"):
                 del st.session_state[f"confirm_delete_{influencer['id']}"]
-                st.rerun()
+                # 리렌더링 없이 상태 기반 UI 업데이트
 
 def render_manager_influencer_management():
     """담당자별 인플루언서 관리 탭"""
@@ -902,7 +904,8 @@ def render_manager_influencer_management():
                     del st.session_state["campaign_participation_cache"]
                 if "all_participation_influencer_ids" in st.session_state:
                     del st.session_state["all_participation_influencer_ids"]
-                st.rerun()
+                st.session_state.manager_refresh_requested = True  # 새로고침 요청 플래그
+                # 리렌더링 없이 상태 기반 UI 업데이트
         
         # 담당자 필터링 (먼저 적용)
         if selected_manager == "전체":
@@ -1435,7 +1438,8 @@ def render_filtered_influencer_list(influencers, selected_manager):
         
         with col2:
             if st.button("🔄 변경사항 취소", key="cancel_changes"):
-                st.rerun()
+                st.session_state.changes_cancelled = True  # 변경사항 취소 플래그
+                # 리렌더링 없이 상태 기반 UI 업데이트
     else:
         st.info("변경된 내용이 없습니다. 테이블에서 데이터를 편집하면 저장 버튼이 나타납니다.")
     
@@ -1536,7 +1540,7 @@ def save_edited_influencers(original_df, edited_df):
                 del st.session_state["all_participation_influencer_ids"]
             
             # 페이지 새로고침
-            st.rerun()
+            st.session_state.bulk_update_completed = True  # 대량 업데이트 완료 플래그
             
     except Exception as e:
         st.error(f"데이터 저장 중 오류가 발생했습니다: {e}")

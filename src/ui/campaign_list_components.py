@@ -23,7 +23,8 @@ def render_campaign_list():
             # 캐시 초기화
             if "campaigns_cache" in st.session_state:
                 del st.session_state["campaigns_cache"]
-            st.rerun()
+            st.session_state.campaign_list_refresh_requested = True  # 캠페인 목록 새로고침 요청 플래그
+            # 리렌더링 없이 상태 기반 UI 업데이트
     
     with col2:
         st.caption("캠페인 목록을 새로고침하려면 새로고침 버튼을 클릭하세요.")
@@ -201,7 +202,8 @@ def render_campaign_edit_form(campaign):
                             # 캐시 초기화
                             if "campaigns_cache" in st.session_state:
                                 del st.session_state["campaigns_cache"]
-                            st.rerun()
+                            st.session_state.campaign_updated = True  # 캠페인 업데이트 완료 플래그
+                            # 리렌더링 없이 상태 기반 UI 업데이트
                         else:
                             st.error(f"캠페인 업데이트 실패: {result['message']}")
         
@@ -213,7 +215,8 @@ def render_campaign_edit_form(campaign):
                     # 캐시 초기화
                     if "campaigns_cache" in st.session_state:
                         del st.session_state["campaigns_cache"]
-                    st.rerun()
+                    st.session_state.campaign_deleted = True  # 캠페인 삭제 완료 플래그
+                    # 리렌더링 없이 상태 기반 UI 업데이트
                 else:
                     st.error(f"캠페인 삭제 실패: {result['message']}")
 

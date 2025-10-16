@@ -394,12 +394,14 @@ def render_influencer_detail_form(influencer):
                             else:
                                 # 폴백: 기존 정보에 업데이트 데이터 병합
                                 st.session_state.selected_influencer.update(update_data)
-                        st.rerun()
+                        st.session_state.detail_update_completed = True  # 상세 업데이트 완료 플래그
+                        # 리렌더링 없이 상태 기반 UI 업데이트
                     else:
                         st.error(f"수정 실패: {result['message']}")
             with col2:
                 if st.form_submit_button("❌ 취소"):
-                    st.rerun()
+                    st.session_state.detail_edit_cancelled = True  # 상세 편집 취소 플래그
+                    # 리렌더링 없이 상태 기반 UI 업데이트
     
     # 선택 해제 버튼
     if st.button("🔄 선택 해제", key=f"clear_selection_{influencer['id']}"):
@@ -417,6 +419,7 @@ def render_influencer_detail_form(influencer):
             if key.startswith(f"edit_") and key.endswith(f"_{influencer['id']}"):
                 del st.session_state[key]
         
-        st.rerun()
+        st.session_state.selection_cleared = True  # 선택 해제 완료 플래그
+        # 리렌더링 없이 상태 기반 UI 업데이트
 
 
