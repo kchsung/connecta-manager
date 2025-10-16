@@ -531,8 +531,8 @@ def render_rating_analysis():
                         'SNS ID': inf.get('sns_id', 'N/A'),
                         '이름': inf.get('influencer_name', 'N/A'),
                         '플랫폼': inf.get('platform', 'N/A'),
-                        '매니저 평점': inf.get('manager_rating', 'N/A') if inf.get('manager_rating') is not None else 'N/A',
-                        '콘텐츠 평점': inf.get('content_rating', 'N/A') if inf.get('content_rating') is not None else 'N/A',
+                        '매니저 평점': inf.get('manager_rating') if inf.get('manager_rating') is not None else 'N/A',
+                        '콘텐츠 평점': inf.get('content_rating') if inf.get('content_rating') is not None else 'N/A',
                         '팔로워 수': f"{inf.get('followers_count', 0):,}" if inf.get('followers_count') else 'N/A',
                         '가격': f"{inf.get('price_krw', 0):,.0f}원" if inf.get('price_krw') else 'N/A'
                     })
