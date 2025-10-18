@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import json
 import os
 import numpy as np
+import time
 from ..db.database import db_manager
 from ..supabase.simple_client import simple_client
 
@@ -241,31 +242,77 @@ def execute_ai_analysis():
         return {"success": False, "error": str(e)}
 
 def get_completed_crawling_data(limit=1000, offset=0):
-    """크롤링 완료된 데이터 조회 (페이징 지원)"""
-    try:
-        # Supabase에서 크롤링 완료된 데이터 조회
-        client = simple_client.get_client()
-        if not client:
-            return []
-        
-        response = client.table("tb_instagram_crawling").select("*").eq("status", "COMPLETE").range(offset, offset + limit - 1).execute()
-        return response.data if response.data else []
-    except Exception as e:
-        st.error(f"크롤링 데이터 조회 중 오류: {str(e)}")
-        return []
+    """크롤링 완료된 데이터 조회 (페이징 지원) - 재시도 로직 포함"""
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            # Supabase에서 크롤링 완료된 데이터 조회
+            client = simple_client.get_client()
+            if not client:
+                if attempt < max_retries - 1:
+                    st.warning(f"Supabase 클라이언트 연결 실패. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                return []
+            
+            response = client.table("tb_instagram_crawling").select("*").eq("status", "COMPLETE").range(offset, offset + limit - 1).execute()
+            return response.data if response.data else []
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "Server disconnected" in error_msg or "connection" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    st.warning(f"서버 연결 오류 발생. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    st.error(f"크롤링 데이터 조회 중 서버 연결 오류 (최대 재시도 횟수 초과): {error_msg}")
+                    return []
+            else:
+                st.error(f"크롤링 데이터 조회 중 오류: {error_msg}")
+                return []
+    
+    return []
 
 def get_completed_crawling_data_count():
-    """크롤링 완료된 데이터 총 개수 조회"""
-    try:
-        client = simple_client.get_client()
-        if not client:
-            return 0
-        
-        response = client.table("tb_instagram_crawling").select("id", count="exact").eq("status", "COMPLETE").execute()
-        return response.count if response.count else 0
-    except Exception as e:
-        st.error(f"크롤링 데이터 개수 조회 중 오류: {str(e)}")
-        return 0
+    """크롤링 완료된 데이터 총 개수 조회 - 재시도 로직 포함"""
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            client = simple_client.get_client()
+            if not client:
+                if attempt < max_retries - 1:
+                    st.warning(f"Supabase 클라이언트 연결 실패. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                return 0
+            
+            response = client.table("tb_instagram_crawling").select("id", count="exact").eq("status", "COMPLETE").execute()
+            return response.count if response.count else 0
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "Server disconnected" in error_msg or "connection" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    st.warning(f"서버 연결 오류 발생. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    st.error(f"크롤링 데이터 개수 조회 중 서버 연결 오류 (최대 재시도 횟수 초과): {error_msg}")
+                    return 0
+            else:
+                st.error(f"크롤링 데이터 개수 조회 중 오류: {error_msg}")
+                return 0
+    
+    return 0
 
 def is_recently_analyzed(influencer_id, platform):
     """최근 분석 여부 확인 (1달 이내) - 기존 함수 (호환성 유지)"""
@@ -284,67 +331,121 @@ def is_recently_analyzed(influencer_id, platform):
         return False
 
 def is_recently_analyzed_by_id(crawling_id):
-    """크롤링 ID 기준으로 최근 분석 여부 확인 (1달 이내)"""
-    try:
-        one_month_ago = datetime.now() - timedelta(days=30)
-        
-        client = simple_client.get_client()
-        if not client:
-            return False
-        
-        # influencer_id와 platform 기준으로 확인 (influencer_id는 이제 VARCHAR 타입)
-        response = client.table("ai_influencer_analyses").select("analyzed_at").eq("influencer_id", crawling_id).eq("platform", "instagram").gte("analyzed_at", one_month_ago.isoformat()).execute()
-        
-        return len(response.data) > 0 if response.data else False
-    except Exception as e:
-        st.error(f"최근 분석 여부 확인 중 오류: {str(e)}")
-        return False
+    """크롤링 ID 기준으로 최근 분석 여부 확인 (1달 이내) - 재시도 로직 포함"""
+    max_retries = 3
+    retry_delay = 1  # 초
+    
+    for attempt in range(max_retries):
+        try:
+            one_month_ago = datetime.now() - timedelta(days=30)
+            
+            client = simple_client.get_client()
+            if not client:
+                if attempt < max_retries - 1:
+                    st.warning(f"Supabase 클라이언트 연결 실패. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # 지수 백오프
+                    continue
+                return False
+            
+            # influencer_id와 platform 기준으로 확인 (influencer_id는 이제 VARCHAR 타입)
+            response = client.table("ai_influencer_analyses").select("analyzed_at").eq("influencer_id", crawling_id).eq("platform", "instagram").gte("analyzed_at", one_month_ago.isoformat()).execute()
+            
+            return len(response.data) > 0 if response.data else False
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "Server disconnected" in error_msg or "connection" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    st.warning(f"서버 연결 오류 발생. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # 지수 백오프
+                    continue
+                else:
+                    st.error(f"최근 분석 여부 확인 중 서버 연결 오류 (최대 재시도 횟수 초과): {error_msg}")
+                    return False
+            else:
+                st.error(f"최근 분석 여부 확인 중 오류: {error_msg}")
+                return False
+    
+    return False
 
 def perform_ai_analysis(data):
-    """AI 분석 수행"""
-    try:
-        # OpenAI API 호출 (새로운 Responses API 사용)
-        from openai import OpenAI
-        api_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-        
-        if not api_key:
-            st.error("OpenAI API 키가 설정되지 않았습니다.")
-            return None
-        
-        client = OpenAI(api_key=api_key)
-        
-        # 프롬프트 ID 설정 (실제 프롬프트 ID로 변경 필요)
-        prompt_id = st.secrets.get("OPENAI_PROMPT_ID", "pmpt_68f36e44eab08196b4e75067a3074b7b0c099d8443a9dd49")
-        prompt_version = st.secrets.get("OPENAI_PROMPT_VERSION", "4")
-        
-        # 데이터를 input으로 전달 (문자열로 변환)
-        # OpenAI Responses API는 input이 문자열 또는 문자열 배열이어야 함
-        input_data = json.dumps(data, ensure_ascii=False)  # JSON 문자열로 변환
-        
-        response = client.responses.create(
-            prompt={
-                "id": prompt_id,
-                "version": prompt_version
-            },
-            input=input_data,
-            reasoning={
-                "summary": "auto"
-            },
-            store=True,
-            include=[
-                "reasoning.encrypted_content",
-                "web_search_call.action.sources"
-            ]
-        )
-        
-        # 응답 파싱 및 ai_influencer_analyses 테이블 구조에 맞게 변환
-        analysis_result = parse_ai_response(response)
-        
-        return analysis_result
-        
-    except Exception as e:
-        st.error(f"AI 분석 수행 중 오류: {str(e)}")
-        return None
+    """AI 분석 수행 - 타임아웃 및 재시도 로직 포함"""
+    max_retries = 2
+    timeout_seconds = 200  # 3분 20초 (OpenAI가 최대 3분까지 걸린다고 하니 여유있게 설정)
+    
+    for attempt in range(max_retries):
+        try:
+            # OpenAI API 호출 (새로운 Responses API 사용)
+            from openai import OpenAI
+            api_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+            
+            if not api_key:
+                st.error("OpenAI API 키가 설정되지 않았습니다.")
+                return None
+            
+            # 타임아웃 설정이 포함된 클라이언트 생성
+            client = OpenAI(
+                api_key=api_key,
+                timeout=timeout_seconds  # 타임아웃 설정
+            )
+            
+            # 프롬프트 ID 설정 (실제 프롬프트 ID로 변경 필요)
+            prompt_id = st.secrets.get("OPENAI_PROMPT_ID", "pmpt_68f36e44eab08196b4e75067a3074b7b0c099d8443a9dd49")
+            prompt_version = st.secrets.get("OPENAI_PROMPT_VERSION", "4")
+            
+            # 데이터를 input으로 전달 (문자열로 변환)
+            # OpenAI Responses API는 input이 문자열 또는 문자열 배열이어야 함
+            input_data = json.dumps(data, ensure_ascii=False)  # JSON 문자열로 변환
+            
+            if attempt > 0:
+                st.info(f"OpenAI API 재시도 중... (시도 {attempt + 1}/{max_retries})")
+            
+            response = client.responses.create(
+                prompt={
+                    "id": prompt_id,
+                    "version": prompt_version
+                },
+                input=input_data,
+                reasoning={
+                    "summary": "auto"
+                },
+                store=True,
+                include=[
+                    "reasoning.encrypted_content",
+                    "web_search_call.action.sources"
+                ]
+            )
+            
+            # 응답 파싱 및 ai_influencer_analyses 테이블 구조에 맞게 변환
+            analysis_result = parse_ai_response(response)
+            
+            return analysis_result
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    st.warning(f"OpenAI API 타임아웃 발생. 5초 후 재시도... (시도 {attempt + 1}/{max_retries})")
+                    time.sleep(5)
+                    continue
+                else:
+                    st.error(f"OpenAI API 타임아웃 (최대 재시도 횟수 초과): {error_msg}")
+                    return None
+            elif "rate limit" in error_msg.lower() or "quota" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    st.warning(f"OpenAI API 제한 발생. 10초 후 재시도... (시도 {attempt + 1}/{max_retries})")
+                    time.sleep(10)
+                    continue
+                else:
+                    st.error(f"OpenAI API 제한 (최대 재시도 횟수 초과): {error_msg}")
+                    return None
+            else:
+                st.error(f"AI 분석 수행 중 오류: {error_msg}")
+                return None
+    
+    return None
 
 def parse_ai_response(response):
     """AI 응답을 파싱하여 JSON 객체로 변환"""
@@ -511,31 +612,58 @@ def transform_to_db_format(ai_input_data, ai_result, crawling_id):
         return None
 
 def save_ai_analysis_result(crawling_data, analysis_result, crawling_id):
-    """AI 분석 결과 저장 (이미 변환된 데이터 구조 사용)"""
-    try:
-        client = simple_client.get_client()
-        if not client:
-            return
-        
-        # analysis_result는 이미 transform_to_db_format에서 변환된 데이터
-        # influencer_id는 이미 crawling_id로 설정됨
-        
-        # 크롤링 ID를 notes에 추가 (추적용)
-        if "notes" in analysis_result and isinstance(analysis_result["notes"], dict):
-            analysis_result["notes"]["crawling_id"] = crawling_id
-        
-        # 기존 데이터 확인 (influencer_id 기준)
-        existing_response = client.table("ai_influencer_analyses").select("id").eq("influencer_id", crawling_id).eq("platform", "instagram").execute()
-        
-        if existing_response.data:
-            # 업데이트
-            client.table("ai_influencer_analyses").update(analysis_result).eq("id", existing_response.data[0]["id"]).execute()
-        else:
-            # 새로 생성
-            client.table("ai_influencer_analyses").insert(analysis_result).execute()
+    """AI 분석 결과 저장 (이미 변환된 데이터 구조 사용) - 재시도 로직 포함"""
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            client = simple_client.get_client()
+            if not client:
+                if attempt < max_retries - 1:
+                    st.warning(f"Supabase 클라이언트 연결 실패. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                return
             
-    except Exception as e:
-        st.error(f"AI 분석 결과 저장 중 오류: {str(e)}")
+            # analysis_result는 이미 transform_to_db_format에서 변환된 데이터
+            # influencer_id는 이미 crawling_id로 설정됨
+            
+            # 크롤링 ID를 notes에 추가 (추적용)
+            if "notes" in analysis_result and isinstance(analysis_result["notes"], dict):
+                analysis_result["notes"]["crawling_id"] = crawling_id
+            
+            # 기존 데이터 확인 (influencer_id 기준)
+            existing_response = client.table("ai_influencer_analyses").select("id").eq("influencer_id", crawling_id).eq("platform", "instagram").execute()
+            
+            if existing_response.data:
+                # 업데이트
+                client.table("ai_influencer_analyses").update(analysis_result).eq("id", existing_response.data[0]["id"]).execute()
+            else:
+                # 새로 생성
+                client.table("ai_influencer_analyses").insert(analysis_result).execute()
+            
+            # 성공적으로 저장되면 함수 종료
+            return
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "Server disconnected" in error_msg or "connection" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    st.warning(f"서버 연결 오류 발생. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    st.error(f"AI 분석 결과 저장 중 서버 연결 오류 (최대 재시도 횟수 초과): {error_msg}")
+                    raise Exception(f"AI 분석 결과 저장 실패: {error_msg}")
+            else:
+                st.error(f"AI 분석 결과 저장 중 오류: {error_msg}")
+                raise Exception(f"AI 분석 결과 저장 실패: {error_msg}")
+    
+    # 모든 재시도가 실패한 경우
+    raise Exception("AI 분석 결과 저장 실패: 최대 재시도 횟수 초과")
 
 def render_ai_analysis_results():
     """AI 분석 결과 탭"""
