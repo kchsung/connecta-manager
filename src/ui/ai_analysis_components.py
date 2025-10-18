@@ -1113,25 +1113,147 @@ def render_comment_authenticity_statistics():
         with col4:
             st.metric("중앙값 형식적 댓글 비율", f"{comment_stats['median_low_authentic_ratio']:.1f}%")
         
-        # 진정성 비율 분포 차트
+        # 진정성 기준별 분포 분석
         if comment_stats['authentic_ratio_distribution']:
-            fig = px.histogram(
-                x=comment_stats['authentic_ratio_distribution'],
-                nbins=20,
-                title="댓글 진정성 비율 분포",
-                labels={"x": "진정성 비율 (%)", "y": "인플루언서 수"}
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            st.markdown("#### 📊 진정성 기준별 분포")
+            
+            # 진정성 기준별 분류
+            high_authenticity = [x for x in comment_stats['authentic_ratio_distribution'] if x >= 70]
+            normal_authenticity = [x for x in comment_stats['authentic_ratio_distribution'] if 50 <= x < 70]
+            low_authenticity = [x for x in comment_stats['authentic_ratio_distribution'] if 30 <= x < 50]
+            very_low_authenticity = [x for x in comment_stats['authentic_ratio_distribution'] if x < 30]
+            
+            authenticity_categories = {
+                "높은 진정성 (70% 이상)": len(high_authenticity),
+                "보통 진정성 (50~70%)": len(normal_authenticity),
+                "낮은 진정성 (30~50%)": len(low_authenticity),
+                "매우 낮은 진정성 (30% 미만)": len(very_low_authenticity)
+            }
+            
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                # 진정성 기준별 분포 파이 차트
+                fig = px.pie(
+                    values=list(authenticity_categories.values()),
+                    names=list(authenticity_categories.keys()),
+                    title="진정성 기준별 분포",
+                    color_discrete_sequence=['#2E8B57', '#FFD700', '#FF8C00', '#DC143C']
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # 형식적 댓글 비율 분포
+                if comment_stats['low_authentic_ratio_distribution']:
+                    # 형식적 댓글 비율 기준별 분류
+                    good_quality = [x for x in comment_stats['low_authentic_ratio_distribution'] if x < 30]
+                    normal_quality = [x for x in comment_stats['low_authentic_ratio_distribution'] if 30 <= x < 50]
+                    poor_quality = [x for x in comment_stats['low_authentic_ratio_distribution'] if x >= 50]
+                    
+                    quality_categories = {
+                        "양호한 품질 (30% 미만)": len(good_quality),
+                        "보통 품질 (30~50%)": len(normal_quality),
+                        "낮은 품질 (50% 이상)": len(poor_quality)
+                    }
+                    
+                    fig = px.pie(
+                        values=list(quality_categories.values()),
+                        names=list(quality_categories.keys()),
+                        title="댓글 품질 기준별 분포",
+                        color_discrete_sequence=['#2E8B57', '#FFD700', '#DC143C']
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
         
-        # 진정성 등급 분포
-        if comment_stats['authenticity_level_distribution']:
-            st.markdown("#### 📊 진정성 등급 분포")
-            fig = px.pie(
-                values=list(comment_stats['authenticity_level_distribution'].values()),
-                names=list(comment_stats['authenticity_level_distribution'].keys()),
-                title="진정성 등급 분포"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+        # 경고 및 주의사항
+        st.markdown("#### ⚠️ 주의사항 및 경고")
+        
+        # 의심스러운 패턴 감지
+        suspicious_count = len([x for x in comment_stats['authentic_ratio_distribution'] if x < 30])
+        poor_quality_count = len([x for x in comment_stats['low_authentic_ratio_distribution'] if x >= 50]) if comment_stats['low_authentic_ratio_distribution'] else 0
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if suspicious_count > 0:
+                st.error(f"🚨 **의심스러운 패턴 감지**: {suspicious_count}명의 인플루언서가 매우 낮은 진정성(30% 미만)을 보입니다.")
+            else:
+                st.success("✅ 의심스러운 패턴이 감지되지 않았습니다.")
+        
+        with col2:
+            if poor_quality_count > 0:
+                st.warning(f"⚠️ **댓글 품질 주의**: {poor_quality_count}명의 인플루언서가 낮은 댓글 품질(50% 이상 형식적 댓글)을 보입니다.")
+            else:
+                st.success("✅ 댓글 품질이 양호합니다.")
+        
+        # 진정성 등급 분포와 상위/하위 인플루언서 분포도
+        st.markdown("#### 📈 AI 분석 등급 분포 & 상위/하위 인플루언서 분포")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if comment_stats['authenticity_level_distribution']:
+                fig = px.pie(
+                    values=list(comment_stats['authenticity_level_distribution'].values()),
+                    names=list(comment_stats['authenticity_level_distribution'].keys()),
+                    title="AI 분석 진정성 등급 분포"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # 상위/하위 인플루언서 분포도
+            render_top_bottom_distribution_plot()
+        
+        # 상위/하위 인플루언서 요약 통계
+        st.markdown("#### 🏆 상위/하위 인플루언서 요약")
+        
+        # 상위/하위 인플루언서 데이터 조회
+        top_bottom_analysis = get_top_bottom_authenticity_analysis()
+        
+        if top_bottom_analysis:
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("상위 인플루언서 수", f"{len(top_bottom_analysis['top_influencers'])}명")
+            with col2:
+                st.metric("하위 인플루언서 수", f"{len(top_bottom_analysis['bottom_influencers'])}명")
+            with col3:
+                if top_bottom_analysis['top_influencers']:
+                    avg_top = sum([x['authentic_ratio'] for x in top_bottom_analysis['top_influencers']]) / len(top_bottom_analysis['top_influencers'])
+                    st.metric("상위 평균 진정성", f"{avg_top:.1f}%")
+                else:
+                    st.metric("상위 평균 진정성", "N/A")
+            with col4:
+                if top_bottom_analysis['bottom_influencers']:
+                    avg_bottom = sum([x['authentic_ratio'] for x in top_bottom_analysis['bottom_influencers']]) / len(top_bottom_analysis['bottom_influencers'])
+                    st.metric("하위 평균 진정성", f"{avg_bottom:.1f}%")
+                else:
+                    st.metric("하위 평균 진정성", "N/A")
+        
+        # 상세 통계 테이블
+        st.markdown("#### 📋 상세 통계")
+        
+        # 진정성 기준별 상세 통계
+        stats_data = []
+        if comment_stats['authentic_ratio_distribution']:
+            stats_data.append({
+                "구분": "진정성 비율",
+                "평균": f"{comment_stats['avg_authentic_ratio']:.1f}%",
+                "중앙값": f"{comment_stats['median_authentic_ratio']:.1f}%",
+                "최고": f"{max(comment_stats['authentic_ratio_distribution']):.1f}%",
+                "최저": f"{min(comment_stats['authentic_ratio_distribution']):.1f}%"
+            })
+        
+        if comment_stats['low_authentic_ratio_distribution']:
+            stats_data.append({
+                "구분": "형식적 댓글 비율",
+                "평균": f"{comment_stats['avg_low_authentic_ratio']:.1f}%",
+                "중앙값": f"{comment_stats['median_low_authentic_ratio']:.1f}%",
+                "최고": f"{max(comment_stats['low_authentic_ratio_distribution']):.1f}%",
+                "최저": f"{min(comment_stats['low_authentic_ratio_distribution']):.1f}%"
+            })
+        
+        if stats_data:
+            st.dataframe(pd.DataFrame(stats_data), use_container_width=True)
         
         # 수치 해석 가이드
         with st.expander("📖 댓글 진정성 해석 가이드", expanded=False):
@@ -1584,21 +1706,32 @@ def get_comment_authenticity_statistics():
         for item in response.data:
             comment_analysis = item.get("comment_authenticity_analysis", {})
             if isinstance(comment_analysis, dict):
-                # 진정성 비율 추출
-                authentic_ratio = comment_analysis.get("authentic_comments_ratio")
-                if authentic_ratio is not None:
-                    try:
-                        authentic_ratios.append(float(authentic_ratio))
-                    except (ValueError, TypeError):
-                        pass
-                
-                # 형식적 댓글 비율 추출
-                low_authentic_ratio = comment_analysis.get("low_authentic_comments_ratio")
-                if low_authentic_ratio is not None:
-                    try:
-                        low_authentic_ratios.append(float(low_authentic_ratio))
-                    except (ValueError, TypeError):
-                        pass
+                # 진정성 비율 추출 - ratio_estimation 내부에서 추출
+                ratio_estimation = comment_analysis.get("ratio_estimation", {})
+                if isinstance(ratio_estimation, dict):
+                    # authentic_comments_ratio 추출 (문자열에서 숫자 추출)
+                    authentic_ratio_str = ratio_estimation.get("authentic_comments_ratio", "")
+                    if authentic_ratio_str:
+                        try:
+                            # "약 40%" 형태에서 숫자만 추출
+                            import re
+                            match = re.search(r'(\d+(?:\.\d+)?)', str(authentic_ratio_str))
+                            if match:
+                                authentic_ratios.append(float(match.group(1)))
+                        except (ValueError, TypeError):
+                            pass
+                    
+                    # low_authentic_comments_ratio 추출 (문자열에서 숫자 추출)
+                    low_authentic_ratio_str = ratio_estimation.get("low_authentic_comments_ratio", "")
+                    if low_authentic_ratio_str:
+                        try:
+                            # "약 60%" 형태에서 숫자만 추출
+                            import re
+                            match = re.search(r'(\d+(?:\.\d+)?)', str(low_authentic_ratio_str))
+                            if match:
+                                low_authentic_ratios.append(float(match.group(1)))
+                        except (ValueError, TypeError):
+                            pass
                 
                 # 진정성 등급 추출
                 authenticity_level = comment_analysis.get("authenticity_level")
@@ -1616,10 +1749,191 @@ def get_comment_authenticity_statistics():
             "avg_low_authentic_ratio": sum(low_authentic_ratios) / len(low_authentic_ratios) if low_authentic_ratios else 0,
             "median_low_authentic_ratio": sorted(low_authentic_ratios)[len(low_authentic_ratios)//2] if low_authentic_ratios else 0,
             "authentic_ratio_distribution": authentic_ratios,
+            "low_authentic_ratio_distribution": low_authentic_ratios,
             "authenticity_level_distribution": authenticity_level_dist
         }
     except Exception as e:
         st.error(f"댓글 진정성 통계 조회 중 오류: {str(e)}")
+        return None
+
+def render_top_bottom_distribution_plot():
+    """상위/하위 인플루언서 분포도 렌더링"""
+    try:
+        # 상위/하위 인플루언서 데이터 조회
+        top_bottom_analysis = get_top_bottom_authenticity_analysis()
+        
+        if not top_bottom_analysis or not top_bottom_analysis['top_influencers'] or not top_bottom_analysis['bottom_influencers']:
+            st.info("분포도 데이터가 없습니다.")
+            return
+        
+        # 데이터 준비
+        plot_data = []
+        
+        # 상위 인플루언서 데이터 추가
+        for inf in top_bottom_analysis['top_influencers']:
+            plot_data.append({
+                'name': inf['name'],
+                'influencer_id': inf['influencer_id'],
+                'authentic_ratio': inf['authentic_ratio'],
+                'low_authentic_ratio': inf['low_authentic_ratio'],
+                'authenticity_level': inf['authenticity_level'],
+                'group': '상위 (평균 이상)',
+                'size': 8
+            })
+        
+        # 하위 인플루언서 데이터 추가
+        for inf in top_bottom_analysis['bottom_influencers']:
+            plot_data.append({
+                'name': inf['name'],
+                'influencer_id': inf['influencer_id'],
+                'authentic_ratio': inf['authentic_ratio'],
+                'low_authentic_ratio': inf['low_authentic_ratio'],
+                'authenticity_level': inf['authenticity_level'],
+                'group': '하위 (평균 미만)',
+                'size': 6
+            })
+        
+        if not plot_data:
+            st.info("분포도 데이터가 없습니다.")
+            return
+        
+        # 분포도 생성
+        fig = px.scatter(
+            plot_data,
+            x='authentic_ratio',
+            y='low_authentic_ratio',
+            color='authenticity_level',
+            symbol='group',
+            size='size',
+            hover_data=['name', 'influencer_id'],
+            title="상위/하위 인플루언서 분포도",
+            labels={
+                'authentic_ratio': '진정성 비율 (%)',
+                'low_authentic_ratio': '형식적 댓글 비율 (%)',
+                'authenticity_level': 'AI 분석 등급',
+                'group': '그룹'
+            },
+            color_discrete_map={
+                '높음': '#2E8B57',
+                '중간': '#FFD700',
+                '낮음': '#DC143C'
+            },
+            symbol_map={
+                '상위 (평균 이상)': 'circle',
+                '하위 (평균 미만)': 'diamond'
+            }
+        )
+        
+        # 평균선 추가
+        avg_authentic = top_bottom_analysis['avg_authentic_ratio']
+        fig.add_vline(
+            x=avg_authentic,
+            line_dash="dash",
+            line_color="red",
+            annotation_text=f"평균 진정성: {avg_authentic:.1f}%",
+            annotation_position="top"
+        )
+        
+        # 레이아웃 조정
+        fig.update_layout(
+            width=500,
+            height=400,
+            showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02
+            )
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # 범례 설명
+        st.caption("""
+        **범례 설명:**
+        - 🟢 높음: 실제 팬들의 진정한 반응이 많음
+        - 🟡 중간: 일부 진정한 반응과 형식적 댓글 혼재  
+        - 🔴 낮음: 대부분 형식적이거나 의심스러운 댓글
+        - ⚪ 상위: 평균 이상 진정성
+        - 🔷 하위: 평균 미만 진정성
+        """)
+        
+    except Exception as e:
+        st.error(f"분포도 생성 중 오류: {str(e)}")
+
+def get_top_bottom_authenticity_analysis():
+    """평균 대비 상위/하위 인플루언서 분석 조회"""
+    try:
+        client = simple_client.get_client()
+        if not client:
+            return None
+        
+        # 전체 데이터 조회
+        response = client.table("ai_influencer_analyses").select("name, influencer_id, comment_authenticity_analysis").execute()
+        
+        if not response.data:
+            return None
+        
+        # 진정성 비율 추출 및 평균 계산
+        influencers_data = []
+        authentic_ratios = []
+        
+        for item in response.data:
+            comment_analysis = item.get("comment_authenticity_analysis", {})
+            if isinstance(comment_analysis, dict):
+                ratio_estimation = comment_analysis.get("ratio_estimation", {})
+                if isinstance(ratio_estimation, dict):
+                    # 진정성 비율 추출
+                    authentic_ratio_str = ratio_estimation.get("authentic_comments_ratio", "")
+                    low_authentic_ratio_str = ratio_estimation.get("low_authentic_comments_ratio", "")
+                    
+                    if authentic_ratio_str and low_authentic_ratio_str:
+                        try:
+                            import re
+                            # "약 40%" 형태에서 숫자만 추출
+                            authentic_match = re.search(r'(\d+(?:\.\d+)?)', str(authentic_ratio_str))
+                            low_authentic_match = re.search(r'(\d+(?:\.\d+)?)', str(low_authentic_ratio_str))
+                            
+                            if authentic_match and low_authentic_match:
+                                authentic_ratio = float(authentic_match.group(1))
+                                low_authentic_ratio = float(low_authentic_match.group(1))
+                                
+                                influencers_data.append({
+                                    "name": item.get("name", "N/A"),
+                                    "influencer_id": item.get("influencer_id", "N/A"),
+                                    "authentic_ratio": authentic_ratio,
+                                    "low_authentic_ratio": low_authentic_ratio,
+                                    "authenticity_level": comment_analysis.get("authenticity_level", "N/A")
+                                })
+                                authentic_ratios.append(authentic_ratio)
+                        except (ValueError, TypeError):
+                            pass
+        
+        if not authentic_ratios:
+            return None
+        
+        # 평균 계산
+        avg_authentic_ratio = sum(authentic_ratios) / len(authentic_ratios)
+        
+        # 상위/하위 인플루언서 분류
+        top_influencers = [inf for inf in influencers_data if inf['authentic_ratio'] >= avg_authentic_ratio]
+        bottom_influencers = [inf for inf in influencers_data if inf['authentic_ratio'] < avg_authentic_ratio]
+        
+        # 진정성 비율 기준으로 정렬
+        top_influencers.sort(key=lambda x: x['authentic_ratio'], reverse=True)
+        bottom_influencers.sort(key=lambda x: x['authentic_ratio'], reverse=True)
+        
+        return {
+            "top_influencers": top_influencers,
+            "bottom_influencers": bottom_influencers,
+            "avg_authentic_ratio": avg_authentic_ratio,
+            "total_count": len(influencers_data)
+        }
+        
+    except Exception as e:
+        st.error(f"상위/하위 인플루언서 분석 조회 중 오류: {str(e)}")
         return None
 
 def get_evaluation_scores_statistics():
