@@ -7,7 +7,7 @@ st.set_page_config(
     page_title="Connecta Manager",
     page_icon="📋",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",  # Streamlit Cloud 호환성을 위해 auto로 변경
 )
 
 # ── Streamlit 설정 (Windows 파일 감시 오류 해결) ──────────────────
@@ -169,9 +169,24 @@ def inject_layout_css():
     }
 
 
-    /* 필요 시 상단 헤더를 숨기지 않음(접힘 버튼 살리기) */
-    /* #MainMenu만 숨기고, header/footer는 유지 */
-    #MainMenu { display: none !important; }
+    /* 메인 메뉴는 숨기지 않음 (Streamlit Cloud 호환성) */
+    /* #MainMenu { display: none !important; } */
+    
+    /* Streamlit Cloud에서 메뉴 표시 보장 */
+    .stApp > header {
+        background-color: transparent;
+    }
+    
+    /* 메뉴 버튼이 보이도록 보장 */
+    .stApp > header [data-testid="stToolbar"] {
+        display: flex !important;
+    }
+    
+    /* 더보기 메뉴 버튼 스타일링 */
+    .stApp > header [data-testid="stToolbar"] button {
+        display: block !important;
+        visibility: visible !important;
+    }
 
     /* 사이드바 폼 전체 간격 */
     .stSidebar .stForm, .stSidebar form {

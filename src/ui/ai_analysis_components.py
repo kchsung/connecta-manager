@@ -522,7 +522,11 @@ def render_ai_analysis_results():
                 selected_analysis = st.session_state.selected_analysis
             
             if selected_analysis:
-                show_detailed_analysis_improved(selected_analysis)
+                try:
+                    show_detailed_analysis_improved(selected_analysis)
+                except Exception as e:
+                    st.error(f"상세 정보 표시 중 오류가 발생했습니다: {str(e)}")
+                    st.info("다른 인플루언서를 선택해보세요.")
             else:
                 st.info("좌측에서 인플루언서를 선택하면 상세 정보가 표시됩니다.")
     
@@ -658,11 +662,28 @@ def show_detailed_analysis_improved(analysis):
         st.metric("카테고리", analysis.get('category', 'N/A'))
     
     with col3:
-        st.metric("팔로워", f"{analysis.get('followers', 0):,}명")
-        st.metric("팔로잉", f"{analysis.get('followings', 0):,}명")
+        # 숫자 데이터 안전하게 처리
+        followers = analysis.get('followers', 0)
+        followings = analysis.get('followings', 0)
+        try:
+            followers_num = int(followers) if followers else 0
+            followings_num = int(followings) if followings else 0
+        except (ValueError, TypeError):
+            followers_num = 0
+            followings_num = 0
+        
+        st.metric("팔로워", f"{followers_num:,}명")
+        st.metric("팔로잉", f"{followings_num:,}명")
     
     with col4:
-        st.metric("게시물 수", f"{analysis.get('posts_count', 0):,}개")
+        # 게시물 수 안전하게 처리
+        posts_count = analysis.get('posts_count', 0)
+        try:
+            posts_count_num = int(posts_count) if posts_count else 0
+        except (ValueError, TypeError):
+            posts_count_num = 0
+            
+        st.metric("게시물 수", f"{posts_count_num:,}개")
         st.metric("추천도", analysis.get('recommendation', 'N/A'))
     
     # 태그 표시
@@ -688,16 +709,29 @@ def show_detailed_analysis_improved(analysis):
         st.markdown("### ⭐ 평가 점수")
         score_cols = st.columns(5)
         
+        # 점수 데이터 안전하게 처리
+        def safe_get_score(score_dict, key, default=0):
+            try:
+                value = score_dict.get(key, default)
+                return float(value) if value is not None else default
+            except (ValueError, TypeError):
+                return default
+        
         with score_cols[0]:
-            st.metric("참여도", f"{evaluation.get('engagement', 0)}/10")
+            engagement_score = safe_get_score(evaluation, 'engagement', 0)
+            st.metric("참여도", f"{engagement_score}/10")
         with score_cols[1]:
-            st.metric("활동성", f"{evaluation.get('activity', 0)}/10")
+            activity_score = safe_get_score(evaluation, 'activity', 0)
+            st.metric("활동성", f"{activity_score}/10")
         with score_cols[2]:
-            st.metric("소통능력", f"{evaluation.get('communication', 0)}/10")
+            communication_score = safe_get_score(evaluation, 'communication', 0)
+            st.metric("소통능력", f"{communication_score}/10")
         with score_cols[3]:
-            st.metric("성장잠재력", f"{evaluation.get('growth_potential', 0)}/10")
+            growth_potential_score = safe_get_score(evaluation, 'growth_potential', 0)
+            st.metric("성장잠재력", f"{growth_potential_score}/10")
         with score_cols[4]:
-            st.metric("종합점수", f"{evaluation.get('overall_score', 0)}/10")
+            overall_score = safe_get_score(evaluation, 'overall_score', 0)
+            st.metric("종합점수", f"{overall_score}/10")
     
     # 상세 분석 섹션들
     st.markdown("### 🔍 상세 분석")
