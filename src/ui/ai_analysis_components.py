@@ -113,10 +113,19 @@ def execute_ai_analysis():
         if not crawling_data:
             return {"success": False, "error": "분석할 크롤링 데이터가 없습니다."}
         
+        total_count = len(crawling_data)
         analyzed_count = 0
         skipped_count = 0
         
-        for data in crawling_data:
+        # 진행 상황 표시를 위한 프로그레스 바
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for index, data in enumerate(crawling_data):
+            current_progress = (index + 1) / total_count
+            progress_bar.progress(current_progress)
+            status_text.text(f"진행 중: {index + 1}/{total_count} - {data.get('id', 'unknown')}")
+            
             # 2. AI 분석용 JSON 데이터 구성 (id, description, posts)
             try:
                 # posts는 TEXT 필드이므로 그대로 사용
@@ -142,20 +151,11 @@ def execute_ai_analysis():
                 continue
             
             # 4. AI 분석 수행 (구성된 JSON 데이터 전달)
-            st.write(f"🔍 AI 분석 시작: {data.get('id', 'unknown')}")
-            st.write(f"입력 데이터 크기: {len(json.dumps(ai_input_data, ensure_ascii=False))} 문자")
-            
             analysis_result = perform_ai_analysis(ai_input_data)
             
             if not analysis_result:
                 st.error(f"AI 분석 실패: {data.get('id', 'unknown')}")
-                st.write("AI 분석 결과가 None입니다. perform_ai_analysis 함수에서 오류가 발생했을 수 있습니다.")
                 return {"success": False, "error": f"AI 분석 실패: {data.get('id', 'unknown')}"}
-            
-            st.write(f"✅ AI 분석 성공: {data.get('id', 'unknown')}")
-            st.write(f"분석 결과 타입: {type(analysis_result)}")
-            if isinstance(analysis_result, dict):
-                st.write(f"분석 결과 키: {list(analysis_result.keys())}")
             
             # 5. 데이터 변환 (크롤링 ID 포함)
             transformed_result = transform_to_db_format(ai_input_data, analysis_result, data["id"])
@@ -170,6 +170,10 @@ def execute_ai_analysis():
             except Exception as e:
                 st.error(f"결과 저장 실패: {data.get('id', 'unknown')} - 오류: {str(e)}")
                 return {"success": False, "error": f"결과 저장 실패: {str(e)}"}
+        
+        # 완료 후 프로그레스 바와 상태 텍스트 정리
+        progress_bar.progress(1.0)
+        status_text.text("분석 완료!")
         
         return {
             "success": True,
@@ -230,8 +234,6 @@ def is_recently_analyzed_by_id(crawling_id):
 def perform_ai_analysis(data):
     """AI 분석 수행"""
     try:
-        st.write("🔧 OpenAI API 설정 확인 중...")
-        
         # OpenAI API 호출 (새로운 Responses API 사용)
         from openai import OpenAI
         api_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -240,21 +242,15 @@ def perform_ai_analysis(data):
             st.error("OpenAI API 키가 설정되지 않았습니다.")
             return None
         
-        st.write("✅ OpenAI API 키 확인됨")
         client = OpenAI(api_key=api_key)
         
         # 프롬프트 ID 설정 (실제 프롬프트 ID로 변경 필요)
         prompt_id = st.secrets.get("OPENAI_PROMPT_ID", "pmpt_68f36e44eab08196b4e75067a3074b7b0c099d8443a9dd49")
         prompt_version = st.secrets.get("OPENAI_PROMPT_VERSION", "4")
         
-        st.write(f"📝 프롬프트 ID: {prompt_id}")
-        st.write(f"📝 프롬프트 버전: {prompt_version}")
-        
         # 데이터를 input으로 전달 (문자열로 변환)
         # OpenAI Responses API는 input이 문자열 또는 문자열 배열이어야 함
         input_data = json.dumps(data, ensure_ascii=False)  # JSON 문자열로 변환
-        
-        st.write(f"📤 API 호출 시작 (입력 데이터 크기: {len(input_data)} 문자)")
         
         response = client.responses.create(
             prompt={
@@ -272,100 +268,54 @@ def perform_ai_analysis(data):
             ]
         )
         
-        st.write("✅ OpenAI API 호출 완료")
-        st.write(f"응답 타입: {type(response)}")
-        
-        # 응답 객체의 주요 속성들 확인
-        st.write("🔍 응답 객체 주요 속성 확인:")
-        if hasattr(response, 'output'):
-            st.write(f"- output: {type(response.output)} - {response.output}")
-        if hasattr(response, 'output_text'):
-            st.write(f"- output_text: {type(response.output_text)} - {response.output_text}")
-        if hasattr(response, 'text'):
-            st.write(f"- text: {type(response.text)} - {response.text}")
-        if hasattr(response, 'status'):
-            st.write(f"- status: {response.status}")
-        if hasattr(response, 'error'):
-            st.write(f"- error: {response.error}")
-        
         # 응답 파싱 및 ai_influencer_analyses 테이블 구조에 맞게 변환
         analysis_result = parse_ai_response(response)
         
-        if analysis_result:
-            st.write("✅ AI 응답 파싱 성공")
-            return analysis_result
-        else:
-            st.error("❌ AI 응답 파싱 실패")
-            return None
+        return analysis_result
         
     except Exception as e:
         st.error(f"AI 분석 수행 중 오류: {str(e)}")
-        st.write(f"오류 타입: {type(e)}")
-        import traceback
-        st.write(f"상세 오류: {traceback.format_exc()}")
         return None
 
 def parse_ai_response(response):
     """AI 응답을 파싱하여 JSON 객체로 변환"""
     try:
-        st.write("🔍 응답 파싱 시작...")
-        
         # 응답 객체의 속성들을 확인
         analysis_result = None
         
         # OpenAI Responses API의 실제 응답 구조에 맞게 수정
         # output_text가 실제 JSON 데이터를 포함하고 있음
         if hasattr(response, 'output_text') and response.output_text:
-            st.write("📤 output_text 속성에서 데이터 추출")
             analysis_result = response.output_text
         elif hasattr(response, 'output') and response.output:
-            st.write("📤 output 속성에서 데이터 추출")
             analysis_result = response.output
         elif hasattr(response, 'text') and response.text:
-            st.write("📤 text 속성에서 데이터 추출")
             analysis_result = response.text
         else:
             st.error("응답에서 분석 결과를 찾을 수 없습니다.")
-            st.write("사용 가능한 속성들:")
-            for attr in ['output', 'output_text', 'text', 'content', 'data']:
-                if hasattr(response, attr):
-                    value = getattr(response, attr)
-                    st.write(f"- {attr}: {type(value)} - {str(value)[:200]}...")
             return None
-        
-        st.write(f"📊 추출된 데이터 타입: {type(analysis_result)}")
-        st.write(f"📊 추출된 데이터 내용 (처음 200자): {str(analysis_result)[:200]}...")
         
         # JSON 파싱
         if isinstance(analysis_result, str):
-            st.write("📝 문자열 데이터 JSON 파싱 시도...")
             try:
                 result = json.loads(analysis_result)
-                st.write("✅ JSON 파싱 성공")
                 return result
-            except json.JSONDecodeError as e:
-                st.write(f"⚠️ JSON 파싱 실패: {str(e)}")
+            except json.JSONDecodeError:
                 # JSON이 아닌 경우 텍스트에서 JSON 추출
                 if "```json" in analysis_result:
-                    st.write("📝 ```json 블록에서 추출 시도...")
                     analysis_result = analysis_result.split("```json")[1].split("```")[0]
                 elif "```" in analysis_result:
-                    st.write("📝 ``` 블록에서 추출 시도...")
                     analysis_result = analysis_result.split("```")[1].split("```")[0]
                 
                 try:
                     result = json.loads(analysis_result)
-                    st.write("✅ 블록 추출 후 JSON 파싱 성공")
                     return result
-                except json.JSONDecodeError as e2:
-                    st.error(f"❌ JSON 파싱 최종 실패: {str(e2)}")
-                    st.write("원본 응답:", analysis_result[:500])
+                except json.JSONDecodeError:
+                    st.error("JSON 파싱에 실패했습니다.")
                     return None
         elif isinstance(analysis_result, dict):
-            st.write("✅ 딕셔너리 형태 응답 - 그대로 반환")
             return analysis_result
         elif isinstance(analysis_result, list) and len(analysis_result) > 0:
-            st.write("📝 리스트 형태 응답 처리...")
             # 리스트 형태의 응답인 경우 첫 번째 요소에서 content 추출
             first_item = analysis_result[0]
             if hasattr(first_item, 'content') and first_item.content:
@@ -375,22 +325,16 @@ def parse_ai_response(response):
                     if hasattr(content_item, 'text'):
                         try:
                             result = json.loads(content_item.text)
-                            st.write("✅ 리스트에서 텍스트 추출 후 JSON 파싱 성공")
                             return result
                         except json.JSONDecodeError:
-                            st.error("❌ 리스트 응답 텍스트에서 JSON 파싱에 실패했습니다.")
-                            st.write("응답 텍스트:", content_item.text[:500])
+                            st.error("리스트 응답 텍스트에서 JSON 파싱에 실패했습니다.")
                             return None
         else:
-            st.error("❌ 예상치 못한 응답 형식입니다.")
-            st.write("응답 타입:", type(analysis_result))
-            st.write("응답 내용:", str(analysis_result)[:500])
+            st.error("예상치 못한 응답 형식입니다.")
             return None
             
     except Exception as e:
-        st.error(f"❌ AI 응답 파싱 중 오류: {str(e)}")
-        import traceback
-        st.write(f"상세 오류: {traceback.format_exc()}")
+        st.error(f"AI 응답 파싱 중 오류: {str(e)}")
         return None
 
 def transform_to_db_format(ai_input_data, ai_result, crawling_id):
