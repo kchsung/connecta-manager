@@ -63,18 +63,35 @@ serve(async (req) => {
   }
 })
 
-// 크롤링 완료된 데이터 조회
-async function getCrawlingData(supabaseClient: any) {
+// 크롤링 완료된 데이터 조회 (페이징 지원)
+async function getCrawlingData(supabaseClient: any, data: any) {
   try {
-    const { data, error } = await supabaseClient
+    const { limit = 1000, offset = 0 } = data || {}
+    
+    const { data: crawlingData, error } = await supabaseClient
       .from('tb_instagram_crawling')
       .select('*')
       .eq('status', 'COMPLETE')
+      .range(offset, offset + limit - 1)
 
     if (error) throw error
 
+    // 전체 개수도 함께 조회
+    const { count, error: countError } = await supabaseClient
+      .from('tb_instagram_crawling')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'COMPLETE')
+
+    if (countError) throw countError
+
     return new Response(
-      JSON.stringify({ success: true, data }),
+      JSON.stringify({ 
+        success: true, 
+        data: crawlingData,
+        total_count: count || 0,
+        limit,
+        offset
+      }),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -205,16 +222,16 @@ async function saveAnalysisResult(supabaseClient: any, data: any) {
   }
 }
 
-// AI 분석 데이터 조회
+// AI 분석 데이터 조회 (페이징 지원)
 async function getAnalysisData(supabaseClient: any, data: any) {
   try {
-    const { search_term, category_filter, recommendation_filter } = data
+    const { search_term, category_filter, recommendation_filter, limit = 1000, offset = 0 } = data
 
     let query = supabaseClient.from('ai_influencer_analyses').select('*')
 
     // 검색 조건
     if (search_term) {
-      query = query.or(`name.ilike.%${search_term}%,tags.cs.{${search_term}}`)
+      query = query.or(`name.ilike.%${search_term}%,tags.cs.{${search_term}},influencer_id.ilike.%${search_term}%`)
     }
 
     // 카테고리 필터
@@ -229,11 +246,36 @@ async function getAnalysisData(supabaseClient: any, data: any) {
 
     const { data: analysisData, error } = await query
       .order('analyzed_at', { ascending: false })
+      .range(offset, offset + limit - 1)
 
     if (error) throw error
 
+    // 전체 개수도 함께 조회
+    let countQuery = supabaseClient.from('ai_influencer_analyses').select('*', { count: 'exact', head: true })
+
+    // 동일한 필터 조건 적용
+    if (search_term) {
+      countQuery = countQuery.or(`name.ilike.%${search_term}%,tags.cs.{${search_term}},influencer_id.ilike.%${search_term}%`)
+    }
+    if (category_filter && category_filter !== '전체') {
+      countQuery = countQuery.eq('category', category_filter)
+    }
+    if (recommendation_filter && recommendation_filter !== '전체') {
+      countQuery = countQuery.eq('recommendation', recommendation_filter)
+    }
+
+    const { count, error: countError } = await countQuery
+
+    if (countError) throw countError
+
     return new Response(
-      JSON.stringify({ success: true, data: analysisData }),
+      JSON.stringify({ 
+        success: true, 
+        data: analysisData,
+        total_count: count || 0,
+        limit,
+        offset
+      }),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

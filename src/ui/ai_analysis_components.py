@@ -72,13 +72,17 @@ def render_ai_analysis_execution():
     # 디버깅용: 크롤링 데이터 미리보기
     if st.button("🔍 크롤링 데이터 미리보기", use_container_width=True):
         try:
-            crawling_data = get_completed_crawling_data()
-            if crawling_data:
-                st.subheader("📊 크롤링 데이터 미리보기")
-                st.write(f"총 {len(crawling_data)}개의 크롤링 데이터가 있습니다.")
+            # 전체 데이터 개수 조회
+            total_count = get_completed_crawling_data_count()
+            st.subheader("📊 크롤링 데이터 미리보기")
+            st.write(f"총 {total_count:,}개의 크롤링 데이터가 있습니다.")
+            
+            if total_count > 0:
+                # 첫 번째 배치 데이터 조회 (최대 5개)
+                crawling_data = get_completed_crawling_data(limit=5, offset=0)
                 
-                # 첫 번째 데이터 구조 확인
-                if len(crawling_data) > 0:
+                if crawling_data:
+                    # 첫 번째 데이터 구조 확인
                     first_data = crawling_data[0]
                     st.write("**첫 번째 데이터 구조:**")
                     st.json(first_data)
@@ -99,104 +103,169 @@ def render_ai_analysis_execution():
                         st.text(posts_content[:500])
                     else:
                         st.warning("posts 필드가 비어있습니다.")
+                    
+                    # 배치 처리 정보 표시
+                    st.info(f"""
+                    **배치 처리 정보:**
+                    - 총 데이터: {total_count:,}개
+                    - 배치 크기: 100개씩
+                    - 예상 배치 수: {(total_count + 99) // 100}개
+                    - 처리 시간 예상: 약 {total_count * 2 // 60}분 (개당 2초 기준)
+                    """)
+                else:
+                    st.warning("데이터 조회에 실패했습니다.")
             else:
                 st.warning("크롤링 데이터가 없습니다.")
         except Exception as e:
             st.error(f"데이터 미리보기 중 오류: {str(e)}")
 
 def execute_ai_analysis():
-    """AI 분석 실행 함수"""
+    """AI 분석 실행 함수 (배치 처리 지원)"""
     try:
-        # 1. 크롤링 완료된 데이터 조회
-        crawling_data = get_completed_crawling_data()
+        # 1. 전체 데이터 개수 조회
+        total_count = get_completed_crawling_data_count()
         
-        if not crawling_data:
+        if total_count == 0:
             return {"success": False, "error": "분석할 크롤링 데이터가 없습니다."}
         
-        total_count = len(crawling_data)
+        st.info(f"총 {total_count:,}개의 크롤링 데이터가 있습니다. 배치 단위로 처리합니다.")
+        
+        # 배치 설정
+        batch_size = 100  # 한 번에 처리할 데이터 개수
+        total_batches = (total_count + batch_size - 1) // batch_size
+        
         analyzed_count = 0
         skipped_count = 0
+        processed_count = 0
         
-        # 진행 상황 표시를 위한 프로그레스 바
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        # 전체 진행 상황 표시를 위한 프로그레스 바
+        overall_progress_bar = st.progress(0)
+        overall_status_text = st.empty()
         
-        for index, data in enumerate(crawling_data):
-            current_progress = (index + 1) / total_count
-            progress_bar.progress(current_progress)
-            status_text.text(f"진행 중: {index + 1}/{total_count} - {data.get('id', 'unknown')}")
+        # 배치별 처리
+        for batch_num in range(total_batches):
+            offset = batch_num * batch_size
             
-            # 2. AI 분석용 JSON 데이터 구성 (id, description, posts)
-            try:
-                # posts는 TEXT 필드이므로 그대로 사용
-                posts_content = data.get("posts", "")
-                if not posts_content:
-                    st.error(f"posts 데이터가 비어있음: {data.get('id', 'unknown')}")
-                    return {"success": False, "error": f"posts 데이터가 비어있음: {data.get('id', 'unknown')}"}
+            # 현재 배치 데이터 조회
+            batch_data = get_completed_crawling_data(limit=batch_size, offset=offset)
+            
+            if not batch_data:
+                break
+            
+            # 배치 내 진행 상황 표시
+            batch_progress_bar = st.progress(0)
+            batch_status_text = st.empty()
+            
+            for index, data in enumerate(batch_data):
+                # 전체 진행률 계산
+                overall_progress = (processed_count + index + 1) / total_count
+                overall_progress_bar.progress(overall_progress)
+                overall_status_text.text(f"전체 진행: {processed_count + index + 1:,}/{total_count:,} (배치 {batch_num + 1}/{total_batches})")
                 
-                # AI 분석용 JSON 구성
-                ai_input_data = {
-                    "id": data.get("id", ""),
-                    "description": data.get("description", ""),
-                    "posts": posts_content
-                }
+                # 배치 내 진행률
+                batch_progress = (index + 1) / len(batch_data)
+                batch_progress_bar.progress(batch_progress)
+                batch_status_text.text(f"배치 {batch_num + 1} 진행: {index + 1}/{len(batch_data)} - {data.get('id', 'unknown')}")
+                
+                # 2. AI 분석용 JSON 데이터 구성 (id, description, posts)
+                try:
+                    # posts는 TEXT 필드이므로 그대로 사용
+                    posts_content = data.get("posts", "")
+                    if not posts_content:
+                        st.warning(f"posts 데이터가 비어있음: {data.get('id', 'unknown')} - 건너뜀")
+                        skipped_count += 1
+                        continue
                     
-            except Exception as e:
-                st.error(f"AI 입력 데이터 구성 중 오류: {data.get('id', 'unknown')} - 오류: {str(e)}")
-                return {"success": False, "error": f"AI 입력 데이터 구성 중 오류: {str(e)}"}
+                    # AI 분석용 JSON 구성
+                    ai_input_data = {
+                        "id": data.get("id", ""),
+                        "description": data.get("description", ""),
+                        "posts": posts_content
+                    }
+                        
+                except Exception as e:
+                    st.error(f"AI 입력 데이터 구성 중 오류: {data.get('id', 'unknown')} - 오류: {str(e)}")
+                    skipped_count += 1
+                    continue
+                
+                # 3. 최근 분석 여부 확인 (1달 이내) - id를 기준으로 확인
+                if is_recently_analyzed_by_id(data["id"]):
+                    skipped_count += 1
+                    continue
+                
+                # 4. AI 분석 수행 (구성된 JSON 데이터 전달)
+                analysis_result = perform_ai_analysis(ai_input_data)
+                
+                if not analysis_result:
+                    st.error(f"AI 분석 실패: {data.get('id', 'unknown')}")
+                    skipped_count += 1
+                    continue
+                
+                # 5. 데이터 변환 (크롤링 ID 포함)
+                transformed_result = transform_to_db_format(ai_input_data, analysis_result, data["id"])
+                if not transformed_result:
+                    st.error(f"데이터 변환 실패: {data.get('id', 'unknown')}")
+                    skipped_count += 1
+                    continue
+                
+                # 6. 결과 저장
+                try:
+                    save_ai_analysis_result(data, transformed_result, data["id"])
+                    analyzed_count += 1
+                except Exception as e:
+                    st.error(f"결과 저장 실패: {data.get('id', 'unknown')} - 오류: {str(e)}")
+                    skipped_count += 1
+                    continue
             
-            # 3. 최근 분석 여부 확인 (1달 이내) - id를 기준으로 확인
-            if is_recently_analyzed_by_id(data["id"]):
-                skipped_count += 1
-                continue
+            # 배치 완료 후 정리
+            processed_count += len(batch_data)
+            batch_progress_bar.empty()
+            batch_status_text.empty()
             
-            # 4. AI 분석 수행 (구성된 JSON 데이터 전달)
-            analysis_result = perform_ai_analysis(ai_input_data)
-            
-            if not analysis_result:
-                st.error(f"AI 분석 실패: {data.get('id', 'unknown')}")
-                return {"success": False, "error": f"AI 분석 실패: {data.get('id', 'unknown')}"}
-            
-            # 5. 데이터 변환 (크롤링 ID 포함)
-            transformed_result = transform_to_db_format(ai_input_data, analysis_result, data["id"])
-            if not transformed_result:
-                st.error(f"데이터 변환 실패: {data.get('id', 'unknown')}")
-                return {"success": False, "error": f"데이터 변환 실패: {data.get('id', 'unknown')}"}
-            
-            # 6. 결과 저장
-            try:
-                save_ai_analysis_result(data, transformed_result, data["id"])
-                analyzed_count += 1
-            except Exception as e:
-                st.error(f"결과 저장 실패: {data.get('id', 'unknown')} - 오류: {str(e)}")
-                return {"success": False, "error": f"결과 저장 실패: {str(e)}"}
+            # 배치 간 잠시 대기 (API 제한 방지)
+            if batch_num < total_batches - 1:  # 마지막 배치가 아닌 경우
+                st.info(f"배치 {batch_num + 1} 완료. 다음 배치 처리 중...")
         
         # 완료 후 프로그레스 바와 상태 텍스트 정리
-        progress_bar.progress(1.0)
-        status_text.text("분석 완료!")
+        overall_progress_bar.progress(1.0)
+        overall_status_text.text("분석 완료!")
         
         return {
             "success": True,
             "analyzed_count": analyzed_count,
-            "skipped_count": skipped_count
+            "skipped_count": skipped_count,
+            "total_count": total_count
         }
         
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-def get_completed_crawling_data():
-    """크롤링 완료된 데이터 조회"""
+def get_completed_crawling_data(limit=1000, offset=0):
+    """크롤링 완료된 데이터 조회 (페이징 지원)"""
     try:
         # Supabase에서 크롤링 완료된 데이터 조회
         client = simple_client.get_client()
         if not client:
             return []
         
-        response = client.table("tb_instagram_crawling").select("*").eq("status", "COMPLETE").execute()
+        response = client.table("tb_instagram_crawling").select("*").eq("status", "COMPLETE").range(offset, offset + limit - 1).execute()
         return response.data if response.data else []
     except Exception as e:
         st.error(f"크롤링 데이터 조회 중 오류: {str(e)}")
         return []
+
+def get_completed_crawling_data_count():
+    """크롤링 완료된 데이터 총 개수 조회"""
+    try:
+        client = simple_client.get_client()
+        if not client:
+            return 0
+        
+        response = client.table("tb_instagram_crawling").select("id", count="exact").eq("status", "COMPLETE").execute()
+        return response.count if response.count else 0
+    except Exception as e:
+        st.error(f"크롤링 데이터 개수 조회 중 오류: {str(e)}")
+        return 0
 
 def is_recently_analyzed(influencer_id, platform):
     """최근 분석 여부 확인 (1달 이내) - 기존 함수 (호환성 유지)"""
@@ -485,9 +554,31 @@ def render_ai_analysis_results():
     with col3:
         recommendation_filter = st.selectbox("⭐ 추천도", ["전체", "매우 추천", "추천", "보통", "비추천", "매우 비추천"])
     
+    # 검색 조건이 변경되면 페이지 초기화
+    current_filters = f"{search_term}_{category_filter}_{recommendation_filter}"
+    if 'last_filters' not in st.session_state or st.session_state.last_filters != current_filters:
+        st.session_state.analysis_page = 1
+        st.session_state.last_filters = current_filters
+    
     # 분석 결과 조회
     try:
-        analysis_data = get_ai_analysis_data(search_term, category_filter, recommendation_filter)
+        # 페이징 설정
+        page_size = 50  # 한 페이지당 표시할 항목 수
+        page = st.session_state.get('analysis_page', 1)
+        
+        # 전체 개수 조회
+        total_count = get_ai_analysis_data_count(search_term, category_filter, recommendation_filter)
+        
+        if total_count == 0:
+            st.warning("분석 결과가 없습니다.")
+            return
+        
+        # 페이징 계산
+        total_pages = (total_count + page_size - 1) // page_size
+        offset = (page - 1) * page_size
+        
+        # 현재 페이지 데이터 조회
+        analysis_data = get_ai_analysis_data(search_term, category_filter, recommendation_filter, page_size, offset)
         
         if not analysis_data:
             st.warning("분석 결과가 없습니다.")
@@ -498,7 +589,34 @@ def render_ai_analysis_results():
         
         with left_col:
             st.markdown("### 📋 검색 결과")
-            st.markdown(f"총 {len(analysis_data)}개의 결과")
+            st.markdown(f"총 {total_count:,}개의 결과 (페이지 {page}/{total_pages})")
+            
+            # 페이징 컨트롤
+            if total_pages > 1:
+                col1, col2, col3, col4, col5 = st.columns(5)
+                
+                with col1:
+                    if st.button("⏮️ 첫 페이지", disabled=(page == 1)):
+                        st.session_state.analysis_page = 1
+                        st.rerun()
+                
+                with col2:
+                    if st.button("⬅️ 이전", disabled=(page == 1)):
+                        st.session_state.analysis_page = page - 1
+                        st.rerun()
+                
+                with col3:
+                    st.write(f"**{page}**")
+                
+                with col4:
+                    if st.button("다음 ➡️", disabled=(page == total_pages)):
+                        st.session_state.analysis_page = page + 1
+                        st.rerun()
+                
+                with col5:
+                    if st.button("마지막 ⏭️", disabled=(page == total_pages)):
+                        st.session_state.analysis_page = total_pages
+                        st.rerun()
             
             # 좌측: 검색 리스트 (이름, 아이디, 플랫폼명만 표시)
             selected_analysis = None
@@ -508,7 +626,7 @@ def render_ai_analysis_results():
                     f"📊 {analysis['name']}\n"
                     f"🆔 {analysis['influencer_id']}\n"
                     f"📱 {analysis['platform']}",
-                    key=f"select_{analysis['id']}",
+                    key=f"select_{analysis['id']}_{page}",  # 페이지별로 고유 키 생성
                     use_container_width=True
                 ):
                     selected_analysis = analysis
@@ -533,8 +651,8 @@ def render_ai_analysis_results():
     except Exception as e:
         st.error(f"분석 결과 조회 중 오류: {str(e)}")
 
-def get_ai_analysis_data(search_term="", category_filter="전체", recommendation_filter="전체"):
-    """AI 분석 데이터 조회"""
+def get_ai_analysis_data(search_term="", category_filter="전체", recommendation_filter="전체", limit=1000, offset=0):
+    """AI 분석 데이터 조회 (페이징 지원)"""
     try:
         client = simple_client.get_client()
         if not client:
@@ -555,12 +673,41 @@ def get_ai_analysis_data(search_term="", category_filter="전체", recommendatio
         if recommendation_filter != "전체":
             query = query.eq("recommendation", recommendation_filter)
         
-        response = query.order("analyzed_at", desc=True).execute()
+        response = query.order("analyzed_at", desc=True).range(offset, offset + limit - 1).execute()
         return response.data if response.data else []
         
     except Exception as e:
         st.error(f"분석 데이터 조회 중 오류: {str(e)}")
         return []
+
+def get_ai_analysis_data_count(search_term="", category_filter="전체", recommendation_filter="전체"):
+    """AI 분석 데이터 총 개수 조회"""
+    try:
+        client = simple_client.get_client()
+        if not client:
+            return 0
+        
+        query = client.table("ai_influencer_analyses").select("id", count="exact")
+        
+        # 검색 조건
+        if search_term:
+            # 이름, 태그, influencer_id에서 검색
+            query = query.or_(f"name.ilike.%{search_term}%,tags.cs.{{{search_term}}},influencer_id.ilike.%{search_term}%")
+        
+        # 카테고리 필터
+        if category_filter != "전체":
+            query = query.eq("category", category_filter)
+        
+        # 추천도 필터
+        if recommendation_filter != "전체":
+            query = query.eq("recommendation", recommendation_filter)
+        
+        response = query.execute()
+        return response.count if response.count else 0
+        
+    except Exception as e:
+        st.error(f"분석 데이터 개수 조회 중 오류: {str(e)}")
+        return 0
 
 def get_categories():
     """카테고리 목록 조회"""
