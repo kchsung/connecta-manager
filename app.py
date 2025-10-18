@@ -39,6 +39,7 @@ from src.ui.campaign_components import render_campaign_management
 from src.ui.performance_components import render_performance_management, render_performance_crawl
 from src.ui.influencer_components import render_influencer_management
 from src.ui.influencer_statistics_management_components import render_influencer_statistics_management
+from src.ui.ai_analysis_components import render_ai_analysis_management
 
 
 # ── CSS ──────────────────────────────────────────────────────
@@ -272,7 +273,7 @@ def render_sidebar():
         
         # 현재 선택된 페이지 초기화
         if 'current_page' not in st.session_state:
-            st.session_state.current_page = 'campaign_management'
+            st.session_state.current_page = 'influencer_management'
         
         # 크롤링 페이지가 선택된 경우 관리 페이지로 리다이렉트 (크롤링 기능 제거됨)
         if st.session_state.current_page in ['single_crawl', 'batch_crawl', 'performance_crawl']:
@@ -284,6 +285,7 @@ def render_sidebar():
         management_menu_options = {
             'influencer_management': '👥 인플루언서 관리',
             'influencer_analysis': '📊 인플루언서 분석',
+            'ai_analysis': '🤖 인공지능 분석',
             'campaign_management': '📁 캠페인 관리',
             'performance_management': '📊 성과 관리'
         }
@@ -297,7 +299,7 @@ def render_sidebar():
             ):
                 st.session_state.current_page = page_key
                 st.session_state.page_changed = True  # 페이지 변경 플래그
-                # 리렌더링 없이 상태 기반 UI 업데이트
+                st.rerun()  # 즉시 리렌더링하여 버튼 상태 업데이트
         
         st.markdown("---")
         
@@ -313,7 +315,7 @@ def render_sidebar():
 def render_main_content():
 
     # 현재 선택된 페이지에 따라 다른 컴포넌트 렌더링
-    current_page = st.session_state.get('current_page', 'campaign_management')
+    current_page = st.session_state.get('current_page', 'influencer_management')
     
     if current_page == 'single_crawl':
         render_single_url_crawl()
@@ -329,9 +331,11 @@ def render_main_content():
         render_influencer_management()
     elif current_page == 'influencer_analysis':
         render_influencer_statistics_management()
+    elif current_page == 'ai_analysis':
+        render_ai_analysis_management()
     else:
-        # 기본값으로 캠페인 관리 표시
-        render_campaign_management()
+        # 기본값으로 인플루언서 관리 표시
+        render_influencer_management()
 
 
 # ── App ──────────────────────────────────────────────────────

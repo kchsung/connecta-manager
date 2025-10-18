@@ -16,12 +16,11 @@ def render_influencer_statistics_management():
     st.markdown("인플루언서 데이터 분석 및 통계 정보를 제공합니다.")
     
     # 분석 탭으로 분리
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "📈 전체 통계", 
         "🏷️ 카테고리별 분석", 
         "📱 플랫폼별 분석", 
-        "⭐ 평점 분석",
-        "🤖 AI 분석"
+        "⭐ 평점 분석"
     ])
     
     with tab1:
@@ -35,9 +34,6 @@ def render_influencer_statistics_management():
     
     with tab4:
         render_rating_analysis()
-    
-    with tab5:
-        render_ai_analysis()
 
 def render_overall_statistics():
     """전체 통계 탭"""
