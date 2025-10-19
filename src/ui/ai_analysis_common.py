@@ -129,12 +129,11 @@ def save_ai_analysis_result(client, crawling_data, analysis_result, crawling_id)
                 raise
 
 def perform_ai_analysis(data):
-    """AI 분석 수행 - 요청별 타임아웃 + 튼튼한 재시도"""
+    """AI 분석 수행 - 5분 타임아웃, 재시도 없음"""
     from openai import OpenAI
-    import random, time
+    import time
 
-    max_retries = 5
-    timeout_seconds = 200  # 요청별 타임아웃
+    timeout_seconds = 300  # 5분 타임아웃
 
     api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
     if not api_key:
@@ -150,52 +149,21 @@ def perform_ai_analysis(data):
 
     input_data = json.dumps(data, ensure_ascii=False)
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            resp = client.responses.create(
-                model=model,
-                prompt={"id": prompt_id, "version": prompt_version},
-                input=input_data,
-                reasoning={"summary": "auto"},
-                store=True,
-                include=["reasoning.encrypted_content", "web_search_call.action.sources"],
-                timeout=timeout_seconds,  # 요청별 timeout
-            )
-            return parse_ai_response(resp)
+    try:
+        resp = client.responses.create(
+            model=model,
+            prompt={"id": prompt_id, "version": prompt_version},
+            input=input_data,
+            reasoning={"summary": "auto"},
+            store=True,
+            include=["reasoning.encrypted_content", "web_search_call.action.sources"],
+            timeout=timeout_seconds,  # 5분 timeout
+        )
+        return parse_ai_response(resp)
 
-        except Exception as e:
-            msg = str(e).lower()
-
-            # Retry-After 헤더가 있으면 존중
-            retry_after = 0
-            if hasattr(e, "response") and getattr(e.response, "headers", None):
-                ra = e.response.headers.get("retry-after")
-                if ra:
-                    try:
-                        retry_after = int(ra)
-                    except:
-                        retry_after = 0
-
-            # 레이트리밋/쿼터
-            if "rate limit" in msg or "quota" in msg or "too many requests" in msg or "429" in msg:
-                wait = max(retry_after, min(40, 2 ** attempt + random.uniform(0, 1)))
-                st.warning(f"[OpenAI] Rate limit: {attempt}/{max_retries} 재시도, {wait:.1f}s 대기")
-                time.sleep(wait)
-                continue
-
-            # 타임아웃/게이트웨이
-            if "timeout" in msg or "timed out" in msg or "504" in msg or "gateway" in msg:
-                wait = min(30, 2 ** attempt)
-                st.warning(f"[OpenAI] Timeout: {attempt}/{max_retries} 재시도, {wait}s 대기")
-                time.sleep(wait)
-                continue
-
-            # 그 외 에러는 중단(로그만)
-            st.error(f"AI 분석 수행 중 오류(중단): {e}")
-            return None
-
-    st.error("OpenAI API 재시도 한도 초과")
-    return None
+    except Exception as e:
+        st.error(f"AI 분석 수행 중 오류: {e}")
+        return None
 
 def parse_ai_response(response):
     """Responses API 표준 파서: output_text 우선, fallback로 content[*].text, 코드펜스 JSON 추출"""
