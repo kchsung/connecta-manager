@@ -42,7 +42,7 @@ def render_ai_analysis_execution():
     st.markdown("크롤링이 완료된 인플루언서 데이터를 AI로 분석합니다.")
     
     # OpenAI API 키 확인
-    openai_api_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+    openai_api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
     
     if not openai_api_key:
         st.error("OpenAI API 키가 설정되지 않았습니다. secrets.toml 또는 .env 파일에 OPENAI_API_KEY를 설정해주세요.")
@@ -62,9 +62,21 @@ def render_ai_analysis_execution():
             try:
                 result = execute_ai_analysis()
                 if result["success"]:
-                    st.success(f"AI 분석이 완료되었습니다. {result['analyzed_count']}명의 인플루언서가 분석되었습니다.")
-                    if result["skipped_count"] > 0:
-                        st.info(f"{result['skipped_count']}명은 최근에 분석되어 건너뛰었습니다.")
+                    # 최종 결과 요약 표시
+                    st.success("🎉 AI 분석이 완료되었습니다!")
+                    
+                    # 상세 결과 표시
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("✅ 성공", result['analyzed_count'])
+                    with col2:
+                        st.metric("⏭️ 건너뜀", result['skipped_count'])
+                    with col3:
+                        st.metric("❌ 실패", result.get('failed_count', 0))
+                    
+                    # 실패한 항목이 있으면 표시
+                    if result.get('failed_count', 0) > 0:
+                        st.warning(f"⚠️ {result['failed_count']}개 항목이 실패했습니다. 실패한 항목들은 위의 상세 결과에서 확인할 수 있습니다.")
                 else:
                     st.error(f"AI 분석 중 오류가 발생했습니다: {result['error']}")
             except Exception as e:
@@ -121,197 +133,205 @@ def render_ai_analysis_execution():
             st.error(f"데이터 미리보기 중 오류: {str(e)}")
 
 def execute_ai_analysis():
-    """AI 분석 실행 함수 (배치 처리 지원)"""
+    """AI 분석 실행 함수 (배치 처리) - 안정화 버전"""
     try:
-        # 1. 전체 데이터 개수 조회
-        total_count = get_completed_crawling_data_count()
-        
+        # Supabase 클라이언트 1회 생성/재사용
+        client = simple_client.get_client()
+        if not client:
+            return {"success": False, "error": "Supabase 클라이언트 생성 실패"}
+
+        # 1. 전체 데이터 개수 (COMPLETE 상태만)
+        total_count = get_completed_crawling_data_count(client)
         if total_count == 0:
             return {"success": False, "error": "분석할 크롤링 데이터가 없습니다."}
+
+        # 디버깅: 전체 데이터 개수도 확인
+        try:
+            total_all_count = client.table("tb_instagram_crawling").select("id", count="exact").execute()
+            st.info(f"📊 데이터 현황: 전체 {total_all_count.count:,}개 중 완료된 크롤링 데이터 {total_count:,}개 (status='COMPLETE')")
+        except:
+            st.info(f"총 {total_count:,}개의 완료된 크롤링 데이터(status='COMPLETE')가 있습니다.")
         
-        st.info(f"총 {total_count:,}개의 크롤링 데이터가 있습니다. 배치 단위로 처리합니다.")
-        
-        # 배치 설정
-        batch_size = 100  # 한 번에 처리할 데이터 개수
+        st.info("배치 단위로 AI 분석을 시작합니다.")
+
+        batch_size = 50
         total_batches = (total_count + batch_size - 1) // batch_size
-        
+
         analyzed_count = 0
         skipped_count = 0
+        failed_count = 0
         processed_count = 0
-        
-        # 전체 진행 상황 표시를 위한 프로그레스 바
+        failed_items = []
+
         overall_progress_bar = st.progress(0)
         overall_status_text = st.empty()
-        
-        # 배치별 처리
+        result_container = st.empty()
+
+        UI_UPDATE_EVERY = 50  # 갱신 주기 줄이기
+
         for batch_num in range(total_batches):
             offset = batch_num * batch_size
-            
-            # 현재 배치 데이터 조회
-            batch_data = get_completed_crawling_data(limit=batch_size, offset=offset)
-            
+            batch_data = get_completed_crawling_data(client, limit=batch_size, offset=offset)
             if not batch_data:
                 break
-            
-            # 배치 내 진행 상황 표시
+
+            # 배치 진행 UI (간소화)
             batch_progress_bar = st.progress(0)
             batch_status_text = st.empty()
-            
+
             for index, data in enumerate(batch_data):
-                # 전체 진행률 계산
-                overall_progress = (processed_count + index + 1) / total_count
-                overall_progress_bar.progress(overall_progress)
-                overall_status_text.text(f"전체 진행: {processed_count + index + 1:,}/{total_count:,} (배치 {batch_num + 1}/{total_batches})")
-                
-                # 배치 내 진행률
-                batch_progress = (index + 1) / len(batch_data)
-                batch_progress_bar.progress(batch_progress)
-                batch_status_text.text(f"배치 {batch_num + 1} 진행: {index + 1}/{len(batch_data)} - {data.get('id', 'unknown')}")
-                
-                # 2. AI 분석용 JSON 데이터 구성 (id, description, posts)
+                current_id = data.get('id', 'unknown')
                 try:
-                    # posts는 TEXT 필드이므로 그대로 사용
-                    posts_content = data.get("posts", "")
-                    if not posts_content:
-                        st.warning(f"posts 데이터가 비어있음: {data.get('id', 'unknown')} - 건너뜀")
+                    # 전체/배치 진행률
+                    overall_progress = (processed_count + index + 1) / total_count
+                    overall_progress_bar.progress(overall_progress)
+                    overall_status_text.text(
+                        f"전체 진행: {processed_count + index + 1:,}/{total_count:,} (배치 {batch_num + 1}/{total_batches})"
+                    )
+                    batch_progress = (index + 1) / len(batch_data)
+                    batch_progress_bar.progress(batch_progress)
+                    batch_status_text.text(f"배치 {batch_num + 1} 진행: {index + 1}/{len(batch_data)} - {current_id}")
+
+                    # 1) 최근 분석 여부 먼저 (DB/API 호출 절약)
+                    if is_recently_analyzed_by_id(client, data["id"]):
                         skipped_count += 1
                         continue
-                    
-                    # AI 분석용 JSON 구성
+
+                    # 2) 입력 구성 (posts는 자르지 않음)
+                    posts_content = data.get("posts", "") or ""
+                    if not posts_content:
+                        skipped_count += 1
+                        continue
+
                     ai_input_data = {
                         "id": data.get("id", ""),
-                        "description": data.get("description", ""),
+                        "description": data.get("description", "") or "",
                         "posts": posts_content
                     }
-                        
+
+                    # 3) AI 분석
+                    analysis_result = perform_ai_analysis(ai_input_data)
+                    if not analysis_result:
+                        failed_items.append({"id": current_id, "error": "AI 분석 실패"})
+                        failed_count += 1
+                        continue
+
+                    # 4) 변환
+                    transformed_result = transform_to_db_format(ai_input_data, analysis_result, data["id"])
+                    if not transformed_result:
+                        failed_items.append({"id": current_id, "error": "데이터 변환 실패"})
+                        failed_count += 1
+                        continue
+
+                    # 5) 저장
+                    try:
+                        save_ai_analysis_result(client, data, transformed_result, data["id"])
+                        analyzed_count += 1
+                    except Exception as se:
+                        failed_items.append({"id": current_id, "error": f"저장 실패: {str(se)}"})
+                        failed_count += 1
+                        continue
+
+                    # UI 업데이트(희소)
+                    if ((index + 1) % UI_UPDATE_EVERY == 0) or (index == len(batch_data) - 1):
+                        with result_container.container():
+                            st.markdown("### 📊 실시간 처리 결과")
+                            c1, c2, c3, c4 = st.columns(4)
+                            c1.metric("✅ 성공", analyzed_count)
+                            c2.metric("⏭️ 건너뜀", skipped_count)
+                            c3.metric("❌ 실패", failed_count)
+                            c4.metric("📊 총 처리", processed_count + index + 1)
+
                 except Exception as e:
-                    st.error(f"AI 입력 데이터 구성 중 오류: {data.get('id', 'unknown')} - 오류: {str(e)}")
-                    skipped_count += 1
+                    failed_items.append({"id": current_id, "error": f"예상치 못한 오류: {str(e)}"})
+                    failed_count += 1
                     continue
-                
-                # 3. 최근 분석 여부 확인 (1달 이내) - id를 기준으로 확인
-                if is_recently_analyzed_by_id(data["id"]):
-                    skipped_count += 1
-                    continue
-                
-                # 4. AI 분석 수행 (구성된 JSON 데이터 전달)
-                analysis_result = perform_ai_analysis(ai_input_data)
-                
-                if not analysis_result:
-                    st.error(f"AI 분석 실패: {data.get('id', 'unknown')}")
-                    skipped_count += 1
-                    continue
-                
-                # 5. 데이터 변환 (크롤링 ID 포함)
-                transformed_result = transform_to_db_format(ai_input_data, analysis_result, data["id"])
-                if not transformed_result:
-                    st.error(f"데이터 변환 실패: {data.get('id', 'unknown')}")
-                    skipped_count += 1
-                    continue
-                
-                # 6. 결과 저장
-                try:
-                    save_ai_analysis_result(data, transformed_result, data["id"])
-                    analyzed_count += 1
-                except Exception as e:
-                    st.error(f"결과 저장 실패: {data.get('id', 'unknown')} - 오류: {str(e)}")
-                    skipped_count += 1
-                    continue
-            
-            # 배치 완료 후 정리
+
             processed_count += len(batch_data)
             batch_progress_bar.empty()
             batch_status_text.empty()
-            
-            # 배치 간 잠시 대기 (API 제한 방지)
-            if batch_num < total_batches - 1:  # 마지막 배치가 아닌 경우
-                st.info(f"배치 {batch_num + 1} 완료. 다음 배치 처리 중...")
-        
-        # 완료 후 프로그레스 바와 상태 텍스트 정리
+
+            # 배치 간 휴식 최소화(또는 제거)
+            if batch_num < total_batches - 1:
+                time.sleep(0.1)
+
         overall_progress_bar.progress(1.0)
         overall_status_text.text("분석 완료!")
-        
+
+        with result_container.container():
+            st.markdown("### 🎉 AI 분석 최종 결과")
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("✅ 성공", analyzed_count, delta=f"{(analyzed_count/total_count*100):.1f}%")
+            c2.metric("⏭️ 건너뜀", skipped_count, delta=f"{(skipped_count/total_count*100):.1f}%")
+            c3.metric("❌ 실패", failed_count, delta=f"{(failed_count/total_count*100):.1f}%")
+            c4.metric("📊 총 처리", total_count, delta="100%")
+
+            if failed_items:
+                st.markdown("### ❌ 실패한 항목들")
+                with st.expander(f"실패한 {len(failed_items)}개 항목 상세보기"):
+                    for item in failed_items:
+                        st.error(f"**ID: {item['id']}** - {item['error']}")
+
         return {
             "success": True,
             "analyzed_count": analyzed_count,
             "skipped_count": skipped_count,
-            "total_count": total_count
+            "failed_count": failed_count,
+            "total_count": total_count,
+            "failed_items": failed_items
         }
-        
+
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-def get_completed_crawling_data(limit=1000, offset=0):
-    """크롤링 완료된 데이터 조회 (페이징 지원) - 재시도 로직 포함"""
+def get_completed_crawling_data(client, limit=1000, offset=0):
+    """크롤링 완료된 데이터 조회 (페이징) - 재시도 포함"""
     max_retries = 3
     retry_delay = 1
-    
     for attempt in range(max_retries):
         try:
-            # Supabase에서 크롤링 완료된 데이터 조회
-            client = simple_client.get_client()
             if not client:
-                if attempt < max_retries - 1:
-                    st.warning(f"Supabase 클라이언트 연결 실패. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-                    continue
                 return []
-            
-            response = client.table("tb_instagram_crawling").select("*").eq("status", "COMPLETE").range(offset, offset + limit - 1).execute()
+            response = client.table("tb_instagram_crawling").select("*")\
+                .eq("status", "COMPLETE").range(offset, offset + limit - 1).execute()
             return response.data if response.data else []
-            
         except Exception as e:
             error_msg = str(e)
             if "Server disconnected" in error_msg or "connection" in error_msg.lower():
                 if attempt < max_retries - 1:
-                    st.warning(f"서버 연결 오류 발생. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-                    continue
+                    st.warning(f"서버 연결 오류. {retry_delay}s 후 재시도... ({attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay); retry_delay *= 2; continue
                 else:
-                    st.error(f"크롤링 데이터 조회 중 서버 연결 오류 (최대 재시도 횟수 초과): {error_msg}")
+                    st.error(f"크롤링 데이터 조회 실패(재시도 초과): {error_msg}")
                     return []
             else:
-                st.error(f"크롤링 데이터 조회 중 오류: {error_msg}")
+                st.error(f"크롤링 데이터 조회 오류: {error_msg}")
                 return []
-    
     return []
 
-def get_completed_crawling_data_count():
-    """크롤링 완료된 데이터 총 개수 조회 - 재시도 로직 포함"""
+def get_completed_crawling_data_count(client):
+    """크롤링 완료된 데이터 총 개수"""
     max_retries = 3
     retry_delay = 1
-    
     for attempt in range(max_retries):
         try:
-            client = simple_client.get_client()
             if not client:
-                if attempt < max_retries - 1:
-                    st.warning(f"Supabase 클라이언트 연결 실패. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-                    continue
                 return 0
-            
-            response = client.table("tb_instagram_crawling").select("id", count="exact").eq("status", "COMPLETE").execute()
+            response = client.table("tb_instagram_crawling").select("id", count="exact")\
+                .eq("status", "COMPLETE").execute()
             return response.count if response.count else 0
-            
         except Exception as e:
             error_msg = str(e)
             if "Server disconnected" in error_msg or "connection" in error_msg.lower():
                 if attempt < max_retries - 1:
-                    st.warning(f"서버 연결 오류 발생. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-                    continue
+                    st.warning(f"서버 연결 오류. {retry_delay}s 후 재시도... ({attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay); retry_delay *= 2; continue
                 else:
-                    st.error(f"크롤링 데이터 개수 조회 중 서버 연결 오류 (최대 재시도 횟수 초과): {error_msg}")
+                    st.error(f"개수 조회 실패(재시도 초과): {error_msg}")
                     return 0
             else:
-                st.error(f"크롤링 데이터 개수 조회 중 오류: {error_msg}")
+                st.error(f"개수 조회 오류: {error_msg}")
                 return 0
-    
     return 0
 
 def is_recently_analyzed(influencer_id, platform):
@@ -330,181 +350,131 @@ def is_recently_analyzed(influencer_id, platform):
         st.error(f"최근 분석 여부 확인 중 오류: {str(e)}")
         return False
 
-def is_recently_analyzed_by_id(crawling_id):
-    """크롤링 ID 기준으로 최근 분석 여부 확인 (1달 이내) - 재시도 로직 포함"""
+def is_recently_analyzed_by_id(client, crawling_id):
+    """크롤링 ID 최근 분석 여부(30일)"""
     max_retries = 3
-    retry_delay = 1  # 초
-    
+    retry_delay = 1
     for attempt in range(max_retries):
         try:
-            one_month_ago = datetime.now() - timedelta(days=30)
-            
-            client = simple_client.get_client()
             if not client:
-                if attempt < max_retries - 1:
-                    st.warning(f"Supabase 클라이언트 연결 실패. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # 지수 백오프
-                    continue
                 return False
-            
-            # influencer_id와 platform 기준으로 확인 (influencer_id는 이제 VARCHAR 타입)
-            response = client.table("ai_influencer_analyses").select("analyzed_at").eq("influencer_id", crawling_id).eq("platform", "instagram").gte("analyzed_at", one_month_ago.isoformat()).execute()
-            
-            return len(response.data) > 0 if response.data else False
-            
+            one_month_ago = datetime.now() - timedelta(days=30)
+            response = client.table("ai_influencer_analyses").select("analyzed_at")\
+                .eq("influencer_id", crawling_id).eq("platform", "instagram")\
+                .gte("analyzed_at", one_month_ago.isoformat()).execute()
+            return bool(response.data)
         except Exception as e:
             error_msg = str(e)
             if "Server disconnected" in error_msg or "connection" in error_msg.lower():
                 if attempt < max_retries - 1:
-                    st.warning(f"서버 연결 오류 발생. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # 지수 백오프
-                    continue
+                    st.warning(f"서버 연결 오류. {retry_delay}s 후 재시도... ({attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay); retry_delay *= 2; continue
                 else:
-                    st.error(f"최근 분석 여부 확인 중 서버 연결 오류 (최대 재시도 횟수 초과): {error_msg}")
+                    st.error(f"최근 분석 여부 확인 실패(재시도 초과): {error_msg}")
                     return False
             else:
-                st.error(f"최근 분석 여부 확인 중 오류: {error_msg}")
+                st.error(f"최근 분석 여부 확인 오류: {error_msg}")
                 return False
-    
     return False
 
 def perform_ai_analysis(data):
-    """AI 분석 수행 - 타임아웃 및 재시도 로직 포함"""
-    max_retries = 2
-    timeout_seconds = 200  # 3분 20초 (OpenAI가 최대 3분까지 걸린다고 하니 여유있게 설정)
-    
-    for attempt in range(max_retries):
+    """AI 분석 수행 - 요청별 타임아웃 + 튼튼한 재시도"""
+    from openai import OpenAI
+    import random, time
+
+    max_retries = 5
+    timeout_seconds = 200  # 요청별 타임아웃
+
+    api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
+    if not api_key:
+        st.error("OpenAI API 키가 설정되지 않았습니다.")
+        return None
+
+    client = OpenAI(api_key=api_key)
+
+    # 모델 명시 필수 (secrets에서 오버라이드 가능)
+    model = st.secrets.get("OPENAI_MODEL", "gpt-5-mini")
+    prompt_id = st.secrets.get("OPENAI_PROMPT_ID", "pmpt_68f36e44eab08196b4e75067a3074b7b0c099d8443a9dd49")
+    prompt_version = st.secrets.get("OPENAI_PROMPT_VERSION", "4")
+
+    input_data = json.dumps(data, ensure_ascii=False)
+
+    for attempt in range(1, max_retries + 1):
         try:
-            # OpenAI API 호출 (새로운 Responses API 사용)
-            from openai import OpenAI
-            api_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-            
-            if not api_key:
-                st.error("OpenAI API 키가 설정되지 않았습니다.")
-                return None
-            
-            # 타임아웃 설정이 포함된 클라이언트 생성
-            client = OpenAI(
-                api_key=api_key,
-                timeout=timeout_seconds  # 타임아웃 설정
-            )
-            
-            # 프롬프트 ID 설정 (실제 프롬프트 ID로 변경 필요)
-            prompt_id = st.secrets.get("OPENAI_PROMPT_ID", "pmpt_68f36e44eab08196b4e75067a3074b7b0c099d8443a9dd49")
-            prompt_version = st.secrets.get("OPENAI_PROMPT_VERSION", "4")
-            
-            # 데이터를 input으로 전달 (문자열로 변환)
-            # OpenAI Responses API는 input이 문자열 또는 문자열 배열이어야 함
-            input_data = json.dumps(data, ensure_ascii=False)  # JSON 문자열로 변환
-            
-            if attempt > 0:
-                st.info(f"OpenAI API 재시도 중... (시도 {attempt + 1}/{max_retries})")
-            
-            response = client.responses.create(
-                prompt={
-                    "id": prompt_id,
-                    "version": prompt_version
-                },
+            resp = client.responses.create(
+                model=model,
+                prompt={"id": prompt_id, "version": prompt_version},
                 input=input_data,
-                reasoning={
-                    "summary": "auto"
-                },
+                reasoning={"summary": "auto"},
                 store=True,
-                include=[
-                    "reasoning.encrypted_content",
-                    "web_search_call.action.sources"
-                ]
+                include=["reasoning.encrypted_content", "web_search_call.action.sources"],
+                timeout=timeout_seconds,  # 요청별 timeout
             )
-            
-            # 응답 파싱 및 ai_influencer_analyses 테이블 구조에 맞게 변환
-            analysis_result = parse_ai_response(response)
-            
-            return analysis_result
-            
+            return parse_ai_response(resp)
+
         except Exception as e:
-            error_msg = str(e)
-            if "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
-                if attempt < max_retries - 1:
-                    st.warning(f"OpenAI API 타임아웃 발생. 5초 후 재시도... (시도 {attempt + 1}/{max_retries})")
-                    time.sleep(5)
-                    continue
-                else:
-                    st.error(f"OpenAI API 타임아웃 (최대 재시도 횟수 초과): {error_msg}")
-                    return None
-            elif "rate limit" in error_msg.lower() or "quota" in error_msg.lower():
-                if attempt < max_retries - 1:
-                    st.warning(f"OpenAI API 제한 발생. 10초 후 재시도... (시도 {attempt + 1}/{max_retries})")
-                    time.sleep(10)
-                    continue
-                else:
-                    st.error(f"OpenAI API 제한 (최대 재시도 횟수 초과): {error_msg}")
-                    return None
-            else:
-                st.error(f"AI 분석 수행 중 오류: {error_msg}")
-                return None
-    
+            msg = str(e).lower()
+
+            # Retry-After 헤더가 있으면 존중
+            retry_after = 0
+            if hasattr(e, "response") and getattr(e.response, "headers", None):
+                ra = e.response.headers.get("retry-after")
+                if ra:
+                    try:
+                        retry_after = int(ra)
+                    except:
+                        retry_after = 0
+
+            # 레이트리밋/쿼터
+            if "rate limit" in msg or "quota" in msg or "too many requests" in msg or "429" in msg:
+                wait = max(retry_after, min(40, 2 ** attempt + random.uniform(0, 1)))
+                st.warning(f"[OpenAI] Rate limit: {attempt}/{max_retries} 재시도, {wait:.1f}s 대기")
+                time.sleep(wait)
+                continue
+
+            # 타임아웃/게이트웨이
+            if "timeout" in msg or "timed out" in msg or "504" in msg or "gateway" in msg:
+                wait = min(30, 2 ** attempt)
+                st.warning(f"[OpenAI] Timeout: {attempt}/{max_retries} 재시도, {wait}s 대기")
+                time.sleep(wait)
+                continue
+
+            # 그 외 에러는 중단(로그만)
+            st.error(f"AI 분석 수행 중 오류(중단): {e}")
+            return None
+
+    st.error("OpenAI API 재시도 한도 초과")
     return None
 
 def parse_ai_response(response):
-    """AI 응답을 파싱하여 JSON 객체로 변환"""
+    """Responses API 표준 파서: output_text 우선, fallback로 content[*].text, 코드펜스 JSON 추출"""
     try:
-        # 응답 객체의 속성들을 확인
-        analysis_result = None
-        
-        # OpenAI Responses API의 실제 응답 구조에 맞게 수정
-        # output_text가 실제 JSON 데이터를 포함하고 있음
-        if hasattr(response, 'output_text') and response.output_text:
-            analysis_result = response.output_text
-        elif hasattr(response, 'output') and response.output:
-            analysis_result = response.output
-        elif hasattr(response, 'text') and response.text:
-            analysis_result = response.text
-        else:
-            st.error("응답에서 분석 결과를 찾을 수 없습니다.")
+        text = None
+
+        if getattr(response, "output_text", None):
+            text = response.output_text
+        elif getattr(response, "output", None):
+            chunks = []
+            for block in (response.output or []):
+                for c in getattr(block, "content", []) or []:
+                    if hasattr(c, "text") and c.text:
+                        chunks.append(c.text)
+            text = "\n".join(chunks) if chunks else None
+
+        if not text:
+            st.error("응답에서 텍스트를 찾지 못했습니다.")
             return None
-        
-        # JSON 파싱
-        if isinstance(analysis_result, str):
-            try:
-                result = json.loads(analysis_result)
-                return result
-            except json.JSONDecodeError:
-                # JSON이 아닌 경우 텍스트에서 JSON 추출
-                if "```json" in analysis_result:
-                    analysis_result = analysis_result.split("```json")[1].split("```")[0]
-                elif "```" in analysis_result:
-                    analysis_result = analysis_result.split("```")[1].split("```")[0]
-                
-                try:
-                    result = json.loads(analysis_result)
-                    return result
-                except json.JSONDecodeError:
-                    st.error("JSON 파싱에 실패했습니다.")
-                    return None
-        elif isinstance(analysis_result, dict):
-            return analysis_result
-        elif isinstance(analysis_result, list) and len(analysis_result) > 0:
-            # 리스트 형태의 응답인 경우 첫 번째 요소에서 content 추출
-            first_item = analysis_result[0]
-            if hasattr(first_item, 'content') and first_item.content:
-                content_list = first_item.content
-                if isinstance(content_list, list) and len(content_list) > 0:
-                    content_item = content_list[0]
-                    if hasattr(content_item, 'text'):
-                        try:
-                            result = json.loads(content_item.text)
-                            return result
-                        except json.JSONDecodeError:
-                            st.error("리스트 응답 텍스트에서 JSON 파싱에 실패했습니다.")
-                            return None
-        else:
-            st.error("예상치 못한 응답 형식입니다.")
-            return None
-            
+
+        import re, json as _json
+        # ```json ... ``` 우선
+        m = re.search(r"```json\s*(\{.*?\}|\[.*?\])\s*```", text, flags=re.S)
+        if m:
+            text = m.group(1)
+
+        return _json.loads(text)
+
     except Exception as e:
-        st.error(f"AI 응답 파싱 중 오류: {str(e)}")
+        st.error(f"AI 응답 파싱 오류: {e}")
         return None
 
 def transform_to_db_format(ai_input_data, ai_result, crawling_id):
@@ -605,65 +575,61 @@ def transform_to_db_format(ai_input_data, ai_result, crawling_id):
             "analyzed_on": datetime.now().date().isoformat()
         }
         
+        # 점수 관련 컬럼들은 모두 generated column이므로 직접 설정하지 않음
+        # evaluation 점수들은 evaluation JSON 필드에 저장되고, 
+        # DB에서 generated column으로 자동 계산됨
+        # if isinstance(evaluation, dict):
+        #     db_data["engagement_score"] = evaluation.get("engagement")
+        #     db_data["activity_score"] = evaluation.get("activity")
+        #     db_data["communication_score"] = evaluation.get("communication")
+        #     db_data["growth_potential_score"] = evaluation.get("growth_potential")
+        #     db_data["overall_score"] = evaluation.get("overall_score")
+
+        # inference_confidence도 generated column이므로 직접 설정하지 않음
+        # if isinstance(content_analysis, dict):
+        #     db_data["inference_confidence"] = content_analysis.get("inference_confidence")
+        
         return db_data
         
     except Exception as e:
         st.error(f"데이터 변환 중 오류: {str(e)}")
         return None
 
-def save_ai_analysis_result(crawling_data, analysis_result, crawling_id):
-    """AI 분석 결과 저장 (이미 변환된 데이터 구조 사용) - 재시도 로직 포함"""
+def save_ai_analysis_result(client, crawling_data, analysis_result, crawling_id):
+    """AI 분석 결과 저장 - client 주입 버전"""
     max_retries = 3
     retry_delay = 1
-    
     for attempt in range(max_retries):
         try:
-            client = simple_client.get_client()
             if not client:
-                if attempt < max_retries - 1:
-                    st.warning(f"Supabase 클라이언트 연결 실패. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-                    continue
-                return
-            
-            # analysis_result는 이미 transform_to_db_format에서 변환된 데이터
-            # influencer_id는 이미 crawling_id로 설정됨
-            
-            # 크롤링 ID를 notes에 추가 (추적용)
+                raise Exception("Supabase 클라이언트 없음")
+
+            # 추적용 crawling_id 주입
             if "notes" in analysis_result and isinstance(analysis_result["notes"], dict):
                 analysis_result["notes"]["crawling_id"] = crawling_id
-            
-            # 기존 데이터 확인 (influencer_id 기준)
-            existing_response = client.table("ai_influencer_analyses").select("id").eq("influencer_id", crawling_id).eq("platform", "instagram").execute()
-            
+
+            existing_response = client.table("ai_influencer_analyses").select("id")\
+                .eq("influencer_id", crawling_id).eq("platform", "instagram").execute()
+
             if existing_response.data:
-                # 업데이트
-                client.table("ai_influencer_analyses").update(analysis_result).eq("id", existing_response.data[0]["id"]).execute()
+                client.table("ai_influencer_analyses").update(analysis_result)\
+                    .eq("id", existing_response.data[0]["id"]).execute()
             else:
-                # 새로 생성
                 client.table("ai_influencer_analyses").insert(analysis_result).execute()
-            
-            # 성공적으로 저장되면 함수 종료
             return
-            
+
         except Exception as e:
             error_msg = str(e)
             if "Server disconnected" in error_msg or "connection" in error_msg.lower():
                 if attempt < max_retries - 1:
-                    st.warning(f"서버 연결 오류 발생. {retry_delay}초 후 재시도... (시도 {attempt + 1}/{max_retries})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-                    continue
+                    st.warning(f"서버 연결 오류. {retry_delay}s 후 재시도... ({attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay); retry_delay *= 2; continue
                 else:
-                    st.error(f"AI 분석 결과 저장 중 서버 연결 오류 (최대 재시도 횟수 초과): {error_msg}")
-                    raise Exception(f"AI 분석 결과 저장 실패: {error_msg}")
+                    st.error(f"AI 분석 결과 저장 실패(재시도 초과): {error_msg}")
+                    raise
             else:
-                st.error(f"AI 분석 결과 저장 중 오류: {error_msg}")
-                raise Exception(f"AI 분석 결과 저장 실패: {error_msg}")
-    
-    # 모든 재시도가 실패한 경우
-    raise Exception("AI 분석 결과 저장 실패: 최대 재시도 횟수 초과")
+                st.error(f"AI 분석 결과 저장 오류: {error_msg}")
+                raise
 
 def render_ai_analysis_results():
     """AI 분석 결과 탭"""
@@ -780,75 +746,125 @@ def render_ai_analysis_results():
         st.error(f"분석 결과 조회 중 오류: {str(e)}")
 
 def get_ai_analysis_data(search_term="", category_filter="전체", recommendation_filter="전체", limit=1000, offset=0):
-    """AI 분석 데이터 조회 (페이징 지원)"""
-    try:
-        client = simple_client.get_client()
-        if not client:
-            return []
-        
-        query = client.table("ai_influencer_analyses").select("*")
-        
-        # 검색 조건
-        if search_term:
-            # 이름, 태그, influencer_id에서 검색
-            query = query.or_(f"name.ilike.%{search_term}%,tags.cs.{{{search_term}}},influencer_id.ilike.%{search_term}%")
-        
-        # 카테고리 필터
-        if category_filter != "전체":
-            query = query.eq("category", category_filter)
-        
-        # 추천도 필터
-        if recommendation_filter != "전체":
-            query = query.eq("recommendation", recommendation_filter)
-        
-        response = query.order("analyzed_at", desc=True).range(offset, offset + limit - 1).execute()
-        return response.data if response.data else []
-        
-    except Exception as e:
-        st.error(f"분석 데이터 조회 중 오류: {str(e)}")
-        return []
+    """AI 분석 데이터 조회 (페이징 지원) - 재시도 로직 포함"""
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            client = simple_client.get_client()
+            if not client:
+                return []
+            
+            query = client.table("ai_influencer_analyses").select("*")
+            
+            # 검색 조건
+            if search_term:
+                # 이름, 태그, influencer_id에서 검색
+                query = query.or_(f"name.ilike.%{search_term}%,tags.cs.{{{search_term}}},influencer_id.ilike.%{search_term}%")
+            
+            # 카테고리 필터
+            if category_filter != "전체":
+                query = query.eq("category", category_filter)
+            
+            # 추천도 필터
+            if recommendation_filter != "전체":
+                query = query.eq("recommendation", recommendation_filter)
+            
+            response = query.order("analyzed_at", desc=True).range(offset, offset + limit - 1).execute()
+            return response.data if response.data else []
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "Server disconnected" in error_msg or "connection" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    st.warning(f"서버 연결 오류. {retry_delay}s 후 재시도... ({attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    st.error(f"분석 데이터 조회 실패(재시도 초과): {error_msg}")
+                    return []
+            else:
+                st.error(f"분석 데이터 조회 중 오류: {error_msg}")
+                return []
+    
+    return []
 
 def get_ai_analysis_data_count(search_term="", category_filter="전체", recommendation_filter="전체"):
-    """AI 분석 데이터 총 개수 조회"""
-    try:
-        client = simple_client.get_client()
-        if not client:
-            return 0
-        
-        query = client.table("ai_influencer_analyses").select("id", count="exact")
-        
-        # 검색 조건
-        if search_term:
-            # 이름, 태그, influencer_id에서 검색
-            query = query.or_(f"name.ilike.%{search_term}%,tags.cs.{{{search_term}}},influencer_id.ilike.%{search_term}%")
-        
-        # 카테고리 필터
-        if category_filter != "전체":
-            query = query.eq("category", category_filter)
-        
-        # 추천도 필터
-        if recommendation_filter != "전체":
-            query = query.eq("recommendation", recommendation_filter)
-        
-        response = query.execute()
-        return response.count if response.count else 0
-        
-    except Exception as e:
-        st.error(f"분석 데이터 개수 조회 중 오류: {str(e)}")
-        return 0
+    """AI 분석 데이터 총 개수 조회 - 재시도 로직 포함"""
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            client = simple_client.get_client()
+            if not client:
+                return 0
+            
+            query = client.table("ai_influencer_analyses").select("id", count="exact")
+            
+            # 검색 조건
+            if search_term:
+                # 이름, 태그, influencer_id에서 검색
+                query = query.or_(f"name.ilike.%{search_term}%,tags.cs.{{{search_term}}},influencer_id.ilike.%{search_term}%")
+            
+            # 카테고리 필터
+            if category_filter != "전체":
+                query = query.eq("category", category_filter)
+            
+            # 추천도 필터
+            if recommendation_filter != "전체":
+                query = query.eq("recommendation", recommendation_filter)
+            
+            response = query.execute()
+            return response.count if response.count else 0
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "Server disconnected" in error_msg or "connection" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    st.warning(f"서버 연결 오류. {retry_delay}s 후 재시도... ({attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    st.error(f"분석 데이터 개수 조회 실패(재시도 초과): {error_msg}")
+                    return 0
+            else:
+                st.error(f"분석 데이터 개수 조회 중 오류: {error_msg}")
+                return 0
+    
+    return 0
 
 def get_categories():
-    """카테고리 목록 조회"""
-    try:
-        client = simple_client.get_client()
-        if not client:
-            return []
-        
-        response = client.table("ai_influencer_analyses").select("category").execute()
-        categories = list(set([item["category"] for item in response.data if item.get("category")]))
-        return sorted(categories)
-    except:
-        return []
+    """카테고리 목록 조회 - 재시도 로직 포함"""
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            client = simple_client.get_client()
+            if not client:
+                return []
+            
+            response = client.table("ai_influencer_analyses").select("category").execute()
+            categories = list(set([item["category"] for item in response.data if item.get("category")]))
+            return sorted(categories)
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "Server disconnected" in error_msg or "connection" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    return []
+            else:
+                return []
+    
+    return []
 
 def display_analysis_section(data):
     """분석 섹션 데이터를 읽기 쉬운 형태로 표시"""
@@ -1731,16 +1747,32 @@ def render_evaluation_scores_statistics():
         st.error(f"평가 점수 통계 조회 중 오류: {str(e)}")
 
 def get_total_analyses_count():
-    """총 분석 수 조회"""
-    try:
-        client = simple_client.get_client()
-        if not client:
-            return 0
-        
-        response = client.table("ai_influencer_analyses").select("id", count="exact").execute()
-        return response.count if response.count else 0
-    except:
-        return 0
+    """총 분석 수 조회 - 재시도 로직 포함"""
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            client = simple_client.get_client()
+            if not client:
+                return 0
+            
+            response = client.table("ai_influencer_analyses").select("id", count="exact").execute()
+            return response.count if response.count else 0
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "Server disconnected" in error_msg or "connection" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    return 0
+            else:
+                return 0
+    
+    return 0
 
 def get_recent_analyses_count():
     """최근 7일 분석 수 조회"""
@@ -1756,14 +1788,25 @@ def get_recent_analyses_count():
         return 0
 
 def get_average_overall_score():
-    """평균 종합점수 조회"""
+    """평균 종합점수 조회 - JSON 필드에서 추출"""
     try:
         client = simple_client.get_client()
         if not client:
             return 0
         
-        response = client.table("ai_influencer_analyses").select("overall_score").not_.is_("overall_score", "null").execute()
-        scores = [item["overall_score"] for item in response.data if item.get("overall_score")]
+        response = client.table("ai_influencer_analyses").select("evaluation").execute()
+        scores = []
+        
+        for item in response.data:
+            evaluation = item.get("evaluation", {})
+            if isinstance(evaluation, dict):
+                overall_score = evaluation.get("overall_score")
+                if overall_score is not None:
+                    try:
+                        scores.append(float(overall_score))
+                    except (ValueError, TypeError):
+                        pass
+        
         return sum(scores) / len(scores) if scores else 0
     except:
         return 0
@@ -2252,18 +2295,72 @@ def get_evaluation_scores_statistics():
         if not client:
             return None
         
-        response = client.table("ai_influencer_analyses").select("engagement_score, activity_score, communication_score, growth_potential_score, overall_score, inference_confidence").execute()
+        response = client.table("ai_influencer_analyses").select("evaluation, content_analysis").execute()
         
         if not response.data:
             return None
         
-        # 각 점수별 데이터 추출
-        engagement_scores = [item["engagement_score"] for item in response.data if item.get("engagement_score") is not None]
-        activity_scores = [item["activity_score"] for item in response.data if item.get("activity_score") is not None]
-        communication_scores = [item["communication_score"] for item in response.data if item.get("communication_score") is not None]
-        growth_potential_scores = [item["growth_potential_score"] for item in response.data if item.get("growth_potential_score") is not None]
-        overall_scores = [item["overall_score"] for item in response.data if item.get("overall_score") is not None]
-        inference_confidences = [item["inference_confidence"] for item in response.data if item.get("inference_confidence") is not None]
+        # 각 점수별 데이터 추출 (JSON 필드에서)
+        engagement_scores = []
+        activity_scores = []
+        communication_scores = []
+        growth_potential_scores = []
+        overall_scores = []
+        
+        for item in response.data:
+            evaluation = item.get("evaluation", {})
+            if isinstance(evaluation, dict):
+                # engagement 점수 추출
+                engagement = evaluation.get("engagement")
+                if engagement is not None:
+                    try:
+                        engagement_scores.append(float(engagement))
+                    except (ValueError, TypeError):
+                        pass
+                
+                # activity 점수 추출
+                activity = evaluation.get("activity")
+                if activity is not None:
+                    try:
+                        activity_scores.append(float(activity))
+                    except (ValueError, TypeError):
+                        pass
+                
+                # communication 점수 추출
+                communication = evaluation.get("communication")
+                if communication is not None:
+                    try:
+                        communication_scores.append(float(communication))
+                    except (ValueError, TypeError):
+                        pass
+                
+                # growth_potential 점수 추출
+                growth_potential = evaluation.get("growth_potential")
+                if growth_potential is not None:
+                    try:
+                        growth_potential_scores.append(float(growth_potential))
+                    except (ValueError, TypeError):
+                        pass
+                
+                # overall_score 점수 추출
+                overall_score = evaluation.get("overall_score")
+                if overall_score is not None:
+                    try:
+                        overall_scores.append(float(overall_score))
+                    except (ValueError, TypeError):
+                        pass
+        
+        # inference_confidence는 content_analysis JSON에서 추출
+        inference_confidences = []
+        for item in response.data:
+            content_analysis = item.get("content_analysis", {})
+            if isinstance(content_analysis, dict):
+                confidence = content_analysis.get("inference_confidence")
+                if confidence is not None:
+                    try:
+                        inference_confidences.append(float(confidence))
+                    except (ValueError, TypeError):
+                        pass
         
         # 상관관계 데이터 준비
         import pandas as pd
