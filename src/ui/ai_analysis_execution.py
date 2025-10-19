@@ -28,13 +28,42 @@ def render_ai_analysis_execution():
     
     st.success("✅ OpenAI API 키가 설정되어 있습니다.")
     
-    # 분석 실행 버튼
-    if st.button("🚀 AI 분석 시작", type="primary"):
+    # 분석 상태 초기화
+    if "ai_analysis_running" not in st.session_state:
+        st.session_state.ai_analysis_running = False
+    if "ai_analysis_stop_requested" not in st.session_state:
+        st.session_state.ai_analysis_stop_requested = False
+    
+    # 분석 중지 버튼 (분석 중일 때만 표시)
+    if st.session_state.ai_analysis_running:
+        col1, col2 = st.columns([3, 1])
+        with col2:
+            if st.button("⏹️ 분석 중지", type="secondary", help="현재 진행 중인 AI 분석을 중지합니다"):
+                st.session_state.ai_analysis_stop_requested = True
+                st.warning("🛑 분석 중지 요청됨. 현재 처리 중인 항목 완료 후 중지됩니다.")
+                st.rerun()
+    
+    # 분석 실행 버튼 (분석 중이 아닐 때만 표시)
+    if not st.session_state.ai_analysis_running:
+        if st.button("🚀 AI 분석 시작", type="primary"):
+            st.session_state.ai_analysis_running = True
+            st.session_state.ai_analysis_stop_requested = False
+            st.rerun()
+    
+    # 분석 실행 중일 때
+    if st.session_state.ai_analysis_running:
         with st.spinner("AI 분석을 시작합니다..."):
             result = execute_ai_analysis()
             
+            # 분석 완료 후 상태 초기화
+            st.session_state.ai_analysis_running = False
+            st.session_state.ai_analysis_stop_requested = False
+            
             if result["success"]:
-                st.success("🎉 AI 분석이 완료되었습니다!")
+                if result.get("stopped", False):
+                    st.warning("🛑 AI 분석이 중지되었습니다.")
+                else:
+                    st.success("🎉 AI 분석이 완료되었습니다!")
                 
                 # 결과 요약 표시
                 col1, col2, col3, col4 = st.columns(4)
@@ -94,6 +123,19 @@ def execute_ai_analysis():
         UI_UPDATE_EVERY = 50  # 갱신 주기 줄이기
 
         for batch_num in range(total_batches):
+            # 중지 요청 확인
+            if st.session_state.get("ai_analysis_stop_requested", False):
+                st.warning("🛑 사용자에 의해 분석이 중지되었습니다.")
+                return {
+                    "success": True,
+                    "stopped": True,
+                    "analyzed_count": analyzed_count,
+                    "skipped_count": skipped_count,
+                    "failed_count": failed_count,
+                    "total_count": total_count,
+                    "failed_items": failed_items
+                }
+            
             offset = batch_num * batch_size
             batch_data = get_completed_crawling_data(client, limit=batch_size, offset=offset)
             
@@ -105,6 +147,19 @@ def execute_ai_analysis():
             batch_status_text = st.empty()
 
             for index, data in enumerate(batch_data):
+                # 각 항목 처리 전에도 중지 요청 확인
+                if st.session_state.get("ai_analysis_stop_requested", False):
+                    st.warning("🛑 사용자에 의해 분석이 중지되었습니다.")
+                    return {
+                        "success": True,
+                        "stopped": True,
+                        "analyzed_count": analyzed_count,
+                        "skipped_count": skipped_count,
+                        "failed_count": failed_count,
+                        "total_count": total_count,
+                        "failed_items": failed_items
+                    }
+                
                 current_id = data.get('id', 'unknown')
                 
                 try:
@@ -168,6 +223,10 @@ def execute_ai_analysis():
                             c2.metric("⏭️ 건너뜀", skipped_count)
                             c3.metric("❌ 실패", failed_count)
                             c4.metric("📊 총 처리", processed_count + index + 1)
+                            
+                            # 중지 요청 상태 표시
+                            if st.session_state.get("ai_analysis_stop_requested", False):
+                                st.warning("🛑 분석 중지 요청됨 - 현재 항목 완료 후 중지됩니다.")
 
                 except Exception as e:
                     failed_items.append({"id": current_id, "error": f"예상치 못한 오류: {str(e)}"})
