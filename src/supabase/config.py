@@ -22,25 +22,30 @@ class SupabaseConfig:
     def get_client(self) -> Client:
         """인증 토큰이 포함된 Supabase 클라이언트 반환"""
         if not self._client:
-            # 환경 변수에서 Supabase 설정 가져오기
-            url = os.getenv("SUPABASE_URL")
-            key = os.getenv("SUPABASE_ANON_KEY")
+            # Streamlit secrets에서 먼저 가져오기 시도
+            url = None
+            key = None
             
-            # 환경 변수 확인 (로그 출력 제거)
+            try:
+                url = st.secrets["supabase"]["url"]
+                key = st.secrets["supabase"]["anon_key"]
+                # Streamlit secrets에서 Supabase 설정 로드됨
+            except Exception as e:
+                # Streamlit secrets에서 가져오기 실패시 환경 변수에서 가져오기
+                url = os.getenv("SUPABASE_URL")
+                key = os.getenv("SUPABASE_ANON_KEY")
+                
+                if not url or not key:
+                    raise Exception(f"Supabase 설정을 찾을 수 없습니다. Streamlit secrets나 환경 변수를 확인하세요. 에러: {str(e)}")
             
-            if not url or not key:
-                # Streamlit secrets에서 가져오기 시도
-                try:
-                    url = st.secrets["supabase"]["url"]
-                    key = st.secrets["supabase"]["anon_key"]
-                    # Streamlit secrets에서 Supabase 설정 로드됨 (로그 출력 제거)
-                except Exception as e:
-                    # Streamlit secrets 로드 실패 (로그 출력 제거)
-                    raise Exception("Supabase 설정을 찾을 수 없습니다. 환경 변수나 Streamlit secrets를 확인하세요.")
-            else:
-                # 환경 변수에서 Supabase 설정 로드됨 (로그 출력 제거)
-                pass
+            # URL 유효성 검사
+            if not url or not url.startswith('https://'):
+                raise Exception(f"Invalid Supabase URL: {url}. URL은 https://로 시작해야 합니다.")
             
+            if not key or len(key) < 10:
+                raise Exception(f"Invalid Supabase Key: {key[:10]}... (너무 짧음)")
+            
+            # Supabase 클라이언트 생성
             self._client = create_client(url, key)
             # Supabase 클라이언트 생성 완료 (로그 출력 제거)
         

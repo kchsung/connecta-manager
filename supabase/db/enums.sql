@@ -19,3 +19,6 @@ CREATE TYPE sample_status AS ENUM ('요청', '발송준비', '발송완료', '�
 
 -- 인플루언서 선호 모드
 CREATE TYPE influencer_pref AS ENUM ('seeding', 'promotion', 'sales');
+
+-- AI 분석 추천도 (한국어)
+CREATE TYPE recommendation_ko AS ENUM ('추천', '조건부', '비추천');
