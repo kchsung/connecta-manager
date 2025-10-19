@@ -265,7 +265,11 @@ def display_analysis_results(analysis_data, total_count, current_page, total_pag
     
     # 결과 테이블
     for i, analysis in enumerate(analysis_data):
-        with st.expander(f"📊 {analysis.get('name', 'Unknown')} ({analysis.get('alias', 'N/A')}) - {analysis.get('recommendation', 'N/A')}"):
+        # None 값 안전 처리
+        name = analysis.get('name') or 'Unknown'
+        alias = analysis.get('alias') or 'N/A'
+        recommendation = analysis.get('recommendation') or 'N/A'
+        with st.expander(f"📊 {name} ({alias}) - {recommendation}"):
             display_analysis_detail(analysis)
 
 def display_analysis_detail(analysis):
@@ -274,16 +278,22 @@ def display_analysis_detail(analysis):
     
     with col1:
         st.markdown("#### 📋 기본 정보")
+        # None 값 안전 처리
+        followers = analysis.get('followers') or 0
+        followings = analysis.get('followings') or 0
+        posts_count = analysis.get('posts_count') or 0
+        analyzed_at = analysis.get('analyzed_at')
+        
         basic_info = {
-            "이름": analysis.get('name', 'N/A'),
-            "별명": analysis.get('alias', 'N/A'),
-            "플랫폼": analysis.get('platform', 'N/A'),
-            "카테고리": analysis.get('category', 'N/A'),
-            "팔로워": f"{analysis.get('followers', 0):,}",
-            "팔로잉": f"{analysis.get('followings', 0):,}",
-            "게시물 수": f"{analysis.get('posts_count', 0):,}",
-            "추천도": analysis.get('recommendation', 'N/A'),
-            "분석일": analysis.get('analyzed_at', 'N/A')[:10] if analysis.get('analyzed_at') else 'N/A'
+            "이름": analysis.get('name') or 'N/A',
+            "별명": analysis.get('alias') or 'N/A',
+            "플랫폼": analysis.get('platform') or 'N/A',
+            "카테고리": analysis.get('category') or 'N/A',
+            "팔로워": f"{followers:,}",
+            "팔로잉": f"{followings:,}",
+            "게시물 수": f"{posts_count:,}",
+            "추천도": analysis.get('recommendation') or 'N/A',
+            "분석일": analyzed_at[:10] if analyzed_at else 'N/A'
         }
         
         for key, value in basic_info.items():
@@ -299,22 +309,22 @@ def display_analysis_detail(analysis):
         evaluation = analysis.get('evaluation', {})
         if evaluation:
             score_metrics = {
-                "참여도": evaluation.get('engagement', 0),
-                "활동성": evaluation.get('activity', 0),
-                "소통력": evaluation.get('communication', 0),
-                "성장성": evaluation.get('growth_potential', 0),
-                "종합점수": evaluation.get('overall_score', 0)
+                "참여도": evaluation.get('engagement') or 0,
+                "활동성": evaluation.get('activity') or 0,
+                "소통력": evaluation.get('communication') or 0,
+                "성장성": evaluation.get('growth_potential') or 0,
+                "종합점수": evaluation.get('overall_score') or 0
             }
             
             for metric, score in score_metrics.items():
-                if isinstance(score, (int, float)):
+                if isinstance(score, (int, float)) and score is not None:
                     st.metric(metric, f"{score:.1f}/10")
                 else:
                     st.metric(metric, "N/A")
     
     # 요약 정보
-    summary = analysis.get('summary', '')
-    if summary:
+    summary = analysis.get('summary')
+    if summary and summary.strip():
         st.markdown("#### 📝 분석 요약")
         st.write(summary)
     
@@ -410,10 +420,14 @@ def display_analysis_section(data, section_title):
             st.markdown(f"**{display_name}**:")
             for sub_key, sub_value in value.items():
                 sub_display_name = get_field_display_name(sub_key)
-                st.write(f"  - {sub_display_name}: {sub_value}")
+                # None 값 안전 처리
+                safe_sub_value = sub_value if sub_value is not None else "없음"
+                st.write(f"  - {sub_display_name}: {safe_sub_value}")
         elif isinstance(value, list):
             if value:
-                st.markdown(f"**{display_name}**: {', '.join(map(str, value))}")
+                # 리스트 내 None 값들도 안전하게 처리
+                safe_values = [str(v) if v is not None else "없음" for v in value]
+                st.markdown(f"**{display_name}**: {', '.join(safe_values)}")
             else:
                 st.markdown(f"**{display_name}**: 없음")
         else:
