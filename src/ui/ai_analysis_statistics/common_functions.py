@@ -321,19 +321,29 @@ def get_enhanced_network_analysis_statistics():
                 except:
                     pass
             
-            # 네트워크 품질 등급 분류
+            # 네트워크 품질 등급 분류 (자연스러운 분포)
             network_quality_grades = {"매우 우수": 0, "우수": 0, "보통": 0, "미흡": 0, "매우 미흡": 0}
-            for score in authenticity_scores:
-                if score >= 85:  # 85점 이상을 매우 우수로 조정
-                    network_quality_grades["매우 우수"] += 1
-                elif score >= 75:  # 75점 이상을 우수로 조정
-                    network_quality_grades["우수"] += 1
-                elif score >= 65:  # 65점 이상을 보통으로 조정
-                    network_quality_grades["보통"] += 1
-                elif score >= 50:  # 50점 이상을 미흡으로 조정
-                    network_quality_grades["미흡"] += 1
-                else:
-                    network_quality_grades["매우 미흡"] += 1
+            
+            if authenticity_scores:
+                # 통계값 계산
+                mean_score = sum(authenticity_scores) / len(authenticity_scores)
+                std_score = (sum((x - mean_score) ** 2 for x in authenticity_scores) / len(authenticity_scores)) ** 0.5
+                
+                for score in authenticity_scores:
+                    # Z-score 계산
+                    z_score = (score - mean_score) / std_score if std_score > 0 else 0
+                    
+                    # 자연스러운 분포를 위한 기준점 (정규분포 가정)
+                    if z_score >= 1.0:  # 상위 15.9%
+                        network_quality_grades["매우 우수"] += 1
+                    elif z_score >= 0.3:  # 상위 38.2%
+                        network_quality_grades["우수"] += 1
+                    elif z_score >= -0.3:  # 중간 23.6%
+                        network_quality_grades["보통"] += 1
+                    elif z_score >= -1.0:  # 하위 15.9%
+                        network_quality_grades["미흡"] += 1
+                    else:  # 최하위 6.4%
+                        network_quality_grades["매우 미흡"] += 1
             
             return {
                 "avg_authenticity_score": sum(authenticity_scores) / len(authenticity_scores),
@@ -591,23 +601,93 @@ def get_enhanced_activity_metrics_statistics():
                 except:
                     pass
             
-            # 활동성 등급 분류 (참여율과 활동 주기 기반)
+            # 활동성 등급 분류 (기존 데이터 기반 활동성 점수 계산)
             activity_grade_distribution = {"매우 활발": 0, "활발": 0, "보통": 0, "비활발": 0, "매우 비활발": 0}
-            for i in range(len(engagement_rates)):
-                engagement_rate = engagement_rates[i]
-                recency_span = recency_spans[i] if i < len(recency_spans) else 7
+            
+            # 기존 데이터로 활동성 점수 계산
+            activity_scores = []
+            
+            for i, item in enumerate(response.data):
+                if i >= len(engagement_rates):
+                    break
+                    
+                # 기본 데이터 추출 (None 체크 포함)
+                followers = item.get('followers') or 0
+                followings = item.get('followings') or 0
+                posts_count = item.get('posts_count') or 0
+                engagement_rate = engagement_rates[i] if i < len(engagement_rates) else 0
                 
-                # 참여율과 활동 주기를 종합하여 등급 결정
-                if engagement_rate >= 3.0 and recency_span <= 3:
-                    activity_grade_distribution["매우 활발"] += 1
-                elif engagement_rate >= 2.0 and recency_span <= 5:
-                    activity_grade_distribution["활발"] += 1
-                elif engagement_rate >= 1.0 and recency_span <= 7:
-                    activity_grade_distribution["보통"] += 1
-                elif engagement_rate >= 0.5 and recency_span <= 14:
-                    activity_grade_distribution["비활발"] += 1
-                else:
-                    activity_grade_distribution["매우 비활발"] += 1
+                # 네트워크 분석 데이터 추출
+                network_analysis = item.get("follow_network_analysis", {})
+                if isinstance(network_analysis, str):
+                    try:
+                        network_analysis = json.loads(network_analysis)
+                    except:
+                        network_analysis = {}
+                
+                ratio_followers_to_followings = network_analysis.get("ratio_followers_to_followings") or 0
+                influence_authenticity_score = network_analysis.get("influence_authenticity_score") or 0
+                
+                # 안전한 타입 변환
+                try:
+                    posts_count = float(posts_count) if posts_count is not None else 0
+                    engagement_rate = float(engagement_rate) if engagement_rate is not None else 0
+                    ratio_followers_to_followings = float(ratio_followers_to_followings) if ratio_followers_to_followings is not None else 0
+                    influence_authenticity_score = float(influence_authenticity_score) if influence_authenticity_score is not None else 0
+                except (ValueError, TypeError):
+                    posts_count = 0
+                    engagement_rate = 0
+                    ratio_followers_to_followings = 0
+                    influence_authenticity_score = 0
+                
+                # 활동성 점수 계산 (0-100 스케일)
+                # 1. 게시물 활동성 (40% 가중치)
+                posts_score = min(100, max(0, (posts_count / 1000) * 100))  # 1000개 게시물 = 100점
+                
+                # 2. 참여율 점수 (30% 가중치)
+                engagement_score = min(100, max(0, engagement_rate * 20))  # 5% 참여율 = 100점
+                
+                # 3. 네트워크 품질 점수 (20% 가중치)
+                network_score = min(100, max(0, (ratio_followers_to_followings / 10) * 100))  # 10:1 비율 = 100점
+                
+                # 4. 진정성 점수 (10% 가중치)
+                authenticity_score = influence_authenticity_score  # 이미 0-100 스케일
+                
+                # 종합 활동성 점수
+                activity_score = (
+                    posts_score * 0.4 +
+                    engagement_score * 0.3 +
+                    network_score * 0.2 +
+                    authenticity_score * 0.1
+                )
+                
+                activity_scores.append(activity_score)
+            
+            # 활동성 점수 기반 등급 분류 (자연스러운 분포)
+            if activity_scores:
+                # 통계값 계산
+                mean_score = sum(activity_scores) / len(activity_scores)
+                std_score = (sum((x - mean_score) ** 2 for x in activity_scores) / len(activity_scores)) ** 0.5
+                
+                for score in activity_scores:
+                    # Z-score 계산
+                    z_score = (score - mean_score) / std_score if std_score > 0 else 0
+                    
+                    # 자연스러운 분포를 위한 기준점 (정규분포 가정)
+                    if z_score >= 1.0:  # 상위 15.9%
+                        activity_grade_distribution["매우 활발"] += 1
+                    elif z_score >= 0.3:  # 상위 38.2%
+                        activity_grade_distribution["활발"] += 1
+                    elif z_score >= -0.3:  # 중간 23.6%
+                        activity_grade_distribution["보통"] += 1
+                    elif z_score >= -1.0:  # 하위 15.9%
+                        activity_grade_distribution["비활발"] += 1
+                    else:  # 최하위 6.4%
+                        activity_grade_distribution["매우 비활발"] += 1
+                
+                # 디버깅 정보 (필요시 주석 해제)
+                # print(f"Activity scores range: {min(activity_scores):.2f} to {max(activity_scores):.2f}")
+                # print(f"Activity distribution: {activity_grade_distribution}")
             
             return {
                 "avg_likes": sum(likes) / len(likes) if likes else 0,

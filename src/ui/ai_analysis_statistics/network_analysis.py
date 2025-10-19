@@ -136,7 +136,7 @@ def render_network_analysis_statistics():
                 title="네트워크 품질 등급 분포",
                 labels={'x': '품질 등급', 'y': '인플루언서 수'},
                 color=list(network_stats['network_quality_grades'].keys()),
-                color_discrete_sequence=['#ff4444', '#ff8800', '#ffaa00', '#88cc00', '#00cc88']
+                color_discrete_sequence=['#00cc88', '#88cc00', '#ffaa00', '#ff8800', '#ff4444']
             )
             st.plotly_chart(fig, use_container_width=True)
     
