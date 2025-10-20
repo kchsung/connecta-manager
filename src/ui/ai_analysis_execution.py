@@ -20,10 +20,15 @@ def render_ai_analysis_execution():
     
     # OpenAI API 키 확인
     import os
-    openai_api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
-    
+    openai_api_key = os.getenv("OPENAI_API_KEY")
     if not openai_api_key:
-        st.error("OpenAI API 키가 설정되지 않았습니다. secrets.toml 또는 .env 파일에 OPENAI_API_KEY를 설정해주세요.")
+        try:
+            openai_api_key = st.secrets["OPENAI_API_KEY"]
+        except (KeyError, AttributeError):
+            openai_api_key = None
+    
+    if not openai_api_key or openai_api_key == "your-openai-api-key-here":
+        st.error("OpenAI API 키가 설정되지 않았습니다. Streamlit Cloud Secrets에서 OPENAI_API_KEY를 설정해주세요.")
         return
     
     st.success("✅ OpenAI API 키가 설정되어 있습니다.")

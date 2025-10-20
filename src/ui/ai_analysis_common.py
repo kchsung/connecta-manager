@@ -135,9 +135,16 @@ def perform_ai_analysis(data):
 
     timeout_seconds = 300  # 5분 타임아웃
 
-    api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
+    # API 키 읽기 (환경변수 우선, 그 다음 secrets)
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        st.error("OpenAI API 키가 설정되지 않았습니다.")
+        try:
+            api_key = st.secrets["OPENAI_API_KEY"]
+        except (KeyError, AttributeError):
+            api_key = None
+    
+    if not api_key or api_key == "your-openai-api-key-here":
+        st.error("OpenAI API 키가 설정되지 않았습니다. Streamlit Cloud Secrets에서 OPENAI_API_KEY를 설정해주세요.")
         return None
 
     client = OpenAI(api_key=api_key)
