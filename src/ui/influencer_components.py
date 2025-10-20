@@ -246,7 +246,7 @@ def render_influencer_registration_form():
                     owner_comment=owner_comment,
                     content_category=content_category,
                     followers_count=followers_count,
-                    created_by=created_by if created_by.strip() else None
+                    created_by=created_by.strip() if created_by and created_by.strip() else None
                 )
                 
                 result = db_manager.create_influencer(influencer)
@@ -792,7 +792,7 @@ def render_influencer_edit_form(influencer):
                         'shipping_address': shipping_address,
                         'dm_reply': dm_reply,
                         'tags': tags,
-                        'created_by': created_by if created_by.strip() else None
+                        'created_by': created_by.strip() if created_by and created_by.strip() else None
                     }
                     
                     # 데이터베이스 업데이트

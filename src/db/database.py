@@ -67,7 +67,21 @@ class DatabaseManager:
     def update_campaign(self, campaign_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
         """캠페인 정보 업데이트"""
         try:
-            result = simple_client.update_campaign(campaign_id, update_data)
+            # date/datetime 객체를 ISO 형식 문자열로 변환하여 직렬화 오류 방지
+            safe_update_data = dict(update_data) if update_data is not None else {}
+            if 'start_date' in safe_update_data and safe_update_data['start_date']:
+                try:
+                    safe_update_data['start_date'] = safe_update_data['start_date'].isoformat()
+                except AttributeError:
+                    # 이미 문자열이면 그대로 사용
+                    pass
+            if 'end_date' in safe_update_data and safe_update_data['end_date']:
+                try:
+                    safe_update_data['end_date'] = safe_update_data['end_date'].isoformat()
+                except AttributeError:
+                    pass
+
+            result = simple_client.update_campaign(campaign_id, safe_update_data)
             return result
         except Exception as e:
             return self._handle_error(e, "캠페인 업데이트")

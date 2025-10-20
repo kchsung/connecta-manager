@@ -45,9 +45,7 @@ def render_campaign_list():
             "유형": format_campaign_type(campaign.get('campaign_type', '')),
             "상태": format_campaign_status(campaign.get('status', 'planned')),
             "시작일": campaign.get('start_date', 'N/A'),
-            "종료일": campaign.get('end_date', '미정'),
-            "예산": f"{campaign.get('budget', 0):,}원" if campaign.get('budget') else "미정",
-            "목표 도달률": f"{campaign.get('target_reach', 0)}%" if campaign.get('target_reach') else "미정"
+            "종료일": campaign.get('end_date', '미정')
         })
     
     if campaign_data:
@@ -142,26 +140,7 @@ def render_campaign_edit_form(campaign):
                 key=f"edit_end_{campaign.get('id', 'unknown')}"
             )
         
-        # 예산 정보
-        st.markdown("#### 💰 예산 정보")
-        col3, col4 = st.columns(2)
-        with col3:
-            budget = st.number_input(
-                "캠페인 예산 (원)", 
-                min_value=0, 
-                value=campaign.get('budget', 0) or 0,
-                step=10000,
-                key=f"edit_budget_{campaign.get('id', 'unknown')}"
-            )
-        with col4:
-            target_reach = st.number_input(
-                "목표 도달률", 
-                min_value=0, 
-                max_value=100, 
-                value=campaign.get('target_reach', 0) or 0,
-                step=1,
-                key=f"edit_reach_{campaign.get('id', 'unknown')}"
-            )
+        # 예산/도달률 필드는 현재 스키마에 없으므로 표시하지 않음
         
         col1, col2 = st.columns(2)
         with col1:
@@ -174,9 +153,7 @@ def render_campaign_edit_form(campaign):
                         'campaign_name': campaign_name,
                         'campaign_type': campaign_type,
                         'start_date': start_date,
-                        'end_date': end_date,
-                        'budget': budget,
-                        'target_reach': target_reach
+                        'end_date': end_date
                     }
                     
                     validation = validate_campaign_data(campaign_data)
@@ -191,9 +168,7 @@ def render_campaign_edit_form(campaign):
                             'campaign_instructions': campaign_instructions,
                             'start_date': start_date,
                             'end_date': end_date,
-                            'status': status,
-                            'budget': budget,
-                            'target_reach': target_reach
+                            'status': status
                         }
                         
                         result = db_manager.update_campaign(campaign.get('id', ''), update_data)
