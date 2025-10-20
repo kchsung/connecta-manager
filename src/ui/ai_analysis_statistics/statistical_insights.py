@@ -35,22 +35,28 @@ def render_statistical_insights():
             # 이상치 시각화
             outlier_viz = insights_data.get('outlier_visualization')
             if outlier_viz is not None and not outlier_viz.empty:
-                fig = px.scatter(
-                    outlier_viz,
-                    x='followers',
-                    y='engagement_rate',
-                    color='is_outlier',
-                    size='overall_score',
-                    title="이상치 탐지 (참여율 기준)",
-                    labels={
-                        'followers': '팔로워 수',
-                        'engagement_rate': '참여율 (%)',
-                        'is_outlier': '이상치 여부',
-                        'overall_score': '종합점수'
-                    }
-                )
-                fig.update_layout(xaxis_type="log")
-                st.plotly_chart(fig, use_container_width=True)
+                # NaN 값 필터링
+                outlier_viz_clean = outlier_viz.dropna(subset=['followers', 'engagement_rate', 'overall_score'])
+                
+                if not outlier_viz_clean.empty:
+                    fig = px.scatter(
+                        outlier_viz_clean,
+                        x='followers',
+                        y='engagement_rate',
+                        color='is_outlier',
+                        size='overall_score',
+                        title="이상치 탐지 (참여율 기준)",
+                        labels={
+                            'followers': '팔로워 수',
+                            'engagement_rate': '참여율 (%)',
+                            'is_outlier': '이상치 여부',
+                            'overall_score': '종합점수'
+                        }
+                    )
+                    fig.update_layout(xaxis_type="log")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("📊 이상치 시각화를 위한 유효한 데이터가 없습니다.")
         
         # 2. 성과 예측 모델
         st.markdown("#### 🔮 성과 예측 모델")
@@ -87,21 +93,27 @@ def render_statistical_insights():
             # 클러스터 시각화
             cluster_viz = cluster_data.get('cluster_visualization')
             if cluster_viz is not None and not cluster_viz.empty:
-                fig = px.scatter(
-                    cluster_viz,
-                    x='engagement_rate',
-                    y='authenticity_score',
-                    color='cluster',
-                    size='followers',
-                    title="인플루언서 클러스터링 결과",
-                    labels={
-                        'engagement_rate': '참여율 (%)',
-                        'authenticity_score': '진정성 점수',
-                        'cluster': '클러스터',
-                        'followers': '팔로워 수'
-                    }
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                # NaN 값 필터링
+                cluster_viz_clean = cluster_viz.dropna(subset=['engagement_rate', 'authenticity_score', 'followers'])
+                
+                if not cluster_viz_clean.empty:
+                    fig = px.scatter(
+                        cluster_viz_clean,
+                        x='engagement_rate',
+                        y='authenticity_score',
+                        color='cluster',
+                        size='followers',
+                        title="인플루언서 클러스터링 결과",
+                        labels={
+                            'engagement_rate': '참여율 (%)',
+                            'authenticity_score': '진정성 점수',
+                            'cluster': '클러스터',
+                            'followers': '팔로워 수'
+                        }
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("📊 클러스터 시각화를 위한 유효한 데이터가 없습니다.")
             else:
                 st.info("📊 클러스터 시각화 데이터가 없습니다.")
             

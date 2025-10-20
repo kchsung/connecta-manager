@@ -982,6 +982,11 @@ def get_statistical_insights_data():
         df['is_outlier'] = detect_outliers(df['engagement_rate'])
         outlier_visualization = df[['followers', 'engagement_rate', 'overall_score', 'is_outlier']].copy()
         
+        # NaN 값 처리 - 기본값으로 대체
+        outlier_visualization['followers'] = outlier_visualization['followers'].fillna(1000)
+        outlier_visualization['engagement_rate'] = outlier_visualization['engagement_rate'].fillna(1.0)
+        outlier_visualization['overall_score'] = outlier_visualization['overall_score'].fillna(5.0)
+        
         # 클러스터링 분석
         if sklearn_available:
             features = ['engagement_rate', 'authenticity_score', 'overall_score']
@@ -1000,6 +1005,11 @@ def get_statistical_insights_data():
                 
                 # 클러스터 시각화 데이터
                 cluster_visualization = df[['engagement_rate', 'authenticity_score', 'followers', 'cluster']].copy()
+                
+                # NaN 값 처리 - 기본값으로 대체
+                cluster_visualization['engagement_rate'] = cluster_visualization['engagement_rate'].fillna(1.0)
+                cluster_visualization['authenticity_score'] = cluster_visualization['authenticity_score'].fillna(5.0)
+                cluster_visualization['followers'] = cluster_visualization['followers'].fillna(1000)
                 
                 # 클러스터별 특성
                 cluster_characteristics = {}
