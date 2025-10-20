@@ -28,11 +28,9 @@ def render_ai_analysis_execution():
             openai_api_key = None
     
     if not openai_api_key or openai_api_key == "your-openai-api-key-here":
-        st.error("OpenAI API 키가 설정되지 않았습니다. Streamlit Cloud Secrets에서 OPENAI_API_KEY를 설정해주세요.")
+        st.error("API 키가 설정되지 않았습니다.")
         return
-    
-    st.success("✅ OpenAI API 키가 설정되어 있습니다.")
-    
+        
     # 분석 상태 초기화
     if "ai_analysis_running" not in st.session_state:
         st.session_state.ai_analysis_running = False

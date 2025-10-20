@@ -12,6 +12,33 @@ from ..db.database import db_manager
 from .common_functions import format_campaign_type, get_date_range_options, calculate_date_range
 
 
+@st.cache_data(ttl=300)
+def _fetch_participations_by_campaign(campaign_ids):
+    """선택된 캠페인들의 참여 데이터를 한 번에 가져와 캐시합니다."""
+    result = {}
+    for cid in campaign_ids:
+        result[cid] = db_manager.get_all_campaign_participations(cid)
+    return result
+
+
+@st.cache_data(ttl=300)
+def _fetch_contents_by_participation(participation_ids):
+    """선택된 참여 ID들의 콘텐츠를 한 번에 가져와 캐시합니다."""
+    result = {}
+    for pid in participation_ids:
+        result[pid] = db_manager.get_campaign_influencer_contents(pid)
+    return result
+
+
+def _prefetch_selected_data(campaigns):
+    """캠페인 → 참여 → 콘텐츠를 프리페치하여 사전 형태로 반환합니다."""
+    campaign_ids = [c["id"] for c in campaigns]
+    participations_by_campaign = _fetch_participations_by_campaign(tuple(campaign_ids))
+    all_participation_ids = [p["id"] for plist in participations_by_campaign.values() for p in plist]
+    contents_by_participation = _fetch_contents_by_participation(tuple(all_participation_ids))
+    return participations_by_campaign, contents_by_participation
+
+
 def render_performance_report_tab():
     """리포트 탭 - 종합적인 성과 분석 및 리포트 생성"""
     st.subheader("📋 성과 리포트")
@@ -64,23 +91,26 @@ def render_performance_report_tab():
                 campaign_data.append(campaign)
                 break
 
+    # 프리페치: 선택된 캠페인의 참여/콘텐츠를 캐시 기반으로 일괄 수집
+    participations_by_campaign, contents_by_participation = _prefetch_selected_data(campaign_data)
+
     # 리포트 타입별 렌더링
     if report_type == "📊 종합 대시보드":
-        render_comprehensive_dashboard(campaign_data)
+        render_comprehensive_dashboard(campaign_data, participations_by_campaign)
     elif report_type == "📈 성과 지표 분석":
-        render_performance_metrics_analysis(campaign_data)
+        render_performance_metrics_analysis(campaign_data, participations_by_campaign, contents_by_participation)
     elif report_type == "👥 인플루언서별 분석":
-        render_influencer_analysis(campaign_data)
+        render_influencer_analysis(campaign_data, participations_by_campaign, contents_by_participation)
     elif report_type == "📅 날짜별 트렌드":
-        render_trend_analysis(campaign_data)
+        render_trend_analysis(campaign_data, participations_by_campaign, contents_by_participation)
     elif report_type == "💰 ROI 분석":
-        render_roi_analysis(campaign_data)
+        render_roi_analysis(campaign_data, participations_by_campaign, contents_by_participation)
 
     # 리포트 내보내기 기능
     render_export_section(campaign_data, report_type)
 
 
-def render_comprehensive_dashboard(campaign_data):
+def render_comprehensive_dashboard(campaign_data, participations_by_campaign):
     """종합 대시보드 렌더링"""
     st.markdown("#### 📊 종합 대시보드")
     
@@ -88,7 +118,7 @@ def render_comprehensive_dashboard(campaign_data):
     participation_counts = []
     try:
         for campaign in campaign_data:
-            participations = db_manager.get_all_campaign_participations(campaign["id"])
+            participations = participations_by_campaign.get(campaign["id"], [])
             completed = len([p for p in participations if p.get("content_uploaded", False)])
             participation_counts.append(
                 {
@@ -124,7 +154,7 @@ def render_comprehensive_dashboard(campaign_data):
     platform_data = {}
     try:
         for campaign in campaign_data:
-            participations = db_manager.get_all_campaign_participations(campaign["id"])
+            participations = participations_by_campaign.get(campaign["id"], [])
             for participation in participations:
                 platform = participation.get("platform", "N/A")
                 if platform not in platform_data:
@@ -163,9 +193,9 @@ def render_comprehensive_dashboard(campaign_data):
     # 요약 통계
     st.markdown("#### 📈 요약 통계")
     try:
-        total_participations = sum(len(db_manager.get_all_campaign_participations(c["id"])) for c in campaign_data)
+        total_participations = sum(len(participations_by_campaign.get(c["id"], [])) for c in campaign_data)
         total_completed = sum(
-            len([p for p in db_manager.get_all_campaign_participations(c["id"]) if p.get("content_uploaded", False)])
+            len([p for p in participations_by_campaign.get(c["id"], []) if p.get("content_uploaded", False)])
             for c in campaign_data
         )
     except Exception as e:
@@ -186,7 +216,7 @@ def render_comprehensive_dashboard(campaign_data):
         st.metric("분석 캠페인 수", f"{len(campaign_data)}개")
 
 
-def render_performance_metrics_analysis(campaign_data):
+def render_performance_metrics_analysis(campaign_data, participations_by_campaign, contents_by_participation):
     """성과 지표 분석 렌더링"""
     st.markdown("#### 📈 성과 지표 분석")
     
@@ -194,9 +224,9 @@ def render_performance_metrics_analysis(campaign_data):
     performance_data = []
     try:
         for campaign in campaign_data:
-            participations = db_manager.get_all_campaign_participations(campaign["id"])
+            participations = participations_by_campaign.get(campaign["id"], [])
             for participation in participations:
-                contents = db_manager.get_campaign_influencer_contents(participation["id"])
+                contents = contents_by_participation.get(participation["id"], [])
                 for content in contents:
                     likes = content.get("likes", 0)
                     comments = content.get("comments", 0)
@@ -347,7 +377,7 @@ def render_performance_metrics_analysis(campaign_data):
     st.plotly_chart(fig_platform_metrics, use_container_width=True)
 
 
-def render_influencer_analysis(campaign_data):
+def render_influencer_analysis(campaign_data, participations_by_campaign, contents_by_participation):
     """인플루언서별 분석 렌더링"""
     st.markdown("#### 👥 인플루언서별 분석")
     
@@ -355,9 +385,9 @@ def render_influencer_analysis(campaign_data):
     influencer_data = []
     try:
         for campaign in campaign_data:
-            participations = db_manager.get_all_campaign_participations(campaign["id"])
+            participations = participations_by_campaign.get(campaign["id"], [])
             for participation in participations:
-                contents = db_manager.get_campaign_influencer_contents(participation["id"])
+                contents = contents_by_participation.get(participation["id"], [])
                 total_likes = sum(content.get("likes", 0) for content in contents)
                 total_comments = sum(content.get("comments", 0) for content in contents)
                 total_views = sum(content.get("views", 0) for content in contents)
@@ -471,7 +501,7 @@ def render_influencer_analysis(campaign_data):
     st.plotly_chart(fig_views, use_container_width=True)
 
 
-def render_trend_analysis(campaign_data):
+def render_trend_analysis(campaign_data, participations_by_campaign, contents_by_participation):
     """날짜별 트렌드 분석 렌더링"""
     st.markdown("#### 📅 날짜별 트렌드 분석")
     
@@ -479,9 +509,9 @@ def render_trend_analysis(campaign_data):
     trend_data = []
     try:
         for campaign in campaign_data:
-            participations = db_manager.get_all_campaign_participations(campaign["id"])
+            participations = participations_by_campaign.get(campaign["id"], [])
             for participation in participations:
-                contents = db_manager.get_campaign_influencer_contents(participation["id"])
+                contents = contents_by_participation.get(participation["id"], [])
                 for content in contents:
                     upload_date = content.get("posted_at")
                     if upload_date:
@@ -612,7 +642,7 @@ def render_trend_analysis(campaign_data):
     st.plotly_chart(fig_campaign_trend, use_container_width=True)
 
 
-def render_roi_analysis(campaign_data):
+def render_roi_analysis(campaign_data, participations_by_campaign, contents_by_participation):
     """ROI 분석 렌더링"""
     st.markdown("#### 💰 ROI 분석")
     st.info("💡 ROI 분석: 인플루언서 비용과 성과 지표를 연계한 종합적인 투자 대비 수익률 분석을 제공합니다.")
@@ -621,7 +651,7 @@ def render_roi_analysis(campaign_data):
     roi_data = []
     try:
         for campaign in campaign_data:
-            participations = db_manager.get_all_campaign_participations(campaign["id"])
+            participations = participations_by_campaign.get(campaign["id"], [])
             total_likes = 0
             total_comments = 0
             total_views = 0
@@ -632,7 +662,7 @@ def render_roi_analysis(campaign_data):
                 # 비용 데이터 수집
                 total_cost += float(participation.get("cost_krw", 0) or 0)
                 
-                contents = db_manager.get_campaign_influencer_contents(participation["id"])
+                contents = contents_by_participation.get(participation["id"], [])
                 for content in contents:
                     total_likes += content.get("likes", 0)
                     total_comments += content.get("comments", 0)
