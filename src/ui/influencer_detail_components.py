@@ -6,6 +6,7 @@ import pandas as pd
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from ..db.database import db_manager
+from .common_functions import safe_int_conversion
 
 def render_influencer_detail_form(influencer):
     """인플루언서 상세 정보 폼 (기존 함수 - 호환성 유지)"""
@@ -242,9 +243,10 @@ def render_influencer_detail_form(influencer):
                 # Price KRW
                 new_price_krw = st.number_input(
                     "💰 Price (KRW)", 
-                    min_value=0.0, 
-                    step=0.01,
-                    format="%.2f",
+                    min_value=0, 
+                    value=safe_int_conversion(influencer.get('price_krw', 0)),
+                    step=1,
+                    format="%d",
                     key=f"edit_price_krw_{influencer['id']}",
                     help="인플루언서 협찬 비용"
                 )
@@ -322,6 +324,7 @@ def render_influencer_detail_form(influencer):
                 new_followers_count = st.number_input(
                     "👥 팔로워수", 
                     min_value=0,
+                    value=safe_int_conversion(influencer.get('followers_count', 0)),
                     step=1,
                     key=f"edit_followers_count_{influencer['id']}",
                     help="인플루언서 팔로워 수"

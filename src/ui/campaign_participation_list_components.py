@@ -92,6 +92,7 @@ def render_participation_list_table(participations):
                 "비용 (원)",
                 help="협찬 비용",
                 min_value=0,
+                step=1,
                 format="%d원",
             ),
             "매니저코멘트": st.column_config.TextColumn(

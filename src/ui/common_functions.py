@@ -3,10 +3,58 @@
 """
 import streamlit as st
 import pandas as pd
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from datetime import datetime, timedelta
 from ..db.database import db_manager
 from ..db.models import Campaign, Influencer, CampaignInfluencer, CampaignInfluencerParticipation, PerformanceMetric
+
+def safe_int_conversion(value: Any, default: int = 0) -> int:
+    """안전한 정수 변환 함수 - Streamlit number_input 호환"""
+    try:
+        if pd.isna(value) or value is None:
+            return default
+        
+        # 문자열인 경우
+        if isinstance(value, str):
+            value = value.strip()
+            if value.lower() in ['false', 'true', 'none', 'null', '']:
+                return default
+            try:
+                return int(float(value))
+            except (ValueError, TypeError):
+                return default
+        
+        # 숫자형인 경우
+        if isinstance(value, (int, float)):
+            return int(value)
+        
+        return default
+    except (ValueError, TypeError, AttributeError):
+        return default
+
+def safe_float_conversion(value: Any, default: float = 0.0) -> float:
+    """안전한 실수 변환 함수 - Streamlit number_input 호환"""
+    try:
+        if pd.isna(value) or value is None:
+            return default
+        
+        # 문자열인 경우
+        if isinstance(value, str):
+            value = value.strip()
+            if value.lower() in ['false', 'true', 'none', 'null', '']:
+                return default
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return default
+        
+        # 숫자형인 경우
+        if isinstance(value, (int, float)):
+            return float(value)
+        
+        return default
+    except (ValueError, TypeError, AttributeError):
+        return default
 
 def check_database_for_influencer(platform: str, sns_id: str) -> Dict[str, Any]:
     """데이터베이스에서 인플루언서 정보 확인"""

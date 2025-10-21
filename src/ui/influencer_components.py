@@ -9,7 +9,8 @@ from ..db.database import db_manager
 from ..db.models import Influencer
 from .common_functions import (
     search_single_influencer, 
-    search_single_influencer_by_platform
+    search_single_influencer_by_platform,
+    safe_int_conversion
 )
 # 통계 기능은 별도 메뉴로 분리됨
 
@@ -166,6 +167,7 @@ def render_influencer_registration_form():
             min_value=0, 
             value=0,
             step=1000,
+            format="%d",
             help="인플루언서의 팔로워 수를 입력하세요"
         )
         
@@ -613,13 +615,13 @@ def render_influencer_edit_form(influencer):
             followers_count = st.number_input(
                 "팔로워 수", 
                 min_value=0, 
-                value=influencer.get('followers_count', 0) or 0,
+                value=safe_int_conversion(influencer.get('followers_count', 0)),
                 key=f"edit_followers_{influencer['id']}"
             )
             post_count = st.number_input(
                 "게시물 수", 
                 min_value=0, 
-                value=influencer.get('post_count', 0) or 0,
+                value=safe_int_conversion(influencer.get('post_count', 0)),
                 key=f"edit_posts_{influencer['id']}"
             )
             # 등록자 필드 추가
@@ -634,7 +636,7 @@ def render_influencer_edit_form(influencer):
             price_krw = st.number_input(
                 "가격 (원)", 
                 min_value=0, 
-                value=influencer.get('price_krw', 0) or 0,
+                value=safe_int_conversion(influencer.get('price_krw', 0)),
                 key=f"edit_price_{influencer['id']}"
             )
             active = st.checkbox(
@@ -1324,6 +1326,7 @@ def render_filtered_influencer_list(influencers, selected_manager):
             min_value=1,
             max_value=5,
             step=1,
+            format="%d",
         ),
         "콘텐츠평점": st.column_config.NumberColumn(
             "콘텐츠 평점",
@@ -1331,6 +1334,7 @@ def render_filtered_influencer_list(influencers, selected_manager):
             min_value=1,
             max_value=5,
             step=1,
+            format="%d",
         ),
         "담당자": st.column_config.TextColumn(
             "담당자",

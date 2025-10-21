@@ -4,7 +4,7 @@
 import streamlit as st
 from src.db.database import db_manager
 from src.db.models import CampaignInfluencerParticipation
-from .common_functions import search_single_influencer, search_single_influencer_by_platform
+from .common_functions import search_single_influencer, search_single_influencer_by_platform, safe_int_conversion
 
 def render_participation_add():
     """참여 인플루언서 추가 메인 컴포넌트"""
@@ -48,11 +48,14 @@ def render_add_influencer_workflow(selected_campaign):
 
 def render_influencer_search_section():
     """인플루언서 검색 섹션"""
-    # 검색 섹션
-    search_term = st.text_input("인플루언서 검색", placeholder="SNS ID 또는 이름을 입력하세요", key="add_influencer_search", help="등록자 검색")
-    search_platform = st.selectbox("플랫폼", ["전체", "instagram", "youtube", "tiktok", "twitter"], key="add_influencer_platform")
+    # 검색 섹션 - 폼 구조로 변경
+    with st.form("add_influencer_search_form"):
+        search_term = st.text_input("인플루언서 검색", placeholder="SNS ID 또는 이름을 입력하세요", key="add_influencer_search", help="등록자 검색")
+        search_platform = st.selectbox("플랫폼", ["전체", "instagram", "youtube", "tiktok", "twitter"], key="add_influencer_platform")
+        
+        search_clicked = st.form_submit_button("🔍 검색", type="primary", key="search_influencer_for_add")
     
-    if st.button("🔍 검색", key="search_influencer_for_add"):
+    if search_clicked:
         if not search_term:
             st.error("검색어를 입력해주세요.")
         else:
@@ -194,9 +197,9 @@ def render_influencer_add_form(selected_campaign):
         )
         cost_krw = st.number_input(
             "비용 (원)", 
-            min_value=0.0, 
-            value=float(existing_participation.get('cost_krw', 0.0)) if existing_participation else 0.0, 
-            step=1000.0, 
+            min_value=0, 
+            value=safe_int_conversion(existing_participation.get('cost_krw', 0)) if existing_participation else 0, 
+            step=1000, 
             key="add_cost_krw"
         )
         
