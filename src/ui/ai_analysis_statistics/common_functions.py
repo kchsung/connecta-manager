@@ -11,7 +11,7 @@ from ...supabase.simple_client import simple_client
 
 # 기본 통계 함수들
 def get_total_analyses_count():
-    """총 분석 수 조회 - 재시도 로직 포함"""
+    """총 분석 수 조회 - count만 사용 (페이징 불필요)"""
     max_retries = 3
     retry_delay = 1
     
@@ -21,11 +21,18 @@ def get_total_analyses_count():
             if not client:
                 return 0
             
+            # count="exact"만 사용하면 모든 레코드 수를 반환 (페이징 불필요)
+            print(f"Attempting to get total count from ai_influencer_analyses table...")
             response = client.table("ai_influencer_analyses").select("id", count="exact").execute()
+            
+            # 디버깅: 응답 확인
+            print(f"Response count: {response.count}")
+            
             return response.count if response.count else 0
             
         except Exception as e:
             error_msg = str(e)
+            print(f"Error in get_total_analyses_count (attempt {attempt + 1}): {error_msg}")
             if "Server disconnected" in error_msg or "connection" in error_msg.lower():
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay)
@@ -46,82 +53,371 @@ def get_recent_analyses_count():
         if not client:
             return 0
         
-        response = client.table("ai_influencer_analyses").select("id", count="exact").gte("analyzed_at", seven_days_ago.isoformat()).execute()
+        # 디버깅: 최근 분석 수 확인
+        print(f"Getting recent analyses since: {seven_days_ago.isoformat()}")
+        response = client.table("ai_influencer_analyses").select("id", count="exact").gte("analyzed_at", seven_days_ago.isoformat()).limit(10000).execute()
+        
+        print(f"Recent analyses count: {response.count if response.count else 0}")
         return response.count if response.count else 0
-    except:
+    except Exception as e:
+        print(f"Error in get_recent_analyses_count: {str(e)}")
         return 0
 
 def get_average_overall_score():
-    """평균 종합점수 조회 - JSON 필드에서 추출"""
+    """평균 종합점수 조회 - 페이징으로 모든 데이터 가져오기"""
     try:
         client = simple_client.get_client()
         if not client:
             return 0
         
-        response = client.table("ai_influencer_analyses").select("evaluation").execute()
-        scores = []
+        all_scores = []
+        page_size = 1000
+        offset = 0
         
-        for item in response.data:
-            evaluation = item.get("evaluation", {})
-            if isinstance(evaluation, dict):
-                overall_score = evaluation.get("overall_score")
-                if overall_score is not None:
-                    try:
-                        scores.append(float(overall_score))
-                    except (ValueError, TypeError):
-                        pass
+        while True:
+            # 페이징으로 데이터 가져오기
+            response = client.table("ai_influencer_analyses").select("evaluation").range(offset, offset + page_size - 1).execute()
+            
+            if not response.data or len(response.data) == 0:
+                break
+            
+            # 점수 추출
+            page_scores = []
+            for item in response.data:
+                evaluation = item.get("evaluation", {})
+                if isinstance(evaluation, dict):
+                    overall_score = evaluation.get("overall_score")
+                    if overall_score is not None:
+                        try:
+                            page_scores.append(float(overall_score))
+                        except (ValueError, TypeError):
+                            pass
+            
+            all_scores.extend(page_scores)
+            
+            # 더 이상 데이터가 없으면 중단
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
         
-        return sum(scores) / len(scores) if scores else 0
-    except:
+        avg_score = sum(all_scores) / len(all_scores) if all_scores else 0
+        
+        return avg_score
+    except Exception as e:
+        print(f"Error in get_average_overall_score: {str(e)}")
         return 0
 
-def get_recommendation_distribution():
-    """추천도 분포 조회"""
+def get_category_average_scores():
+    """카테고리별 평균 종합점수 조회 - 페이징으로 모든 데이터 가져오기"""
     try:
         client = simple_client.get_client()
         if not client:
             return {}
         
-        response = client.table("ai_influencer_analyses").select("recommendation").execute()
-        recommendations = [item["recommendation"] for item in response.data if item.get("recommendation")]
+        category_scores = {}  # {category: [scores]}
+        page_size = 1000
+        offset = 0
         
+        while True:
+            # 페이징으로 데이터 가져오기
+            response = client.table("ai_influencer_analyses").select("category, evaluation").range(offset, offset + page_size - 1).execute()
+            
+            if not response.data or len(response.data) == 0:
+                break
+            
+            # 점수 추출
+            for item in response.data:
+                category = item.get("category")
+                evaluation = item.get("evaluation", {})
+                
+                if category and isinstance(evaluation, dict):
+                    overall_score = evaluation.get("overall_score")
+                    if overall_score is not None:
+                        try:
+                            score = float(overall_score)
+                            if category not in category_scores:
+                                category_scores[category] = []
+                            category_scores[category].append(score)
+                        except (ValueError, TypeError):
+                            pass
+            
+            # 더 이상 데이터가 없으면 중단
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
+        
+        # 카테고리별 평균 계산
+        category_averages = {}
+        for category, scores in category_scores.items():
+            if scores:
+                avg_score = sum(scores) / len(scores)
+                category_averages[category] = avg_score
+        
+        return category_averages
+    except Exception as e:
+        print(f"Error in get_category_average_scores: {str(e)}")
+        return {}
+
+def get_recommendation_distribution():
+    """추천도 분포 조회 - 페이징으로 모든 데이터 가져오기"""
+    try:
+        client = simple_client.get_client()
+        if not client:
+            return {}
+        
+        all_recommendations = []
+        page_size = 1000
+        offset = 0
+        
+        print(f"Starting to fetch all recommendations with pagination...")
+        
+        while True:
+            # 페이징으로 데이터 가져오기
+            response = client.table("ai_influencer_analyses").select("recommendation").range(offset, offset + page_size - 1).execute()
+            
+            if not response.data or len(response.data) == 0:
+                break
+                
+            # 추천도 추출
+            page_recommendations = [item.get("recommendation") for item in response.data if item.get("recommendation")]
+            all_recommendations.extend(page_recommendations)
+            
+            print(f"Fetched page {offset//page_size + 1}: {len(response.data)} records, {len(page_recommendations)} recommendations")
+            
+            # 더 이상 데이터가 없으면 중단
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
+        
+        print(f"Total recommendations collected: {len(all_recommendations)}")
+        
+        # 추천도 분포 계산
         distribution = {}
-        for rec in recommendations:
+        for rec in all_recommendations:
             distribution[rec] = distribution.get(rec, 0) + 1
         
+        print(f"Recommendation distribution: {distribution}")
         return distribution
     except Exception as e:
-        st.error(f"추천도 분포 조회 중 오류: {str(e)}")
+        print(f"Error in get_recommendation_distribution: {str(e)}")
         return {}
 
 def get_category_distribution():
-    """카테고리 분포 조회"""
+    """카테고리 분포 조회 - 페이징으로 모든 데이터 가져오기"""
     try:
         client = simple_client.get_client()
         if not client:
             return {}
         
-        response = client.table("ai_influencer_analyses").select("category").execute()
-        categories = [item["category"] for item in response.data if item.get("category")]
+        all_categories = []
+        page_size = 1000
+        offset = 0
         
+        print(f"Starting to fetch all categories with pagination...")
+        
+        while True:
+            # 페이징으로 데이터 가져오기
+            response = client.table("ai_influencer_analyses").select("category").range(offset, offset + page_size - 1).execute()
+            
+            if not response.data or len(response.data) == 0:
+                break
+                
+            # 카테고리 추출
+            page_categories = [item.get("category") for item in response.data if item.get("category")]
+            all_categories.extend(page_categories)
+            
+            print(f"Fetched page {offset//page_size + 1}: {len(response.data)} records, {len(page_categories)} categories")
+            
+            # 더 이상 데이터가 없으면 중단
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
+        
+        print(f"Total categories collected: {len(all_categories)}")
+        
+        if all_categories:
+            unique_categories = list(set(all_categories))
+            print(f"Unique categories found: {unique_categories}")
+            print(f"Total unique categories: {len(unique_categories)}")
+        
+        # 카테고리 분포 계산
         distribution = {}
-        for cat in categories:
+        for cat in all_categories:
             distribution[cat] = distribution.get(cat, 0) + 1
         
+        
         return distribution
-    except:
+    except Exception as e:
+        print(f"Error in get_category_distribution: {str(e)}")
         return {}
 
+def get_analysis_rate():
+    """분석률 조회 - tb_instagram_crawling 테이블 대비 ai_influencer_analyses 테이블의 비율"""
+    try:
+        client = simple_client.get_client()
+        if not client:
+            return 0
+        
+        # tb_instagram_crawling 테이블의 총 크롤링 수
+        crawling_response = client.table("tb_instagram_crawling").select("id", count="exact").limit(10000).execute()
+        total_crawling_count = crawling_response.count if crawling_response.count else 0
+        
+        # ai_influencer_analyses 테이블의 총 분석 수
+        analysis_response = client.table("ai_influencer_analyses").select("id", count="exact").limit(10000).execute()
+        total_analysis_count = analysis_response.count if analysis_response.count else 0
+        
+        analysis_rate = (total_analysis_count / total_crawling_count) * 100 if total_crawling_count > 0 else 0
+        
+        return analysis_rate
+    except Exception as e:
+        print(f"Error in get_analysis_rate: {str(e)}")
+        return 0
+
+def get_tags_for_wordcloud():
+    """워드클라우드를 위한 tags 데이터 조회 - 페이징으로 모든 데이터 가져오기"""
+    try:
+        client = simple_client.get_client()
+        if not client:
+            return []
+        
+        all_tags = []
+        page_size = 1000
+        offset = 0
+        
+        print(f"Starting to fetch all tags with pagination...")
+        
+        while True:
+            # 페이징으로 데이터 가져오기
+            response = client.table("ai_influencer_analyses").select("tags").range(offset, offset + page_size - 1).execute()
+            
+            if not response.data or len(response.data) == 0:
+                break
+            
+            # 태그 추출
+            page_tags = []
+            for item in response.data:
+                tags = item.get("tags")
+                if tags:
+                    # tags가 문자열인 경우 쉼표로 분리
+                    if isinstance(tags, str):
+                        tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+                        page_tags.extend(tag_list)
+                    # tags가 리스트인 경우
+                    elif isinstance(tags, list):
+                        page_tags.extend([tag.strip() for tag in tags if tag.strip()])
+            
+            all_tags.extend(page_tags)
+            
+            print(f"Fetched page {offset//page_size + 1}: {len(response.data)} records, {len(page_tags)} tags")
+            
+            # 더 이상 데이터가 없으면 중단
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
+        
+        # 디버깅: 태그 통계 확인
+        print(f"Total tags collected: {len(all_tags)}")
+        if all_tags:
+            tag_counts = Counter(all_tags)
+            print(f"Unique tags: {len(tag_counts)}")
+            print(f"Top 5 tags: {tag_counts.most_common(5)}")
+        
+        return all_tags
+    except Exception as e:
+        print(f"Error in get_tags_for_wordcloud: {str(e)}")
+        return []
+
+def get_category_tags(category):
+    """특정 카테고리의 태그 데이터 조회 - 페이징으로 모든 데이터 가져오기"""
+    try:
+        from collections import Counter
+        client = simple_client.get_client()
+        if not client:
+            return []
+        
+        all_tags = []
+        page_size = 1000
+        offset = 0
+        
+        while True:
+            # 특정 카테고리의 데이터만 페이징으로 가져오기
+            response = client.table("ai_influencer_analyses").select("tags").eq("category", category).range(offset, offset + page_size - 1).execute()
+            
+            if not response.data or len(response.data) == 0:
+                break
+            
+            # 태그 추출
+            page_tags = []
+            for item in response.data:
+                tags = item.get("tags")
+                if tags:
+                    # tags가 문자열인 경우 텍스트 배열로 파싱
+                    if isinstance(tags, str):
+                        # 텍스트 배열 형태: ["태그1","태그2","태그3"] -> 태그1, 태그2, 태그3
+                        if tags.startswith('[') and tags.endswith(']'):
+                            # 대괄호 제거하고 쉼표로 분리
+                            content = tags[1:-1]  # [ ] 제거
+                            # 따옴표로 둘러싸인 태그들을 추출
+                            import re
+                            tag_matches = re.findall(r'"([^"]*)"', content)
+                            if tag_matches:
+                                page_tags.extend([tag.strip() for tag in tag_matches if tag.strip()])
+                            else:
+                                # 따옴표가 없는 경우 쉼표로 분리
+                                tag_list = [tag.strip() for tag in content.split(',') if tag.strip()]
+                                page_tags.extend(tag_list)
+                        else:
+                            # 일반 쉼표로 구분된 문자열
+                            tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+                            page_tags.extend(tag_list)
+                    # tags가 리스트인 경우
+                    elif isinstance(tags, list):
+                        page_tags.extend([tag.strip() for tag in tags if tag.strip()])
+            
+            all_tags.extend(page_tags)
+            
+            # 더 이상 데이터가 없으면 중단
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
+        
+        return all_tags
+    except Exception as e:
+        print(f"Error in get_category_tags for category '{category}': {str(e)}")
+        return []
+
 def get_evaluation_scores_statistics():
-    """평가 점수 통계 조회 - JSON 필드에서 추출"""
+    """평가 점수 통계 조회 - JSON 필드에서 추출 (페이징으로 모든 데이터 가져오기)"""
     try:
         client = simple_client.get_client()
         if not client:
             return None
         
-        response = client.table("ai_influencer_analyses").select("evaluation, content_analysis").execute()
+        all_data = []
+        page_size = 1000
+        offset = 0
         
-        if not response.data:
+        while True:
+            response = client.table("ai_influencer_analyses").select("evaluation, content_analysis").range(offset, offset + page_size - 1).execute()
+            
+            if not response.data or len(response.data) == 0:
+                break
+            
+            all_data.extend(response.data)
+            
+            # 더 이상 데이터가 없으면 중단
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
+        
+        if not all_data:
             return None
         
         # 각 점수별 데이터 추출 (JSON 필드에서)
@@ -131,7 +427,7 @@ def get_evaluation_scores_statistics():
         growth_potential_scores = []
         overall_scores = []
         
-        for item in response.data:
+        for item in all_data:
             evaluation = item.get("evaluation", {})
             if isinstance(evaluation, dict):
                 # engagement 점수 추출
@@ -176,7 +472,7 @@ def get_evaluation_scores_statistics():
         
         # inference_confidence는 content_analysis JSON에서 추출
         inference_confidences = []
-        for item in response.data:
+        for item in all_data:
             content_analysis = item.get("content_analysis", {})
             if isinstance(content_analysis, dict):
                 confidence = content_analysis.get("inference_confidence")
