@@ -17,12 +17,12 @@ from .common_functions import (
 def render_influencer_management():
     """인플루언서 관리 메인 컴포넌트"""
     st.subheader("👥 인플루언서 관리")
-    st.markdown("인플루언서 수정과 조회 기능을 제공합니다.")
+    st.markdown("인플루언서 등록, 수정, 조회 기능을 제공합니다.")
     
     # 탭 간 이동 처리 (담당자별 관리에서는 수정 기능이 없으므로 제거)
     
-    # 수정, 조회 탭으로 분리 (등록 탭 숨김, 통계는 별도 메뉴로 분리)
-    tab_names = ["📋 인플루언서 정보 수정", "👥 인플루언서 조회"]
+    # 등록, 수정, 조회 탭으로 분리 (통계는 별도 메뉴로 분리)
+    tab_names = ["📝 인플루언서 등록", "📋 인플루언서 정보 수정", "👥 인플루언서 조회"]
     
     # 기본 탭 인덱스 설정
     default_tab = st.session_state.get("influencer_active_tab", 0)
@@ -31,9 +31,12 @@ def render_influencer_management():
     tabs = st.tabs(tab_names)
     
     with tabs[0]:
-        render_influencer_inquiry()
+        render_influencer_registration()
     
     with tabs[1]:
+        render_influencer_inquiry()
+    
+    with tabs[2]:
         render_manager_influencer_management()
 
 def render_influencer_registration():

@@ -323,7 +323,7 @@ def render_sidebar():
         
         # 크롤링 페이지가 선택된 경우 관리 페이지로 리다이렉트 (크롤링 기능 제거됨)
         if st.session_state.current_page in ['single_crawl', 'batch_crawl', 'performance_crawl']:
-            st.session_state.current_page = 'campaign_management'
+            st.session_state.current_page = 'influencer_management'
         
         # 관리 메뉴 그룹
         st.markdown("### 📋 관리 메뉴")
