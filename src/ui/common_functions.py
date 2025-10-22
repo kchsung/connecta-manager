@@ -59,8 +59,8 @@ def safe_float_conversion(value: Any, default: float = 0.0) -> float:
 def check_database_for_influencer(platform: str, sns_id: str) -> Dict[str, Any]:
     """데이터베이스에서 인플루언서 정보 확인"""
     try:
-        # SNS ID에서 @ 제거
-        clean_sns_id = sns_id.replace('@', '') if sns_id else ''
+        # SNS ID에서 @ 제거하고 앞뒤 공백 제거
+        clean_sns_id = sns_id.replace('@', '').strip() if sns_id else ''
         
         # 데이터베이스에서 인플루언서 정보 조회
         result = db_manager.get_influencer_info(platform, clean_sns_id)
@@ -98,7 +98,10 @@ def perform_crawling(platform: str, url: str, sns_id: str, debug_mode: bool, sav
 def search_single_influencer(search_term: str):
     """단일 인플루언서 검색 - 개선된 검색 로직 (전체 플랫폼)"""
     try:
-        if not search_term or not search_term.strip():
+        # 검색어에서 앞뒤 공백 제거
+        clean_search_term = search_term.strip() if search_term else ""
+        
+        if not clean_search_term:
             return {
                 "success": False,
                 "message": "검색어를 입력해주세요.",
@@ -116,11 +119,11 @@ def search_single_influencer(search_term: str):
                 "data": None
             }
         
-        # 서버 코드와 동일한 검색 로직 사용
+        # 서버 코드와 동일한 검색 로직 사용 (공백 제거된 검색어 사용)
         search_response = client.table("connecta_influencers")\
             .select("*")\
             .order("created_at", desc=True)\
-            .or_(f"influencer_name.ilike.%{search_term}%,sns_id.ilike.%{search_term}%")\
+            .or_(f"influencer_name.ilike.%{clean_search_term}%,sns_id.ilike.%{clean_search_term}%")\
             .execute()
         
         if search_response.data:
@@ -146,7 +149,10 @@ def search_single_influencer(search_term: str):
 def search_single_influencer_by_platform(search_term: str, platform: str):
     """특정 플랫폼에서 단일 인플루언서 검색"""
     try:
-        if not search_term or not search_term.strip():
+        # 검색어에서 앞뒤 공백 제거
+        clean_search_term = search_term.strip() if search_term else ""
+        
+        if not clean_search_term:
             return {
                 "success": False,
                 "message": "검색어를 입력해주세요.",
@@ -164,12 +170,12 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
                 "data": None
             }
         
-        # 서버 코드와 동일한 검색 로직 사용 (플랫폼 필터 포함)
+        # 서버 코드와 동일한 검색 로직 사용 (플랫폼 필터 포함, 공백 제거된 검색어 사용)
         search_response = client.table("connecta_influencers")\
             .select("*")\
             .order("created_at", desc=True)\
             .eq("platform", platform)\
-            .or_(f"influencer_name.ilike.%{search_term}%,sns_id.ilike.%{search_term}%")\
+            .or_(f"influencer_name.ilike.%{clean_search_term}%,sns_id.ilike.%{clean_search_term}%")\
             .execute()
         
         if search_response.data:

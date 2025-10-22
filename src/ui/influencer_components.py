@@ -17,12 +17,12 @@ from .common_functions import (
 def render_influencer_management():
     """인플루언서 관리 메인 컴포넌트"""
     st.subheader("👥 인플루언서 관리")
-    st.markdown("인플루언서 등록과 수정, 조회 기능을 제공합니다.")
+    st.markdown("인플루언서 수정과 조회 기능을 제공합니다.")
     
     # 탭 간 이동 처리 (담당자별 관리에서는 수정 기능이 없으므로 제거)
     
-    # 등록, 조회, 담당자별 관리 탭으로 분리 (통계는 별도 메뉴로 분리)
-    tab_names = ["📝 인플루언서 등록", "📋 인플루언서 정보 수정", "👥 인플루언서 조회"]
+    # 수정, 조회 탭으로 분리 (등록 탭 숨김, 통계는 별도 메뉴로 분리)
+    tab_names = ["📋 인플루언서 정보 수정", "👥 인플루언서 조회"]
     
     # 기본 탭 인덱스 설정
     default_tab = st.session_state.get("influencer_active_tab", 0)
@@ -31,18 +31,15 @@ def render_influencer_management():
     tabs = st.tabs(tab_names)
     
     with tabs[0]:
-        render_influencer_registration()
-    
-    with tabs[1]:
         render_influencer_inquiry()
     
-    with tabs[2]:
+    with tabs[1]:
         render_manager_influencer_management()
 
 def render_influencer_registration():
     """인플루언서 등록 탭"""
-    st.subheader("📝 인플루언서 등록")
-    st.markdown("새로운 인플루언서를 검색하고 등록합니다.")
+    st.subheader("📝 인플루언서 등록/수정")
+    st.markdown("인플루언서를 검색하고 등록하거나 기존 정보를 수정합니다.")
     
     # 두 컬럼으로 분할
     col1, col2 = st.columns([1, 1])
@@ -51,7 +48,335 @@ def render_influencer_registration():
         render_influencer_search_for_registration()
     
     with col2:
+        render_influencer_management_panel()
+
+def render_influencer_management_panel():
+    """인플루언서 관리 패널 (등록/수정 통합)"""
+    # 세션 상태에서 검색 결과 확인
+    search_result = st.session_state.get('registration_search_result')
+    
+    if search_result:
+        # 중복된 인플루언서가 있으면 수정 폼 표시
+        st.markdown("### ✏️ 인플루언서 정보 수정")
+        st.info(f"**수정 대상:** {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')})")
+        render_influencer_edit_form_for_registration(search_result)
+    else:
+        # 등록된 인플루언서가 없으면 등록 폼 표시
+        st.markdown("### 📝 인플루언서 등록")
+        st.info("새로운 인플루언서를 등록합니다.")
         render_influencer_registration_form()
+
+def render_influencer_edit_form_for_registration(influencer):
+    """인플루언서 정보 수정 폼 (등록 컨텍스트용) - 모든 필드 포함"""
+    st.markdown("---")
+    
+    # 편집 폼
+    with st.form(f"edit_influencer_registration_form_{influencer['id']}"):
+        # 기본 정보 섹션
+        st.markdown("#### 📝 기본 정보")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            platform_options = ["instagram", "youtube", "tiktok", "twitter"]
+            current_platform = influencer.get('platform', 'instagram')
+            try:
+                platform_index = platform_options.index(current_platform)
+            except ValueError:
+                platform_index = 0
+            
+            platform = st.selectbox(
+                "플랫폼",
+                platform_options,
+                index=platform_index,
+                key=f"edit_reg_platform_{influencer['id']}",
+                format_func=lambda x: {
+                    "instagram": "📸 Instagram",
+                    "youtube": "📺 YouTube",
+                    "tiktok": "🎵 TikTok",
+                    "twitter": "🐦 Twitter"
+                }[x]
+            )
+            sns_id = st.text_input("SNS ID", value=influencer.get('sns_id', ''), key=f"edit_reg_sns_id_{influencer['id']}")
+        
+        with col2:
+            influencer_name = st.text_input("별칭", value=influencer.get('influencer_name', ''), key=f"edit_reg_name_{influencer['id']}")
+            sns_url = st.text_input("SNS URL", value=influencer.get('sns_url', ''), key=f"edit_reg_url_{influencer['id']}")
+        
+        # 카테고리와 Owner Comment
+        category_options = ["일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"]
+        current_category = influencer.get('content_category', '일반')
+        try:
+            category_index = category_options.index(current_category)
+        except ValueError:
+            category_index = 0
+        
+        content_category = st.selectbox(
+            "카테고리",
+            category_options,
+            index=category_index,
+            key=f"edit_reg_category_{influencer['id']}",
+            format_func=lambda x: {
+                "일반": "📝 일반",
+                "뷰티": "💄 뷰티",
+                "패션": "👗 패션",
+                "푸드": "🍽️ 푸드",
+                "여행": "✈️ 여행",
+                "라이프스타일": "🏠 라이프스타일",
+                "테크": "💻 테크",
+                "게임": "🎮 게임",
+                "스포츠": "⚽ 스포츠",
+                "애견": "🐕 애견",
+                "기타": "🔧 기타"
+            }[x]
+        )
+        
+        owner_comment = st.text_area(
+            "Owner Comment", 
+            value=influencer.get('owner_comment', ''), 
+            key=f"edit_reg_owner_comment_{influencer['id']}"
+        )
+        
+        # 통계 정보 섹션
+        st.markdown("#### 📊 통계 정보")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            followers_count = st.number_input(
+                "팔로워 수", 
+                min_value=0, 
+                value=safe_int_conversion(influencer.get('followers_count', 0)),
+                key=f"edit_reg_followers_{influencer['id']}"
+            )
+            post_count = st.number_input(
+                "게시물 수", 
+                min_value=0, 
+                value=safe_int_conversion(influencer.get('post_count', 0)),
+                key=f"edit_reg_posts_{influencer['id']}"
+            )
+            # 등록자 필드 추가
+            created_by = st.text_input(
+                "등록자", 
+                value=influencer.get('created_by', ''),
+                key=f"edit_reg_created_by_{influencer['id']}",
+                help="이 인플루언서를 등록한 담당자 정보"
+            )
+        
+        with col2:
+            price_krw = st.number_input(
+                "가격 (원)", 
+                min_value=0, 
+                value=safe_int_conversion(influencer.get('price_krw', 0)),
+                key=f"edit_reg_price_{influencer['id']}"
+            )
+            active = st.checkbox(
+                "활성 상태", 
+                value=influencer.get('active', True),
+                key=f"edit_reg_active_{influencer['id']}"
+            )
+        
+        # 평점 정보
+        st.markdown("#### ⭐ 평점 정보")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            manager_rating = st.slider(
+                "매니저 평점", 
+                min_value=1, 
+                max_value=5, 
+                value=influencer.get('manager_rating', 3) or 3,
+                key=f"edit_reg_manager_rating_{influencer['id']}"
+            )
+        
+        with col2:
+            content_rating = st.slider(
+                "콘텐츠 평점", 
+                min_value=1, 
+                max_value=5, 
+                value=influencer.get('content_rating', 3) or 3,
+                key=f"edit_reg_content_rating_{influencer['id']}"
+            )
+        
+        # 연락처 정보
+        st.markdown("#### 📞 연락처 정보")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            phone_number = st.text_input(
+                "전화번호", 
+                value=influencer.get('phone_number', ''),
+                key=f"edit_reg_phone_{influencer['id']}"
+            )
+            
+            # 데이터베이스 enum 값과 매핑
+            contact_method_mapping = {
+                'dm': 'DM',
+                'email': '이메일', 
+                'phone': '전화',
+                'kakao': '카카오톡',
+                'form': '폼',
+                'other': '기타'
+            }
+            contact_method_options = list(contact_method_mapping.values())
+            contact_method_db_values = list(contact_method_mapping.keys())
+            
+            current_contact_method = influencer.get('contact_method', 'dm')
+            try:
+                contact_method_index = contact_method_db_values.index(current_contact_method)
+            except ValueError:
+                contact_method_index = 0
+            
+            contact_method = st.selectbox(
+                "연락 방법",
+                contact_method_options,
+                index=contact_method_index,
+                key=f"edit_reg_contact_method_{influencer['id']}"
+            )
+        
+        with col2:
+            # 데이터베이스 enum 값과 매핑
+            preferred_mode_mapping = {
+                'seeding': '협찬',
+                'promotion': '홍보',
+                'sales': '판매'
+            }
+            preferred_mode_options = list(preferred_mode_mapping.values())
+            preferred_mode_db_values = list(preferred_mode_mapping.keys())
+            
+            current_preferred_mode = influencer.get('preferred_mode', 'seeding')
+            try:
+                preferred_mode_index = preferred_mode_db_values.index(current_preferred_mode)
+            except ValueError:
+                preferred_mode_index = 0
+            
+            preferred_mode = st.selectbox(
+                "선호 모드",
+                preferred_mode_options,
+                index=preferred_mode_index,
+                key=f"edit_reg_preferred_mode_{influencer['id']}"
+            )
+            
+            # 연락방법 추가정보 필드 (언제나 표시)
+            contacts_method_etc = st.text_input(
+                "연락방법 추가정보",
+                value=influencer.get('contacts_method_etc', ''),
+                key=f"edit_reg_contacts_method_etc_{influencer['id']}",
+                help="연락방법에 대한 추가 상세 정보를 입력해주세요"
+            )
+        
+        shipping_address = st.text_area(
+            "배송 주소", 
+            value=influencer.get('shipping_address', ''),
+            key=f"edit_reg_shipping_{influencer['id']}"
+        )
+        
+        # DM 응답 정보
+        st.markdown("#### 💬 DM 응답 정보")
+        dm_reply = st.text_area(
+            "DM 응답 내용", 
+            value=influencer.get('dm_reply', ''),
+            key=f"edit_reg_dm_reply_{influencer['id']}",
+            help="인플루언서의 DM 응답 내용을 기록하세요"
+        )
+        
+        # 태그 정보
+        tags = st.text_input(
+            "태그 (쉼표로 구분)", 
+            value=influencer.get('tags', ''),
+            key=f"edit_reg_tags_{influencer['id']}"
+        )
+        
+        # 버튼
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.form_submit_button("💾 정보 수정", type="primary"):
+                if not sns_id:
+                    st.error("SNS ID를 입력해주세요.")
+                elif not sns_url:
+                    st.error("SNS URL을 입력해주세요.")
+                else:
+                    # 별칭이 비어있으면 SNS ID를 사용
+                    final_influencer_name = influencer_name.strip() if influencer_name else sns_id
+                    
+                    # 선택된 값들을 데이터베이스 값으로 변환
+                    selected_contact_method_db = contact_method_db_values[contact_method_options.index(contact_method)]
+                    selected_preferred_mode_db = preferred_mode_db_values[preferred_mode_options.index(preferred_mode)]
+                    
+                    # 업데이트할 데이터 준비
+                    update_data = {
+                        'platform': platform,
+                        'sns_id': sns_id,
+                        'influencer_name': final_influencer_name,
+                        'sns_url': sns_url,
+                        'content_category': content_category,
+                        'owner_comment': owner_comment,
+                        'followers_count': followers_count,
+                        'post_count': post_count,
+                        'price_krw': price_krw,
+                        'active': active,
+                        'manager_rating': manager_rating,
+                        'content_rating': content_rating,
+                        'phone_number': phone_number,
+                        'contact_method': selected_contact_method_db,
+                        'contacts_method_etc': contacts_method_etc,
+                        'preferred_mode': selected_preferred_mode_db,
+                        'shipping_address': shipping_address,
+                        'dm_reply': dm_reply,
+                        'tags': tags,
+                        'created_by': created_by.strip() if created_by and created_by.strip() else None
+                    }
+                    
+                    # 데이터베이스 업데이트
+                    result = db_manager.update_influencer(influencer['id'], update_data)
+                    if result["success"]:
+                        st.success("인플루언서 정보가 수정되었습니다!")
+                        # 세션 상태 초기화하여 폼 리셋
+                        st.session_state.registration_search_result = None
+                        st.rerun()
+                    else:
+                        st.error(f"수정 실패: {result['message']}")
+        
+        with col2:
+            if st.form_submit_button("🗑️ 삭제", type="secondary"):
+                # 삭제 확인 플래그 설정
+                st.session_state[f"confirm_delete_registration_{influencer['id']}"] = True
+                st.rerun()
+        
+        with col3:
+            if st.form_submit_button("❌ 취소"):
+                # 세션 상태 초기화
+                st.session_state.registration_search_result = None
+                st.rerun()
+    
+    # 삭제 확인 다이얼로그
+    if st.session_state.get(f"confirm_delete_registration_{influencer['id']}", False):
+        st.warning("⚠️ 정말로 이 인플루언서를 삭제하시겠습니까?")
+        st.error("**주의:** 삭제된 인플루언서는 복구할 수 없습니다!")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("✅ 삭제 확인", type="primary", key=f"confirm_delete_yes_{influencer['id']}"):
+                # 인플루언서 삭제 실행
+                result = db_manager.delete_influencer(influencer['id'])
+                if result["success"]:
+                    st.success("인플루언서가 삭제되었습니다!")
+                    # 세션 상태 초기화
+                    st.session_state.registration_search_result = None
+                    # 삭제 확인 플래그 제거
+                    if f"confirm_delete_registration_{influencer['id']}" in st.session_state:
+                        del st.session_state[f"confirm_delete_registration_{influencer['id']}"]
+                    st.rerun()
+                else:
+                    st.error(f"삭제 실패: {result['message']}")
+        
+        with col2:
+            if st.button("❌ 삭제 취소", key=f"confirm_delete_no_{influencer['id']}"):
+                # 삭제 확인 플래그 제거
+                if f"confirm_delete_registration_{influencer['id']}" in st.session_state:
+                    del st.session_state[f"confirm_delete_registration_{influencer['id']}"]
+                st.rerun()
+        
+        with col3:
+            st.empty()  # 빈 공간
 
 def render_influencer_search_for_registration():
     """인플루언서 검색 (중복체크) - 좌측 아래"""
@@ -104,6 +429,7 @@ def render_influencer_search_for_registration():
                     st.session_state.registration_search_result = search_result
                     active_status = "활성" if search_result.get('active', True) else "비활성"
                     st.warning(f"⚠️ 이미 등록된 인플루언서입니다: {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')}) [{active_status}]")
+                    st.info("💡 우측에서 인플루언서 정보를 수정할 수 있습니다.")
                 
                     # 검색된 인플루언서 정보 표시
                     with st.expander("📋 검색된 인플루언서 정보", expanded=True):
@@ -119,6 +445,7 @@ def render_influencer_search_for_registration():
                     # 검색 결과가 없으면 등록 가능
                     st.session_state.registration_search_result = None
                     st.success(f"✅ '{search_term}'은(는) 등록되지 않은 인플루언서입니다. 등록이 가능합니다.")
+                    st.info("💡 우측에서 새로운 인플루언서를 등록할 수 있습니다.")
                     
                     # 등록 가능한 인플루언서 정보 표시
                     with st.expander("📝 등록 가능한 인플루언서", expanded=True):
@@ -129,6 +456,7 @@ def render_influencer_search_for_registration():
                 # 검색 결과가 없으면 등록 가능
                 st.session_state.registration_search_result = None
                 st.success(f"✅ '{search_term}'은(는) 등록되지 않은 인플루언서입니다. 등록이 가능합니다.")
+                st.info("💡 우측에서 새로운 인플루언서를 등록할 수 있습니다.")
                 
                 # 등록 가능한 인플루언서 정보 표시
                 with st.expander("📝 등록 가능한 인플루언서", expanded=True):
@@ -137,10 +465,12 @@ def render_influencer_search_for_registration():
                     st.info("**상태:** 등록 가능 ✅")
 
 def render_influencer_registration_form():
-    """인플루언서 등록 폼 (우측)"""
+    """인플루언서 등록 폼 (우측) - 모든 필드 포함"""
     st.markdown("### 📝 인플루언서 등록")
     
     with st.form("create_influencer_form"):
+        # 기본 정보 섹션
+        st.markdown("#### 📝 기본 정보")
         col1, col2 = st.columns(2)
         
         with col1:
@@ -161,52 +491,7 @@ def render_influencer_registration_form():
             influencer_name = st.text_input("별칭", placeholder="인플루언서의 별칭")
             sns_url = st.text_input("SNS URL", placeholder="https://...")
         
-        # 팔로워 수 필드 추가
-        followers_count = st.number_input(
-            "팔로워 수", 
-            min_value=0, 
-            value=0,
-            step=1000,
-            format="%d",
-            help="인플루언서의 팔로워 수를 입력하세요"
-        )
-        
-        # 등록자 필드 추가
-        created_by = st.text_input(
-            "등록자", 
-            placeholder="등록자 이름 또는 ID를 입력하세요",
-            help="홍길동"
-        )
-        
-        # 연락방법 선택
-        contact_method_mapping = {
-            'dm': 'DM',
-            'email': '이메일', 
-            'phone': '전화',
-            'kakao': '카카오톡',
-            'form': '폼',
-            'other': '기타'
-        }
-        contact_method_options = list(contact_method_mapping.values())
-        contact_method_db_values = list(contact_method_mapping.keys())
-        
-        contact_method = st.selectbox(
-            "연락 방법",
-            contact_method_options,
-            key="create_contact_method"
-        )
-        
-        # 연락방법 추가정보 필드 (언제나 표시)
-        contacts_method_etc = st.text_input(
-            "연락방법 추가정보",
-            placeholder="연락방법에 대한 추가 상세 정보를 입력해주세요",
-            key="create_contacts_method_etc",
-            help="예: 특별한 연락 방법, 추가 연락처 정보 등"
-        )
-        
-        # Owner Comment와 Content Category 추가
-        owner_comment = st.text_area("Owner Comment", placeholder="인플루언서에 대한 담당자 코멘트")
-        
+        # 카테고리
         content_category = st.selectbox(
             "카테고리",
             ["일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"],
@@ -226,44 +511,234 @@ def render_influencer_registration_form():
             }[x]
         )
         
-        if st.form_submit_button("인플루언서 등록", type="primary"):
-            if not sns_id:
-                st.error("SNS ID를 입력해주세요.")
-            elif not sns_url:
-                st.error("SNS URL을 입력해주세요.")
-            else:
-                # 별칭이 비어있으면 SNS ID를 사용
-                final_influencer_name = influencer_name.strip() if influencer_name else sns_id
-                
-                # 선택된 연락방법을 데이터베이스 값으로 변환
-                selected_contact_method_db = contact_method_db_values[contact_method_options.index(contact_method)]
-                
-                influencer = Influencer(
-                    platform=platform,
-                    sns_id=sns_id,
-                    influencer_name=final_influencer_name,
-                    sns_url=sns_url,
-                    contact_method=selected_contact_method_db,
-                    contacts_method_etc=contacts_method_etc,
-                    owner_comment=owner_comment,
-                    content_category=content_category,
-                    followers_count=followers_count,
-                    created_by=created_by.strip() if created_by and created_by.strip() else None
-                )
-                
-                result = db_manager.create_influencer(influencer)
-                if result["success"]:
-                    st.success("인플루언서가 등록되었습니다!")
-                    # 캐시 초기화
-                    if "influencers_data" in st.session_state:
-                        del st.session_state["influencers_data"]
-                    # 검색 결과 초기화
-                    if "registration_search_result" in st.session_state:
-                        del st.session_state["registration_search_result"]
-                    st.session_state.registration_completed = True  # 등록 완료 플래그
-                    # 리렌더링 없이 상태 기반 UI 업데이트
+        # Owner Comment
+        owner_comment = st.text_area(
+            "Owner Comment", 
+            placeholder="인플루언서에 대한 추가 메모나 코멘트를 입력하세요",
+            help="인플루언서에 대한 추가 메모나 코멘트를 입력하세요"
+        )
+        
+        # 통계 정보 섹션
+        st.markdown("#### 📊 통계 정보")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            followers_count = st.number_input(
+                "팔로워 수", 
+                min_value=0, 
+                value=0,
+                step=1000,
+                format="%d",
+                key="create_followers_count",
+                help="인플루언서의 팔로워 수를 입력하세요"
+            )
+            post_count = st.number_input(
+                "게시물 수", 
+                min_value=0, 
+                value=0,
+                step=1,
+                format="%d",
+                key="create_post_count",
+                help="인플루언서의 게시물 수를 입력하세요"
+            )
+        
+        with col2:
+            price_krw = st.number_input(
+                "가격 (원)", 
+                min_value=0, 
+                value=0,
+                step=10000,
+                format="%d",
+                key="create_price_krw",
+                help="인플루언서의 협찬 가격을 입력하세요"
+            )
+            active = st.checkbox(
+                "활성 상태", 
+                value=True,
+                key="create_active",
+                help="인플루언서의 활성 상태를 설정하세요"
+            )
+        
+        # 등록자 정보
+        created_by = st.text_input(
+            "등록자", 
+            placeholder="등록자 이름 또는 ID를 입력하세요",
+            key="create_created_by",
+            help="이 인플루언서를 등록한 담당자 정보"
+        )
+        
+        # 평점 정보
+        st.markdown("#### ⭐ 평점 정보")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            manager_rating = st.slider(
+                "매니저 평점", 
+                min_value=1, 
+                max_value=5, 
+                value=3,
+                key="create_manager_rating",
+                help="매니저가 평가한 인플루언서 평점"
+            )
+        
+        with col2:
+            content_rating = st.slider(
+                "콘텐츠 평점", 
+                min_value=1, 
+                max_value=5, 
+                value=3,
+                key="create_content_rating",
+                help="콘텐츠 품질에 대한 평점"
+            )
+        
+        # 연락처 정보
+        st.markdown("#### 📞 연락처 정보")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            phone_number = st.text_input(
+                "전화번호", 
+                placeholder="010-1234-5678",
+                key="create_phone_number",
+                help="인플루언서의 전화번호"
+            )
+            
+            # 연락방법 선택
+            contact_method_mapping = {
+                'dm': 'DM',
+                'email': '이메일', 
+                'phone': '전화',
+                'kakao': '카카오톡',
+                'form': '폼',
+                'other': '기타'
+            }
+            contact_method_options = list(contact_method_mapping.values())
+            contact_method_db_values = list(contact_method_mapping.keys())
+            
+            contact_method = st.selectbox(
+                "연락방법",
+                contact_method_options,
+                key="create_contact_method",
+                format_func=lambda x: {
+                    "DM": "💬 DM",
+                    "이메일": "📧 이메일",
+                    "전화": "📞 전화",
+                    "카카오톡": "💛 카카오톡",
+                    "폼": "📋 폼",
+                    "기타": "🔧 기타"
+                }[x]
+            )
+        
+        with col2:
+            # 선호 모드
+            preferred_mode_mapping = {
+                'seeding': '협찬',
+                'promotion': '홍보',
+                'sales': '판매'
+            }
+            preferred_mode_options = list(preferred_mode_mapping.values())
+            preferred_mode_db_values = list(preferred_mode_mapping.keys())
+            
+            preferred_mode = st.selectbox(
+                "선호 모드",
+                preferred_mode_options,
+                key="create_preferred_mode",
+                format_func=lambda x: {
+                    "협찬": "🎁 협찬",
+                    "홍보": "📢 홍보",
+                    "판매": "💰 판매"
+                }[x]
+            )
+            
+            # 연락방법 기타 필드
+            contacts_method_etc = st.text_input(
+                "연락방법 기타", 
+                placeholder="연락방법이 '기타'인 경우 상세 내용을 입력하세요",
+                key="create_contacts_method_etc",
+                help="연락방법이 '기타'인 경우 상세 내용을 입력하세요"
+            )
+        
+        # 배송 주소
+        shipping_address = st.text_area(
+            "배송 주소", 
+            placeholder="인플루언서의 배송 주소를 입력하세요",
+            key="create_shipping_address",
+            help="제품 배송을 위한 주소 정보"
+        )
+        
+        # DM 응답 정보
+        st.markdown("#### 💬 DM 응답 정보")
+        dm_reply = st.text_area(
+            "DM 응답 내용", 
+            placeholder="인플루언서의 DM 응답 내용을 기록하세요",
+            key="create_dm_reply",
+            help="인플루언서의 DM 응답 내용을 기록하세요"
+        )
+        
+        # 태그 정보
+        tags = st.text_input(
+            "태그 (쉼표로 구분)", 
+            placeholder="예: 뷰티, 패션, 라이프스타일",
+            key="create_tags",
+            help="인플루언서를 분류할 수 있는 태그를 쉼표로 구분하여 입력하세요"
+        )
+        
+        # 버튼
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.form_submit_button("📝 인플루언서 등록", type="primary"):
+                if not sns_id:
+                    st.error("SNS ID를 입력해주세요.")
+                elif not sns_url:
+                    st.error("SNS URL을 입력해주세요.")
                 else:
-                    st.error(f"인플루언서 등록 실패: {result['message']}")
+                    # 별칭이 비어있으면 SNS ID를 사용
+                    final_influencer_name = influencer_name.strip() if influencer_name else sns_id
+                    
+                    # 선택된 값들을 데이터베이스 값으로 변환
+                    selected_contact_method_db = contact_method_db_values[contact_method_options.index(contact_method)]
+                    selected_preferred_mode_db = preferred_mode_db_values[preferred_mode_options.index(preferred_mode)]
+                    
+                    influencer = Influencer(
+                        platform=platform,
+                        sns_id=sns_id,
+                        influencer_name=final_influencer_name,
+                        sns_url=sns_url,
+                        contact_method=selected_contact_method_db,
+                        contacts_method_etc=contacts_method_etc,
+                        owner_comment=owner_comment,
+                        content_category=content_category,
+                        followers_count=followers_count,
+                        post_count=post_count,
+                        price_krw=price_krw,
+                        active=active,
+                        manager_rating=manager_rating,
+                        content_rating=content_rating,
+                        phone_number=phone_number,
+                        preferred_mode=selected_preferred_mode_db,
+                        shipping_address=shipping_address,
+                        dm_reply=dm_reply,
+                        tags=tags,
+                        created_by=created_by.strip() if created_by and created_by.strip() else None
+                    )
+                    
+                    result = db_manager.create_influencer(influencer)
+                    if result["success"]:
+                        st.success("인플루언서가 성공적으로 등록되었습니다!")
+                        # 캐시 초기화
+                        if "influencers_data" in st.session_state:
+                            del st.session_state["influencers_data"]
+                        # 검색 결과 초기화
+                        if "registration_search_result" in st.session_state:
+                            del st.session_state["registration_search_result"]
+                        st.session_state.registration_completed = True  # 등록 완료 플래그
+                        # 리렌더링 없이 상태 기반 UI 업데이트
+                    else:
+                        st.error(f"인플루언서 등록 실패: {result['message']}")
+        
+        with col2:
+            if st.form_submit_button("🔄 초기화"):
+                st.rerun()
 
 def render_influencer_inquiry():
     """인플루언서 정보 관리 탭"""
@@ -382,6 +857,7 @@ def render_influencer_search_for_inquiry():
                         # 검색어와 정확히 일치하는 인플루언서 찾기
                         exact_matches = []
                         partial_matches = []
+                        # 검색어에서 @ 제거하고 앞뒤 공백 제거
                         clean_search_term = search_term.replace('@', '').strip().lower()
                         
                         for inf in all_influencers:
@@ -389,18 +865,18 @@ def render_influencer_search_for_inquiry():
                             name = (inf.get('influencer_name', '') or '').lower()
                             clean_sns_id = sns_id.replace('@', '').strip()
                             
-                            # 정확한 매칭
-                            if (search_term.lower() == sns_id or 
-                                search_term.lower() == name or
+                            # 정확한 매칭 (공백 제거된 검색어 사용)
+                            if (clean_search_term == sns_id.strip() or 
+                                clean_search_term == name.strip() or
                                 clean_search_term == clean_sns_id or
-                                clean_search_term == name):
+                                clean_search_term == name.strip()):
                                 exact_matches.append(inf)
                             
-                            # 부분 매칭
+                            # 부분 매칭 (공백 제거된 검색어 사용)
                             elif (clean_search_term in clean_sns_id or 
-                                  clean_search_term in name or
-                                  search_term.lower() in sns_id or
-                                  search_term.lower() in name):
+                                  clean_search_term in name.strip() or
+                                  clean_search_term in sns_id.strip() or
+                                  clean_search_term in name.strip()):
                                 partial_matches.append(inf)
                         
                         # 정확한 매칭 결과
@@ -873,8 +1349,15 @@ def render_manager_influencer_management():
         
         managers = sorted(list(managers))
         
+        # 담당자가 없어도 UI는 계속 표시하되, 메시지만 표시
         if not managers:
-            st.warning("등록된 담당자가 없습니다.")
+            # 필터링 조건 섹션은 표시하되 비활성화
+            st.markdown("### 🎯 필터링")
+            st.info("📝 등록된 담당자가 없습니다. 인플루언서를 등록할 때 '등록자' 필드를 입력해주세요.")
+            
+            # 빈 테이블 형태로 메시지 표시
+            st.markdown("### 📊 인플루언서 목록")
+            st.info("📝 등록된 담당자가 없어서 표시할 인플루언서가 없습니다.")
             return
         
         # 필터링 조건

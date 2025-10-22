@@ -13,20 +13,51 @@ st.set_page_config(
 # ── Streamlit 설정 (Windows 파일 감시 오류 해결) ──────────────────
 import os
 os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
+os.environ["STREAMLIT_SERVER_RUN_ON_SAVE"] = "false"
+os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
+os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
+os.environ["STREAMLIT_LOGGER_LEVEL"] = "error"
+os.environ["STREAMLIT_CLIENT_SHOW_ERROR_DETAILS"] = "false"
+os.environ["STREAMLIT_SERVER_ENABLE_CORS"] = "false"
+os.environ["STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION"] = "false"
+os.environ["STREAMLIT_SERVER_PORT"] = "8501"
+os.environ["STREAMLIT_SERVER_ADDRESS"] = "localhost"
+
+# Watchdog 모듈 완전 비활성화
+try:
+    import watchdog
+    watchdog.observers.api.Observer = None
+    watchdog.events.FileSystemEventHandler = None
+except ImportError:
+    pass
 
 # ── 에러 처리 및 안정성 개선 ─────────────────────────────────────
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="streamlit")
 warnings.filterwarnings("ignore", category=FutureWarning, module="streamlit")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="streamlit")
+warnings.filterwarnings("ignore", category=UserWarning, module="watchdog")
+warnings.filterwarnings("ignore", category=FutureWarning, module="watchdog")
 
 # Streamlit 로그 레벨 설정 (터미널 출력 최소화)
 import logging
 logging.getLogger("streamlit").setLevel(logging.ERROR)
+logging.getLogger("watchdog").setLevel(logging.CRITICAL)
+logging.getLogger("watchdog.observers").setLevel(logging.CRITICAL)
+logging.getLogger("watchdog.observers.api").setLevel(logging.CRITICAL)
+logging.getLogger("streamlit.watcher").setLevel(logging.CRITICAL)
+logging.getLogger("streamlit.watcher.event_based_path_watcher").setLevel(logging.CRITICAL)
 
 # Streamlit Cloud 호환성을 위한 경고 필터 추가
 warnings.filterwarnings("ignore", message=".*use_container_width.*")
 warnings.filterwarnings("ignore", message=".*Please replace.*use_container_width.*")
+
+# Watchdog 관련 경고 필터 추가
+warnings.filterwarnings("ignore", message=".*Paths don't have the same drive.*")
+warnings.filterwarnings("ignore", message=".*ValueError.*commonpath.*")
+warnings.filterwarnings("ignore", message=".*watchdog.*")
+warnings.filterwarnings("ignore", message=".*event_based_path_watcher.*")
+warnings.filterwarnings("ignore", message=".*handle_path_change_event.*")
 
 # ── Path ─────────────────────────────────────────────────────
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
