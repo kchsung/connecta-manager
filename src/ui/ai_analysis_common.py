@@ -16,15 +16,18 @@ from ..db.database import db_manager
 from ..supabase.simple_client import simple_client
 
 def get_completed_crawling_data(client, limit=1000, offset=0):
-    """크롤링 완료된 데이터 조회 (페이징) - 재시도 포함"""
+    """크롤링 완료되고 AI 분석이 필요한 데이터 조회 (페이징) - 재시도 포함"""
     max_retries = 3
     retry_delay = 1
     for attempt in range(max_retries):
         try:
             if not client:
                 return []
+            # status가 COMPLETE이고 ai_analysis_status가 false인 데이터만 조회
             response = client.table("tb_instagram_crawling").select("*")\
-                .eq("status", "COMPLETE").range(offset, offset + limit - 1).execute()
+                .eq("status", "COMPLETE")\
+                .eq("ai_analysis_status", False)\
+                .range(offset, offset + limit - 1).execute()
             return response.data if response.data else []
         except Exception as e:
             error_msg = str(e)
@@ -41,15 +44,17 @@ def get_completed_crawling_data(client, limit=1000, offset=0):
     return []
 
 def get_completed_crawling_data_count(client):
-    """크롤링 완료된 데이터 총 개수"""
+    """크롤링 완료되고 AI 분석이 필요한 데이터 총 개수"""
     max_retries = 3
     retry_delay = 1
     for attempt in range(max_retries):
         try:
             if not client:
                 return 0
+            # status가 COMPLETE이고 ai_analysis_status가 false인 데이터 개수만 조회
             response = client.table("tb_instagram_crawling").select("id", count="exact")\
-                .eq("status", "COMPLETE").execute()
+                .eq("status", "COMPLETE")\
+                .eq("ai_analysis_status", False).execute()
             return response.count if response.count else 0
         except Exception as e:
             error_msg = str(e)
@@ -66,7 +71,7 @@ def get_completed_crawling_data_count(client):
     return 0
 
 def is_recently_analyzed_by_id(client, crawling_id):
-    """크롤링 ID 최근 분석 여부(30일)"""
+    """크롤링 ID 최근 분석 여부(30일) - AI 분석 상태 테이블 사용"""
     max_retries = 3
     retry_delay = 1
     for attempt in range(max_retries):
@@ -74,8 +79,10 @@ def is_recently_analyzed_by_id(client, crawling_id):
             if not client:
                 return False
             one_month_ago = datetime.now() - timedelta(days=30)
-            response = client.table("ai_influencer_analyses").select("analyzed_at")\
-                .eq("influencer_id", crawling_id).eq("platform", "instagram")\
+            # ai_analysis_status 테이블에서 확인
+            response = client.table("ai_analysis_status").select("is_analyzed", "analyzed_at")\
+                .eq("id", crawling_id)\
+                .eq("is_analyzed", True)\
                 .gte("analyzed_at", one_month_ago.isoformat()).execute()
             return bool(response.data)
         except Exception as e:
@@ -113,6 +120,26 @@ def save_ai_analysis_result(client, crawling_data, analysis_result, crawling_id)
                     .eq("id", existing_response.data[0]["id"]).execute()
             else:
                 client.table("ai_influencer_analyses").insert(analysis_result).execute()
+            
+            # AI 분석 상태 업데이트 (트리거가 있지만 명시적으로도 업데이트)
+            try:
+                analyzed_at = analysis_result.get("analyzed_at", datetime.now().isoformat())
+                client.table("ai_analysis_status").upsert({
+                    "id": crawling_id,
+                    "is_analyzed": True,
+                    "analyzed_at": analyzed_at,
+                    "updated_at": datetime.now().isoformat()
+                }).execute()
+                
+                # tb_instagram_crawling 테이블의 AI 분석 상태도 업데이트
+                client.table("tb_instagram_crawling").update({
+                    "ai_analysis_status": True,
+                    "ai_analyzed_at": analyzed_at,
+                    "updated_at": datetime.now().isoformat()
+                }).eq("id", crawling_id).execute()
+            except Exception as status_error:
+                st.warning(f"AI 분석 상태 업데이트 중 오류 (분석 결과는 저장됨): {str(status_error)}")
+            
             return
 
         except Exception as e:
@@ -144,7 +171,7 @@ def perform_ai_analysis(data):
             api_key = None
     
     if not api_key or api_key == "your-openai-api-key-here":
-        st.error("OpenAI API 키가 설정되지 않았습니다. Streamlit Cloud Secrets에서 OPENAI_API_KEY를 설정해주세요.")
+        st.error("키가 설정되지 않았습니다.")
         return None
 
     client = OpenAI(api_key=api_key)
