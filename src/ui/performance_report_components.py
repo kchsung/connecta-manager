@@ -44,41 +44,45 @@ def render_performance_report_tab():
     st.subheader("📋 성과 리포트")
     st.markdown("캠페인별 성과를 종합적으로 분석하고 상세한 리포트를 생성합니다.")
 
-    # 리포트 타입 선택
-    report_type = st.selectbox(
-        "리포트 타입 선택",
-        ["📊 종합 대시보드", "📈 성과 지표 분석", "👥 인플루언서별 분석", "📅 날짜별 트렌드", "💰 ROI 분석"],
-        key="report_type"
-    )
+    # 리포트 타입 선택과 캠페인 선택을 한 줄로 배치
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        report_type = st.selectbox(
+            "리포트 타입 선택",
+            ["📊 종합 대시보드", "📈 성과 지표 분석", "👥 인플루언서별 분석", "📅 날짜별 트렌드", "💰 ROI 분석"],
+            key="report_type"
+        )
+    
+    with col2:
+        # 캠페인 선택
+        try:
+            campaigns = db_manager.get_campaigns()
+            if not campaigns:
+                st.info("분석할 캠페인이 없습니다.")
+                return
+        except Exception as e:
+            st.error(f"❌ 캠페인 데이터 조회 중 오류가 발생했습니다: {str(e)}")
+            return
+
+        selected_campaigns = st.multiselect(
+            "분석할 캠페인 선택",
+            [f"{c['campaign_name']} ({format_campaign_type(c['campaign_type'])})" for c in campaigns],
+            key="report_campaigns",
+            help="여러 캠페인을 선택하여 비교 분석할 수 있습니다",
+        )
 
     # 날짜 범위 선택
     st.markdown("#### 📅 분석 기간 선택")
-    col1, col2 = st.columns(2)
-    with col1:
+    col_date1, col_date2 = st.columns(2)
+    with col_date1:
         date_range_option = st.selectbox("날짜 범위", list(get_date_range_options().keys()), key="report_date_range")
-    with col2:
+    with col_date2:
         if date_range_option != "전체":
             start_date, end_date = calculate_date_range(get_date_range_options()[date_range_option])
             st.info(f"분석 기간: {start_date} ~ {end_date}")
         else:
             st.info("전체 기간 분석")
-
-    # 캠페인 선택
-    try:
-        campaigns = db_manager.get_campaigns()
-        if not campaigns:
-            st.info("분석할 캠페인이 없습니다.")
-            return
-    except Exception as e:
-        st.error(f"❌ 캠페인 데이터 조회 중 오류가 발생했습니다: {str(e)}")
-        return
-
-    selected_campaigns = st.multiselect(
-        "분석할 캠페인 선택",
-        [f"{c['campaign_name']} ({format_campaign_type(c['campaign_type'])})" for c in campaigns],
-        key="report_campaigns",
-        help="여러 캠페인을 선택하여 비교 분석할 수 있습니다",
-    )
 
     if not selected_campaigns:
         st.info("분석할 캠페인을 선택해주세요.")
