@@ -319,28 +319,38 @@ def render_performance_view_tab():
         st.markdown("#### 📊 성과 데이터 (편집 가능)")
         st.caption("조회수, 좋아요, 댓글 수, 콘텐츠 URL, 컨텐츠내용, 업로드일, 릴스여부를 직접 편집할 수 있습니다. 변경 후 저장 버튼을 클릭하세요.")
         
-        # 편집 가능한 데이터 테이블
+        # 편집 가능한 데이터 테이블 (화면 갱신 방지)
         edited_df = st.data_editor(
             df,
             column_config=column_config,
             use_container_width=True,
             hide_index=True,
-            key="performance_data_editor"
+            key="performance_data_editor",
+            on_change=None  # 변경 시 자동 갱신 방지
         )
         
-        # 저장 버튼
-        col1, col2, col3 = st.columns([1, 1, 3])
+        # 변경사항 감지 및 저장 버튼
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
         with col1:
             if st.button("💾 변경사항 저장", type="primary", key="save_performance_changes"):
-                save_performance_changes(df, edited_df, participation_mapping)
+                # 변경사항이 있는지 확인
+                has_changes = check_performance_changes(df, edited_df)
+                if has_changes:
+                    save_performance_changes(df, edited_df, participation_mapping)
+                else:
+                    st.info("💡 변경된 데이터가 없습니다.")
         with col2:
             if st.button("🔄 새로고침", key="refresh_performance_data"):
                 st.session_state.pop("campaigns_cache", None)
                 st.session_state.pop("participations_cache", None)
-                st.session_state.performance_data_refresh_requested = True  # 성과 데이터 새로고침 요청 플래그
-                # 리렌더링 없이 상태 기반 UI 업데이트
+                st.session_state.performance_data_refresh_requested = True
+                st.success("✅ 데이터가 새로고침되었습니다!")
+                st.rerun()
         with col3:
-            st.caption("변경사항을 저장하거나 데이터를 새로고침할 수 있습니다.")
+            if st.button("📋 변경사항 미리보기", key="preview_changes"):
+                preview_performance_changes(df, edited_df)
+        with col4:
+            st.caption("여러 항목을 수정한 후 한 번에 저장할 수 있습니다.")
             
     else:
         st.info("표시할 성과 데이터가 없습니다.")
@@ -474,6 +484,62 @@ def safe_rels_conversion(value):
     except (ValueError, TypeError):
         return 0
 
+def check_performance_changes(original_df, edited_df):
+    """변경사항이 있는지 확인"""
+    try:
+        # 편집 가능한 필드들만 확인
+        editable_columns = ['조회수', '좋아요', '댓글', '콘텐츠 URL', '컨텐츠내용', '업로드일', '릴스여부']
+        
+        for col in editable_columns:
+            if col in original_df.columns and col in edited_df.columns:
+                if not original_df[col].equals(edited_df[col]):
+                    return True
+        return False
+    except Exception:
+        return False
+
+
+def preview_performance_changes(original_df, edited_df):
+    """변경사항 미리보기"""
+    try:
+        # 편집 가능한 필드들만 확인
+        editable_columns = ['조회수', '좋아요', '댓글', '콘텐츠 URL', '컨텐츠내용', '업로드일', '릴스여부']
+        changes = []
+        
+        for idx, row in edited_df.iterrows():
+            original_row = original_df.iloc[idx]
+            row_changes = []
+            
+            for col in editable_columns:
+                if col in original_df.columns and col in edited_df.columns:
+                    if not pd.isna(original_row[col]) and not pd.isna(row[col]):
+                        if original_row[col] != row[col]:
+                            row_changes.append(f"{col}: {original_row[col]} → {row[col]}")
+                    elif pd.isna(original_row[col]) and not pd.isna(row[col]):
+                        row_changes.append(f"{col}: (빈값) → {row[col]}")
+                    elif not pd.isna(original_row[col]) and pd.isna(row[col]):
+                        row_changes.append(f"{col}: {original_row[col]} → (빈값)")
+            
+            if row_changes:
+                changes.append({
+                    "인덱스": idx,
+                    "캠페인": row.get("캠페인", "N/A"),
+                    "인플루언서": row.get("인플루언서", "N/A"),
+                    "변경사항": " | ".join(row_changes)
+                })
+        
+        if changes:
+            st.markdown("#### 📋 변경사항 미리보기")
+            changes_df = pd.DataFrame(changes)
+            st.dataframe(changes_df, use_container_width=True, hide_index=True)
+            st.success(f"✅ {len(changes)}개 항목에 변경사항이 있습니다.")
+        else:
+            st.info("💡 변경된 데이터가 없습니다.")
+            
+    except Exception as e:
+        st.error(f"변경사항 미리보기 중 오류가 발생했습니다: {str(e)}")
+
+
 def save_performance_changes(original_df, edited_df, participation_mapping):
     """성과 데이터 변경사항을 데이터베이스에 저장"""
     try:
@@ -481,19 +547,45 @@ def save_performance_changes(original_df, edited_df, participation_mapping):
         changes_made = False
         success_count = 0
         error_count = 0
+        changed_items = []
         
         for idx, row in edited_df.iterrows():
             original_row = original_df.iloc[idx]
             
             # 편집 가능한 필드들이 변경되었는지 확인
-            if (row['조회수'] != original_row['조회수'] or 
-                row['좋아요'] != original_row['좋아요'] or 
-                row['댓글'] != original_row['댓글'] or
-                row['콘텐츠 URL'] != original_row['콘텐츠 URL'] or
-                row['컨텐츠내용'] != original_row['컨텐츠내용'] or
-                row['업로드일'] != original_row['업로드일'] or
-                row['릴스여부'] != original_row['릴스여부']):
-                
+            has_changes = False
+            changed_fields = []
+            
+            # 각 필드별로 변경사항 확인
+            if row['조회수'] != original_row['조회수']:
+                has_changes = True
+                changed_fields.append(f"조회수: {original_row['조회수']} → {row['조회수']}")
+            
+            if row['좋아요'] != original_row['좋아요']:
+                has_changes = True
+                changed_fields.append(f"좋아요: {original_row['좋아요']} → {row['좋아요']}")
+            
+            if row['댓글'] != original_row['댓글']:
+                has_changes = True
+                changed_fields.append(f"댓글: {original_row['댓글']} → {row['댓글']}")
+            
+            if row['콘텐츠 URL'] != original_row['콘텐츠 URL']:
+                has_changes = True
+                changed_fields.append(f"콘텐츠 URL: {original_row['콘텐츠 URL']} → {row['콘텐츠 URL']}")
+            
+            if row['컨텐츠내용'] != original_row['컨텐츠내용']:
+                has_changes = True
+                changed_fields.append(f"컨텐츠내용: {original_row['컨텐츠내용']} → {row['컨텐츠내용']}")
+            
+            if row['업로드일'] != original_row['업로드일']:
+                has_changes = True
+                changed_fields.append(f"업로드일: {original_row['업로드일']} → {row['업로드일']}")
+            
+            if row['릴스여부'] != original_row['릴스여부']:
+                has_changes = True
+                changed_fields.append(f"릴스여부: {original_row['릴스여부']} → {row['릴스여부']}")
+            
+            if has_changes:
                 changes_made = True
                 participation_id = participation_mapping.get(idx)
                 
@@ -501,6 +593,13 @@ def save_performance_changes(original_df, edited_df, participation_mapping):
                     st.error(f"인덱스 {idx}에 대한 참여 ID를 찾을 수 없습니다.")
                     error_count += 1
                     continue
+                
+                changed_items.append({
+                    "인덱스": idx,
+                    "캠페인": row.get("캠페인", "N/A"),
+                    "인플루언서": row.get("인플루언서", "N/A"),
+                    "변경사항": " | ".join(changed_fields)
+                })
                 
                 try:
                     # 해당 참여의 모든 콘텐츠 조회
@@ -555,19 +654,27 @@ def save_performance_changes(original_df, edited_df, participation_mapping):
                     st.error(f"인덱스 {idx} 데이터 저장 중 오류: {str(e)}")
                     error_count += 1
         
-        if changes_made:
-            if success_count > 0:
-                st.success(f"✅ {success_count}개의 성과 데이터가 성공적으로 저장되었습니다!")
-            if error_count > 0:
-                st.error(f"❌ {error_count}개의 데이터 저장에 실패했습니다.")
+        # 결과 표시
+        if success_count > 0:
+            st.success(f"✅ {success_count}개의 성과 데이터가 성공적으로 저장되었습니다!")
             
+            # 변경된 항목 목록 표시
+            if changed_items:
+                with st.expander("📋 변경된 성과 데이터", expanded=True):
+                    changes_df = pd.DataFrame(changed_items)
+                    st.dataframe(changes_df, use_container_width=True, hide_index=True)
+        
+        if error_count > 0:
+            st.error(f"❌ {error_count}개의 데이터 저장에 실패했습니다.")
+        
+        if success_count == 0 and error_count == 0:
+            st.info("💡 변경된 데이터가 없습니다. 테이블에서 데이터를 편집한 후 다시 시도해주세요.")
+        
+        if success_count > 0:
             # 캐시 클리어하여 최신 데이터 반영
             st.session_state.pop("campaigns_cache", None)
             st.session_state.pop("participations_cache", None)
-            st.session_state.performance_save_completed = True  # 성과 저장 완료 플래그
-            # 리렌더링 없이 상태 기반 UI 업데이트
-        else:
-            st.info("변경된 데이터가 없습니다.")
+            st.rerun()
             
     except Exception as e:
         st.error(f"❌ 성과 데이터 저장 중 오류가 발생했습니다: {str(e)}")

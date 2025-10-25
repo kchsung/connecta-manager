@@ -17,12 +17,12 @@ from .common_functions import (
 def render_influencer_management():
     """인플루언서 관리 메인 컴포넌트"""
     st.subheader("👥 인플루언서 관리")
-    st.markdown("인플루언서 등록, 수정, 조회 기능을 제공합니다.")
+    st.markdown("인플루언서 등록, 조회 기능을 제공합니다.")
     
     # 탭 간 이동 처리 (담당자별 관리에서는 수정 기능이 없으므로 제거)
     
-    # 등록, 수정, 조회 탭으로 분리 (통계는 별도 메뉴로 분리)
-    tab_names = ["📝 인플루언서 등록", "📋 인플루언서 정보 수정", "👥 인플루언서 조회"]
+    # 등록, 조회 탭으로 분리 (정보 수정 탭 숨김)
+    tab_names = ["📝 인플루언서 등록", "👥 인플루언서 조회"]
     
     # 기본 탭 인덱스 설정
     default_tab = st.session_state.get("influencer_active_tab", 0)
@@ -34,9 +34,6 @@ def render_influencer_management():
         render_influencer_registration()
     
     with tabs[1]:
-        render_influencer_inquiry()
-    
-    with tabs[2]:
         render_manager_influencer_management()
 
 def render_influencer_registration():
@@ -1865,73 +1862,24 @@ def render_filtered_influencer_list(influencers, selected_manager):
         key="influencer_editor"
     )
     
-    # 편집된 데이터가 있는지 확인하고 저장
+    # 저장 버튼 (변경사항 감지 없이 항상 표시)
     st.markdown("---")
     st.markdown("### 💾 변경사항 저장")
     
-    # 변경사항 감지 (더 정확한 방법)
-    changes_made = False
-    try:
-        # DataFrame 비교를 위한 정확한 방법
-        if not edited_df.equals(df):
-            # 각 행과 열을 비교하여 실제 변경사항 확인
-            for idx in range(len(df)):
-                for col in df.columns:
-                    if col not in ["ID", "등록일", "캠페인 참여"]:  # 비교에서 제외할 컬럼
-                        original_val = str(df.iloc[idx][col])
-                        edited_val = str(edited_df.iloc[idx][col])
-                        if original_val != edited_val:
-                            changes_made = True
-                            break
-                if changes_made:
-                    break
-    except Exception as e:
-        # 비교 실패 시 기본적으로 변경사항이 있다고 가정
-        changes_made = True
-        st.warning(f"변경사항 감지 중 오류: {e}")
+    col1, col2 = st.columns([1, 1])
     
-    if changes_made:
-        # 변경된 항목 수 표시
-        changed_items = 0
-        for idx in range(len(df)):
-            for col in df.columns:
-                if col not in ["ID", "등록일", "캠페인 참여"]:
-                    original_val = str(df.iloc[idx][col])
-                    edited_val = str(edited_df.iloc[idx][col])
-                    if original_val != edited_val:
-                        changed_items += 1
-        
-        st.success(f"📝 테이블에서 {changed_items}개의 변경사항이 감지되었습니다!")
-        
-        # 변경사항 미리보기
-        with st.expander("🔍 변경사항 미리보기", expanded=False):
-            for idx in range(len(df)):
-                row_changes = []
-                for col in df.columns:
-                    if col not in ["ID", "등록일", "캠페인 참여"]:
-                        original_val = str(df.iloc[idx][col])
-                        edited_val = str(edited_df.iloc[idx][col])
-                        if original_val != edited_val:
-                            row_changes.append(f"**{col}**: '{original_val}' → '{edited_val}'")
-                
-                if row_changes:
-                    influencer_name = edited_df.iloc[idx]["이름"]
-                    st.write(f"**{influencer_name}**:")
-                    for change in row_changes:
-                        st.write(f"  - {change}")
-        
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            if st.button("💾 변경사항 저장", type="primary", key="save_changes"):
-                save_edited_influencers(df, edited_df)
-        
-        with col2:
-            if st.button("🔄 변경사항 취소", key="cancel_changes"):
-                st.session_state.changes_cancelled = True  # 변경사항 취소 플래그
-                # 리렌더링 없이 상태 기반 UI 업데이트
-    else:
-        st.info("변경된 내용이 없습니다. 테이블에서 데이터를 편집하면 저장 버튼이 나타납니다.")
+    with col1:
+        if st.button("💾 변경사항 저장", type="primary", key="save_changes"):
+            save_edited_influencers(df, edited_df)
+    
+    with col2:
+        if st.button("🔄 새로고침", key="refresh_data"):
+            # 캐시 초기화하여 데이터 새로고침
+            if 'influencers_cache' in st.session_state:
+                del st.session_state['influencers_cache']
+            st.rerun()
+    
+    st.info("💡 테이블에서 데이터를 편집한 후 '변경사항 저장' 버튼을 클릭하여 저장하세요.")
     
     # 상세 편집 안내 메시지
     st.markdown("---")
@@ -1942,13 +1890,13 @@ def render_filtered_influencer_list(influencers, selected_manager):
     st.caption(f"총 {len(influencers)}명의 인플루언서가 표시됩니다. (편집 가능)")
 
 def save_edited_influencers(original_df, edited_df):
-    """편집된 인플루언서 데이터를 저장"""
+    """편집된 인플루언서 데이터를 저장 (변경된 행만)"""
     try:
-        # 변경된 행들을 찾아서 업데이트
         updated_count = 0
         error_count = 0
+        changed_influencers = []
         
-        # DataFrame을 인덱스 기반으로 비교
+        # 변경된 행만 찾아서 업데이트
         for idx in range(len(original_df)):
             original_row = original_df.iloc[idx]
             edited_row = edited_df.iloc[idx]
@@ -1964,6 +1912,8 @@ def save_edited_influencers(original_df, edited_df):
             
             if has_changes:
                 influencer_id = edited_row["ID"]
+                influencer_name = edited_row["이름"]
+                changed_influencers.append(influencer_name)
                 
                 # 업데이트할 데이터 준비 (NumPy 타입을 Python 기본 타입으로 변환)
                 update_data = {
@@ -1988,35 +1938,22 @@ def save_edited_influencers(original_df, edited_df):
                     updated_count += 1
                 else:
                     error_count += 1
-                    st.error(f"❌ ID {influencer_id} 업데이트 실패: {result['message']}")
+                    st.error(f"❌ {influencer_name} (ID: {influencer_id}) 업데이트 실패: {result['message']}")
         
         # 결과 표시
         if updated_count > 0:
             st.success(f"✅ {updated_count}명의 인플루언서 정보가 성공적으로 업데이트되었습니다!")
             
-            # 업데이트된 인플루언서 목록 표시
-            with st.expander("📋 업데이트된 인플루언서 목록", expanded=False):
-                updated_influencers = []
-                for idx in range(len(original_df)):
-                    original_row = original_df.iloc[idx]
-                    edited_row = edited_df.iloc[idx]
-                    
-                    # 변경사항이 있는지 확인
-                    has_changes = False
-                    for col in original_df.columns:
-                        if col not in ["ID", "등록일", "캠페인 참여"]:
-                            if str(original_row[col]) != str(edited_row[col]):
-                                has_changes = True
-                                break
-                    
-                    if has_changes:
-                        updated_influencers.append(edited_row["이름"])
-                
-                for name in updated_influencers:
+            # 변경된 인플루언서 목록 표시
+            with st.expander("📋 변경된 인플루언서 목록", expanded=False):
+                for name in changed_influencers:
                     st.write(f"• {name}")
         
         if error_count > 0:
             st.error(f"❌ {error_count}명의 인플루언서 업데이트에 실패했습니다.")
+        
+        if updated_count == 0 and error_count == 0:
+            st.info("💡 변경된 데이터가 없습니다. 테이블에서 데이터를 편집한 후 다시 시도해주세요.")
         
         if updated_count > 0:
             # 캐시 초기화
@@ -2030,7 +1967,7 @@ def save_edited_influencers(original_df, edited_df):
                 del st.session_state["all_participation_influencer_ids"]
             
             # 페이지 새로고침
-            st.session_state.bulk_update_completed = True  # 대량 업데이트 완료 플래그
+            st.rerun()
             
     except Exception as e:
         st.error(f"데이터 저장 중 오류가 발생했습니다: {e}")

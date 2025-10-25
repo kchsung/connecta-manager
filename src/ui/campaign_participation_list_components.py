@@ -133,38 +133,22 @@ def render_participation_list_table(participations):
             key="participation_editor"
         )
         
-        # 편집된 데이터가 있는지 확인하고 저장
-        if not edited_df.equals(df):
-            st.markdown("---")
-            st.markdown("### 💾 변경사항 저장")
-            st.info("📝 테이블에서 변경사항이 감지되었습니다. 저장 버튼을 클릭하여 데이터베이스를 업데이트하세요.")
-            
-            col1, col2 = st.columns([1, 1])
-            
-            with col1:
-                if st.button("💾 변경사항 저장", type="primary", key="save_participation_changes"):
-                    save_edited_participations(df, edited_df)
-            
-            with col2:
-                if st.button("🔄 변경사항 취소", key="cancel_participation_changes"):
-                    st.session_state.participation_changes_cancelled = True  # 참여 변경사항 취소 플래그
-                    # 리렌더링 없이 상태 기반 UI 업데이트
-        else:
-            # 항상 저장 버튼을 표시 (편의를 위해)
-            st.markdown("---")
-            st.markdown("### 💾 데이터 관리")
-            st.info("💡 테이블에서 정보를 편집한 후 저장 버튼을 클릭하세요.")
-            
-            col1, col2 = st.columns([1, 1])
-            
-            with col1:
-                if st.button("💾 현재 데이터 저장", type="primary", key="save_current_participation_data"):
-                    save_edited_participations(df, edited_df)
-            
-            with col2:
-                if st.button("🔄 새로고침", key="refresh_participation_data"):
-                    st.session_state.participation_data_refresh_requested = True  # 참여 데이터 새로고침 요청 플래그
-                    # 리렌더링 없이 상태 기반 UI 업데이트
+        # 저장 버튼 (변경사항 감지 없이 항상 표시)
+        st.markdown("---")
+        st.markdown("### 💾 변경사항 저장")
+        
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            if st.button("💾 변경사항 저장", type="primary", key="save_participation_changes"):
+                save_edited_participations(df, edited_df)
+        
+        with col2:
+            if st.button("🔄 새로고침", key="refresh_participation_data"):
+                st.session_state.participation_data_refresh_requested = True  # 참여 데이터 새로고침 요청 플래그
+                st.rerun()
+        
+        st.info("💡 테이블에서 데이터를 편집한 후 '변경사항 저장' 버튼을 클릭하여 저장하세요.")
         
         # 총 개수 표시 및 편집 안내
         st.caption(f"총 {len(participations)}명의 참여 인플루언서가 표시됩니다.")
