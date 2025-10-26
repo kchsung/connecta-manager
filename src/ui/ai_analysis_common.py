@@ -23,11 +23,21 @@ def get_completed_crawling_data(client, limit=1000, offset=0):
         try:
             if not client:
                 return []
-            # status가 COMPLETE이고 ai_analysis_status가 false인 데이터만 조회
-            response = client.table("tb_instagram_crawling").select("*")\
-                .eq("status", "COMPLETE")\
-                .eq("ai_analysis_status", False)\
+            
+            # ai_analysis_status 테이블에서 is_analyzed = FALSE인 ID들을 먼저 조회
+            analysis_status_response = client.table("ai_analysis_status").select("id")\
+                .eq("is_analyzed", False)\
                 .range(offset, offset + limit - 1).execute()
+            
+            if not analysis_status_response.data:
+                return []
+            
+            # 조회된 ID들로 tb_instagram_crawling 테이블에서 COMPLETE 상태인 데이터 조회
+            crawling_ids = [item["id"] for item in analysis_status_response.data]
+            response = client.table("tb_instagram_crawling").select("*")\
+                .in_("id", crawling_ids)\
+                .eq("status", "COMPLETE").execute()
+            
             return response.data if response.data else []
         except Exception as e:
             error_msg = str(e)
@@ -51,10 +61,20 @@ def get_completed_crawling_data_count(client):
         try:
             if not client:
                 return 0
-            # status가 COMPLETE이고 ai_analysis_status가 false인 데이터 개수만 조회
+            
+            # ai_analysis_status 테이블에서 is_analyzed = FALSE인 ID들을 먼저 조회
+            analysis_status_response = client.table("ai_analysis_status").select("id")\
+                .eq("is_analyzed", False).execute()
+            
+            if not analysis_status_response.data:
+                return 0
+            
+            # 조회된 ID들로 tb_instagram_crawling 테이블에서 COMPLETE 상태인 데이터 개수 조회
+            crawling_ids = [item["id"] for item in analysis_status_response.data]
             response = client.table("tb_instagram_crawling").select("id", count="exact")\
-                .eq("status", "COMPLETE")\
-                .eq("ai_analysis_status", False).execute()
+                .in_("id", crawling_ids)\
+                .eq("status", "COMPLETE").execute()
+            
             return response.count if response.count else 0
         except Exception as e:
             error_msg = str(e)

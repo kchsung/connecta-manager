@@ -6,13 +6,23 @@ import pandas as pd
 from src.db.database import db_manager
 from .common_functions import format_campaign_type, format_sample_status
 
+@st.cache_data(ttl=300)  # 5분 캐시
+def get_cached_campaigns():
+    """캠페인 목록 캐싱"""
+    return db_manager.get_campaigns()
+
+@st.cache_data(ttl=60)  # 1분 캐시
+def get_cached_participations(campaign_id: str):
+    """참여 인플루언서 목록 캐싱"""
+    return db_manager.get_all_campaign_participations(campaign_id)
+
 def render_participation_list():
     """참여 인플루언서 목록 및 편집 메인 컴포넌트"""
     st.markdown("### 📋 참여 인플루언서 목록 / 편집")
     st.markdown("캠페인에 참여하는 인플루언서 목록을 조회하고 편집합니다.")
     
-    # 캠페인 선택
-    campaigns = db_manager.get_campaigns()
+    # 캠페인 선택 (캐싱 적용)
+    campaigns = get_cached_campaigns()
     if not campaigns:
         st.info("먼저 캠페인을 생성해주세요.")
         return
@@ -41,8 +51,8 @@ def render_participation_list():
         selected_campaign = campaign_options[selected_campaign_name]
         st.markdown(f"**선택된 캠페인:** {selected_campaign.get('campaign_name', 'N/A')} ({format_campaign_type(selected_campaign.get('campaign_type', ''))})")
         
-        # 참여 인플루언서 목록
-        participations = db_manager.get_all_campaign_participations(selected_campaign.get('id', ''))
+        # 참여 인플루언서 목록 (캐싱 적용)
+        participations = get_cached_participations(selected_campaign.get('id', ''))
         
         if not participations:
             st.info("이 캠페인에 참여한 인플루언서가 없습니다.")

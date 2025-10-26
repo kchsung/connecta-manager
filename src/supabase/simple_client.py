@@ -344,6 +344,10 @@ class SimpleSupabaseClient:
             if not client:
                 return {"data": [], "total_count": 0, "total_pages": 0, "current_page": page}
             
+            # Streamlit Cloud 최적화: 페이지 크기 제한
+            if page_size > 100:
+                page_size = 100
+            
             # 직접 Supabase 클라이언트 사용 (Edge Function 우회)
             # sns_url 필드를 명시적으로 포함하여 테스트
             query = client.table('campaign_influencer_participations').select("""

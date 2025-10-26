@@ -79,6 +79,7 @@ def render_ai_analysis_execution():
                 with col4:
                     st.metric("📊 총 처리", result["total_count"])
                 
+                
                 # 실패한 항목들 표시
                 if result.get("failed_items"):
                     st.markdown("### ❌ 실패한 항목들")
@@ -177,7 +178,9 @@ def execute_ai_analysis():
                     batch_progress_bar.progress(batch_progress)
                     batch_status_text.text(f"배치 {batch_num + 1} 진행: {index + 1}/{len(batch_data)} - {current_id}")
 
-                    # 1) 최근 분석 여부 먼저 (DB/API 호출 절약)
+                    # 1) 최근 분석 여부 체크 (30일 이내 분석된 것은 건너뛰기)
+                    # 새로운 조건에서는 ai_analysis_status.is_analyzed = FALSE인 것만 조회하므로
+                    # 30일 체크는 선택적으로 적용 (강제 재분석 방지용)
                     if is_recently_analyzed_by_id(client, data["id"]):
                         skipped_count += 1
                         continue
