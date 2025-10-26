@@ -345,10 +345,18 @@ class SimpleSupabaseClient:
                 return {"data": [], "total_count": 0, "total_pages": 0, "current_page": page}
             
             # 직접 Supabase 클라이언트 사용 (Edge Function 우회)
+            # sns_url 필드를 명시적으로 포함하여 테스트
             query = client.table('campaign_influencer_participations').select("""
                 *,
                 campaigns!inner(id, campaign_name, created_by),
-                connecta_influencers!inner(id, influencer_name, sns_id, platform, followers_count, phone_number, shipping_address, email, kakao_channel_id)
+                connecta_influencers!inner(
+                    id, influencer_name, sns_id, platform, sns_url, 
+                    followers_count, phone_number, shipping_address, 
+                    email, kakao_channel_id, content_category, 
+                    contact_method, interested_products, owner_comment, 
+                    manager_rating, content_rating, comments_count, 
+                    post_count, profile_text, dm_reply
+                )
             """)
             
             # 사용자 필터링 (RLS 정책 적용)
@@ -373,7 +381,7 @@ class SimpleSupabaseClient:
             count_query = client.table('campaign_influencer_participations').select("""
                 id,
                 campaigns!inner(id, campaign_name, created_by),
-                connecta_influencers!inner(id, influencer_name, sns_id, platform, followers_count, phone_number, shipping_address, email, kakao_channel_id)
+                connecta_influencers!inner(id)
             """, count="exact")
             
             # 사용자 필터링 (RLS 정책 적용)
@@ -430,6 +438,7 @@ class SimpleSupabaseClient:
                         'influencer_name': item.get('connecta_influencers', {}).get('influencer_name'),
                         'sns_id': item.get('connecta_influencers', {}).get('sns_id'),
                         'platform': item.get('connecta_influencers', {}).get('platform'),
+                        'sns_url': item.get('connecta_influencers', {}).get('sns_url'),
                         'followers_count': item.get('connecta_influencers', {}).get('followers_count'),
                         'phone_number': item.get('connecta_influencers', {}).get('phone_number'),
                         'shipping_address': item.get('connecta_influencers', {}).get('shipping_address'),

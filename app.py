@@ -200,23 +200,28 @@ def inject_layout_css():
     }
 
 
-    /* 메인 메뉴는 숨기지 않음 (Streamlit Cloud 호환성) */
-    /* #MainMenu { display: none !important; } */
-    
-    /* Streamlit Cloud에서 메뉴 표시 보장 */
+    /* Streamlit 헤더와 설정 메뉴 표시 보장 */
     .stApp > header {
         background-color: transparent;
+        min-height: 3rem !important;
     }
     
-    /* 메뉴 버튼이 보이도록 보장 */
+    /* 헤더 툴바(설정 메뉴 포함) 표시 보장 */
     .stApp > header [data-testid="stToolbar"] {
         display: flex !important;
+        visibility: visible !important;
     }
     
-    /* 더보기 메뉴 버튼 스타일링 */
+    /* 설정 메뉴 버튼(점 3개) 표시 보장 */
     .stApp > header [data-testid="stToolbar"] button {
         display: block !important;
         visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* MainMenu 숨기지 않음 (설정 메뉴 보존) */
+    #MainMenu {
+        display: block !important;
     }
 
     /* 사이드바 폼 전체 간격 */

@@ -32,20 +32,15 @@ div[data-testid="stHorizontalBlock"] {
     justify-content: flex-start !important; 
 }
 
-/* Streamlit 기본 헤더 숨기기 */
-#MainMenu { 
-    display: none !important; 
-}
-
 /* Streamlit 기본 푸터 숨기기 */
 footer { 
     display: none !important; 
 }
 
-/* Streamlit 기본 헤더 영역 최소화 */
+/* Streamlit 헤더는 유지하되 높이만 조정 (설정 메뉴 보존) */
 header[data-testid="stHeader"] {
-    height: 0 !important;
-    padding: 0 !important;
+    min-height: 3rem !important;
+    padding: 0.5rem 0 !important;
     margin: 0 !important;
 }
 
