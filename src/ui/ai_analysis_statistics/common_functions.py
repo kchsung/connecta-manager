@@ -516,7 +516,7 @@ def get_evaluation_scores_statistics():
         return None
 
 def get_enhanced_network_analysis_statistics():
-    """고도화된 네트워크 분석 통계 조회"""
+    """고도화된 네트워크 분석 통계 조회 - 페이징으로 모든 데이터 가져오기"""
     max_retries = 3
     retry_delay = 1
     
@@ -526,10 +526,28 @@ def get_enhanced_network_analysis_statistics():
             if not client:
                 return None
             
-            response = client.table("ai_influencer_analyses").select("follow_network_analysis, followers, followings").execute()
+            all_data = []
+            page_size = 1000
+            offset = 0
             
-            if not response.data:
+            while True:
+                response = client.table("ai_influencer_analyses").select("follow_network_analysis, followers, followings").range(offset, offset + page_size - 1).execute()
+                
+                if not response.data or len(response.data) == 0:
+                    break
+                
+                all_data.extend(response.data)
+                
+                # 더 이상 데이터가 없으면 중단
+                if len(response.data) < page_size:
+                    break
+                    
+                offset += page_size
+            
+            if not all_data:
                 return None
+            
+            print(f"Network analysis - Total data fetched: {len(all_data)} records")
         
             authenticity_scores = []
             network_types = []
@@ -537,7 +555,7 @@ def get_enhanced_network_analysis_statistics():
             followings_list = []
             network_type_authenticity = {}
             
-            for item in response.data:
+            for item in all_data:
                 network_analysis = item.get("follow_network_analysis", {})
                 followers = item.get("followers", 0)
                 followings = item.get("followings", 0)
@@ -677,7 +695,7 @@ def get_enhanced_network_analysis_statistics():
     return None
 
 def get_enhanced_activity_metrics_statistics():
-    """고도화된 활동성 메트릭 통계 조회"""
+    """고도화된 활동성 메트릭 통계 조회 - 페이징으로 모든 데이터 가져오기"""
     max_retries = 3
     retry_delay = 1
     
@@ -687,10 +705,28 @@ def get_enhanced_activity_metrics_statistics():
             if not client:
                 return None
             
-            response = client.table("ai_influencer_analyses").select("follow_network_analysis, comment_authenticity_analysis, followers, followings, posts_count").execute()
+            all_data = []
+            page_size = 1000
+            offset = 0
             
-            if not response.data:
+            while True:
+                response = client.table("ai_influencer_analyses").select("follow_network_analysis, comment_authenticity_analysis, followers, followings, posts_count").range(offset, offset + page_size - 1).execute()
+                
+                if not response.data or len(response.data) == 0:
+                    break
+                
+                all_data.extend(response.data)
+                
+                # 더 이상 데이터가 없으면 중단
+                if len(response.data) < page_size:
+                    break
+                    
+                offset += page_size
+            
+            if not all_data:
                 return None
+            
+            print(f"Activity metrics - Total data fetched: {len(all_data)} records")
         
             likes = []
             comments = []
@@ -699,7 +735,7 @@ def get_enhanced_activity_metrics_statistics():
             posting_paces = []
             posting_pace_engagement = {}
             
-            for item in response.data:
+            for item in all_data:
                 # JSON 필드가 문자열로 저장된 경우 파싱
                 network_analysis_raw = item.get("follow_network_analysis", {})
                 comment_analysis_raw = item.get("comment_authenticity_analysis", {})
@@ -902,25 +938,41 @@ def get_enhanced_activity_metrics_statistics():
             
             # 기존 데이터로 활동성 점수 계산
             activity_scores = []
+            print(f"Activity metrics - Processing {len(all_data)} records for activity grade distribution")
             
-            for i, item in enumerate(response.data):
-                if i >= len(engagement_rates):
-                    break
-                    
+            for item in all_data:
                 # 기본 데이터 추출 (None 체크 포함)
                 followers = item.get('followers') or 0
                 followings = item.get('followings') or 0
                 posts_count = item.get('posts_count') or 0
-                engagement_rate = engagement_rates[i] if i < len(engagement_rates) else 0
                 
-                # 네트워크 분석 데이터 추출
-                network_analysis = item.get("follow_network_analysis", {})
-                if isinstance(network_analysis, str):
+                # 참여율 계산 (기존 로직과 동일)
+                engagement_rate = 0
+                network_analysis_raw = item.get("follow_network_analysis", {})
+                if isinstance(network_analysis_raw, str):
                     try:
-                        network_analysis = json.loads(network_analysis)
+                        import json
+                        network_analysis = json.loads(network_analysis_raw)
                     except:
                         network_analysis = {}
+                else:
+                    network_analysis = network_analysis_raw
                 
+                if isinstance(network_analysis, dict):
+                    engagement_rate = (
+                        network_analysis.get('est_engagement_rate_last5') or
+                        network_analysis.get('engagement_rate') or
+                        network_analysis.get('avg_engagement_rate') or
+                        network_analysis.get('engagement_percentage') or
+                        0
+                    )
+                    
+                    # 참여율이 없으면 팔로워/팔로잉 비율로 추정
+                    if engagement_rate == 0 and followers > 0 and followings > 0:
+                        ratio = followers / followings
+                        engagement_rate = min(5.0, ratio / 10)  # 최대 5%로 제한
+                
+                # 네트워크 분석 데이터 추출 (이미 위에서 처리됨)
                 ratio_followers_to_followings = network_analysis.get("ratio_followers_to_followings") or 0
                 influence_authenticity_score = network_analysis.get("influence_authenticity_score") or 0
                 
@@ -981,9 +1033,10 @@ def get_enhanced_activity_metrics_statistics():
                     else:  # 최하위 6.4%
                         activity_grade_distribution["매우 비활발"] += 1
                 
-                # 디버깅 정보 (필요시 주석 해제)
-                # print(f"Activity scores range: {min(activity_scores):.2f} to {max(activity_scores):.2f}")
-                # print(f"Activity distribution: {activity_grade_distribution}")
+                # 디버깅 정보
+                print(f"Activity scores range: {min(activity_scores):.2f} to {max(activity_scores):.2f}")
+                print(f"Activity distribution: {activity_grade_distribution}")
+                print(f"Total activity scores calculated: {len(activity_scores)}")
             
             return {
                 "avg_likes": sum(likes) / len(likes) if likes else 0,
@@ -1023,22 +1076,40 @@ def get_enhanced_activity_metrics_statistics():
     return None
 
 def get_comment_authenticity_statistics():
-    """댓글 진정성 분석 통계 조회"""
+    """댓글 진정성 분석 통계 조회 - 페이징으로 모든 데이터 가져오기"""
     try:
         client = simple_client.get_client()
         if not client:
             return None
         
-        response = client.table("ai_influencer_analyses").select("comment_authenticity_analysis").execute()
+        all_data = []
+        page_size = 1000
+        offset = 0
         
-        if not response.data:
+        while True:
+            response = client.table("ai_influencer_analyses").select("comment_authenticity_analysis").range(offset, offset + page_size - 1).execute()
+            
+            if not response.data or len(response.data) == 0:
+                break
+            
+            all_data.extend(response.data)
+            
+            # 더 이상 데이터가 없으면 중단
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
+        
+        if not all_data:
             return None
+        
+        print(f"Comment authenticity - Total data fetched: {len(all_data)} records")
         
         authentic_ratios = []
         low_authentic_ratios = []
         authenticity_levels = []
         
-        for item in response.data:
+        for item in all_data:
             comment_analysis = item.get("comment_authenticity_analysis", {})
             if isinstance(comment_analysis, dict):
                 # 진정성 비율 추출
@@ -1092,92 +1163,246 @@ def get_comment_authenticity_statistics():
         return None
 
 def get_comprehensive_analysis_data():
-    """종합 분석 데이터 조회"""
+    """종합 분석 데이터 조회 - 페이징으로 모든 데이터 가져오기"""
     try:
         client = simple_client.get_client()
         if not client:
             return None
         
-        response = client.table("ai_influencer_analyses").select(
-            "followers, followings, category, evaluation, follow_network_analysis, comment_authenticity_analysis"
-        ).execute()
+        all_data = []
+        page_size = 1000
+        offset = 0
         
-        if not response.data:
+        while True:
+            response = client.table("ai_influencer_analyses").select(
+                "followers, followings, posts_count, category, evaluation, follow_network_analysis, comment_authenticity_analysis, engagement_score, activity_score, communication_score, growth_potential_score, overall_score"
+            ).range(offset, offset + page_size - 1).execute()
+            
+            if not response.data or len(response.data) == 0:
+                break
+            
+            all_data.extend(response.data)
+            
+            # 더 이상 데이터가 없으면 중단
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
+
+        if not all_data:
             return None
         
-        # 데이터 수집
+        # 데이터 수집 - 테이블 구조에 맞게 수정
         data_points = []
-        for item in response.data:
+        for item in all_data:
             evaluation = item.get("evaluation", {})
             network_analysis = item.get("follow_network_analysis", {})
             comment_analysis = item.get("comment_authenticity_analysis", {})
             
-            if isinstance(evaluation, dict) and isinstance(network_analysis, dict):
+            # 기본값 설정
+            followers = item.get('followers', 0) or 0
+            followings = item.get('followings', 0) or 0
+            posts_count = item.get('posts_count', 0) or 0
+            
+            # 참여율 계산: engagement_score를 참여율로 사용
+            # engagement_score는 0-10 범위이므로 퍼센트로 변환
+            engagement_rate = 0
+            engagement_score = item.get('engagement_score', 0) or 0
+            
+            if engagement_score > 0:
+                # 0-10 점수를 0-5% 참여율로 변환 (10점 = 5% 참여율)
+                engagement_rate = (engagement_score / 10) * 5.0
+            else:
+                # engagement_score가 없으면 network_analysis에서 찾기
+                if isinstance(network_analysis, dict):
+                    engagement_rate = (
+                        network_analysis.get('est_engagement_rate_last5') or
+                        network_analysis.get('engagement_rate') or
+                        network_analysis.get('avg_engagement_rate') or
+                        network_analysis.get('engagement_percentage') or
+                        0
+                    )
+                    
+                    # 참여율이 없으면 팔로워/팔로잉 비율로 추정
+                    if engagement_rate == 0 and followers > 0 and followings > 0:
+                        ratio = followers / followings
+                        # 비율을 참여율로 변환 (1:10 비율을 1% 참여율로 가정)
+                        engagement_rate = min(5.0, ratio / 10)  # 최대 5%로 제한
+            
+            # 진정성 점수 계산: 테이블의 generated column 우선 사용
+            authenticity_score = 0
+            
+            # 먼저 테이블의 generated column에서 찾기 (없을 수 있음)
+            # comment_authenticity_analysis에서 진정성 점수 추출
+            if isinstance(comment_analysis, dict):
+                # 여러 가능한 필드명에서 진정성 점수 찾기
+                authenticity_score = (
+                    comment_analysis.get('authenticity_score') or
+                    comment_analysis.get('influence_authenticity_score') or
+                    comment_analysis.get('overall_authenticity') or
+                    0
+                )
+                
+                # 진정성 점수가 없으면 ratio_estimation에서 추정
+                if authenticity_score == 0:
+                    ratio_estimation = comment_analysis.get('ratio_estimation', {})
+                    if isinstance(ratio_estimation, dict):
+                        authentic_ratio_str = ratio_estimation.get('authentic_comments_ratio', '')
+                        if authentic_ratio_str:
+                            try:
+                                import re
+                                match = re.search(r'(\d+(?:\.\d+)?)', str(authentic_ratio_str))
+                                if match:
+                                    # 진정성 비율을 0-10 점수로 변환
+                                    ratio = float(match.group(1))
+                                    authenticity_score = min(10.0, ratio * 0.1)  # 100% = 10점
+                            except (ValueError, TypeError):
+                                pass
+            
+            # 종합점수는 테이블의 generated column에서 직접 가져오기
+            overall_score = item.get('overall_score', 0) or 0
+            
+            # 다른 점수들도 테이블의 generated column에서 가져오기
+            activity_score = item.get('activity_score', 0) or 0
+            communication_score = item.get('communication_score', 0) or 0
+            growth_potential_score = item.get('growth_potential_score', 0) or 0
+            
+            # 점수들이 없으면 evaluation에서 가져오기
+            if overall_score == 0 and isinstance(evaluation, dict):
+                overall_score = (
+                    evaluation.get('overall_score') or
+                    evaluation.get('overall') or
+                    0
+                )
+            
+            if engagement_score == 0 and isinstance(evaluation, dict):
+                engagement_score = evaluation.get('engagement', 0) or 0
+            
+            if activity_score == 0 and isinstance(evaluation, dict):
+                activity_score = evaluation.get('activity', 0) or 0
+            
+            if communication_score == 0 and isinstance(evaluation, dict):
+                communication_score = evaluation.get('communication', 0) or 0
+            
+            if growth_potential_score == 0 and isinstance(evaluation, dict):
+                growth_potential_score = evaluation.get('growth_potential', 0) or 0
+            
+            data_point = {
+                'followers': followers,
+                'followings': followings,
+                'posts_count': posts_count,
+                'category': item.get('category', '기타'),
+                'engagement_rate': engagement_rate,
+                'authenticity_score': authenticity_score,
+                'overall_score': overall_score,
+                'engagement_score': engagement_score,  # 0-10 범위의 원본 점수
+                'activity_score': activity_score,
+                'communication_score': communication_score,
+                'growth_potential_score': growth_potential_score
+            }
+            data_points.append(data_point)
+        
+        # 디버깅: 데이터 수 확인
+        print(f"Collected data points: {len(data_points)}")
+        if data_points:
+            sample_point = data_points[0]
+            print(f"Sample data point keys: {list(sample_point.keys())}")
+            print(f"Sample engagement_rate: {sample_point.get('engagement_rate', 'N/A')}")
+            print(f"Sample engagement_score: {sample_point.get('engagement_score', 'N/A')}")
+            print(f"Sample authenticity_score: {sample_point.get('authenticity_score', 'N/A')}")
+            print(f"Sample overall_score: {sample_point.get('overall_score', 'N/A')}")
+        
+        # 데이터가 없으면 샘플 데이터 생성
+        if not data_points:
+            print("No data points found, generating sample data...")
+            # 샘플 데이터 생성 (실제 데이터가 없을 때)
+            import random
+            categories = ['뷰티', '패션', '라이프스타일', '푸드', '여행', '스포츠', '애견', '기타']
+            
+            for i in range(20):  # 20개의 샘플 데이터
+                followers = random.randint(1000, 100000)
+                followings = random.randint(100, 10000)
+                posts_count = random.randint(50, 2000)
+                
+                # 참여율 계산 (1-5% 범위)
+                engagement_rate = random.uniform(1.0, 5.0)
+                
+                # 진정성 점수 (5-10 범위)
+                authenticity_score = random.uniform(5.0, 10.0)
+                
+                # 종합점수 (5-10 범위)
+                overall_score = random.uniform(5.0, 10.0)
+                
                 data_point = {
-                    'followers': item.get('followers', 0),
-                    'followings': item.get('followings', 0),
-                    'category': item.get('category', '기타'),
-                    'engagement_rate': network_analysis.get('est_engagement_rate_last5', 0),
-                    'authenticity_score': network_analysis.get('influence_authenticity_score', 0),
-                    'overall_score': evaluation.get('overall_score', 0),
-                    'engagement_score': evaluation.get('engagement', 0),
-                    'activity_score': evaluation.get('activity', 0),
-                    'communication_score': evaluation.get('communication', 0),
-                    'growth_potential_score': evaluation.get('growth_potential', 0)
+                    'followers': followers,
+                    'followings': followings,
+                    'posts_count': posts_count,
+                    'category': random.choice(categories),
+                    'engagement_rate': engagement_rate,
+                    'authenticity_score': authenticity_score,
+                    'overall_score': overall_score,
+                    'engagement_score': random.uniform(5.0, 10.0),
+                    'activity_score': random.uniform(5.0, 10.0),
+                    'communication_score': random.uniform(5.0, 10.0),
+                    'growth_potential_score': random.uniform(5.0, 10.0)
                 }
                 data_points.append(data_point)
-        
-        if not data_points:
-            return None
+            print(f"Generated {len(data_points)} sample data points")
         
         # 상관관계 매트릭스 계산
         df = pd.DataFrame(data_points)
-        numeric_columns = ['followers', 'followings', 'engagement_rate', 'authenticity_score', 
-                          'overall_score', 'engagement_score', 'activity_score', 
+        numeric_columns = ['followers', 'followings', 'engagement_score', 'authenticity_score', 
+                          'overall_score', 'activity_score', 
                           'communication_score', 'growth_potential_score']
         
         correlation_matrix = df[numeric_columns].corr()
         
-        # 3D 산점도 데이터
-        scatter_3d_data = df[['followers', 'engagement_rate', 'authenticity_score', 'category', 'overall_score']].copy()
+        # 산점도 데이터 (engagement_rate 대신 engagement_score 사용)
+        scatter_3d_data = df[['followers', 'engagement_score', 'authenticity_score', 'category', 'overall_score']].copy()
         
         # 다중 지표 분포 - 데이터 정제 및 필터링
-        # 참여율 데이터 정제 (0이 아닌 값만 포함)
-        engagement_rates = df[df['engagement_rate'] > 0]['engagement_rate'].tolist()
-        if not engagement_rates:  # 참여율 데이터가 없으면 기본값 사용
-            engagement_rates = [0.5, 1.2, 2.1, 1.8, 3.2, 2.5, 1.9, 2.8, 1.5, 2.3]  # 샘플 데이터
+        # 모든 데이터를 일관되게 처리 (0이 아닌 값만 포함하되, 모든 지표에서 동일한 개수 유지)
         
-        # 진정성 점수 데이터 정제 (0이 아닌 값만 포함)
-        authenticity_scores = df[df['authenticity_score'] > 0]['authenticity_score'].tolist()
-        if not authenticity_scores:  # 진정성 점수 데이터가 없으면 기본값 사용
-            authenticity_scores = [6.2, 7.1, 5.8, 6.9, 7.5, 6.4, 7.2, 6.1, 6.8, 7.0]  # 샘플 데이터
+        # 유효한 데이터만 필터링 (모든 주요 지표가 0보다 큰 경우)
+        valid_data = df[
+            (df['engagement_score'] > 0) & 
+            (df['authenticity_score'] > 0) & 
+            (df['overall_score'] > 0)
+        ].copy()
         
-        # 종합점수 데이터 정제 (0이 아닌 값만 포함)
-        overall_scores = df[df['overall_score'] > 0]['overall_score'].tolist()
-        if not overall_scores:  # 종합점수 데이터가 없으면 기본값 사용
-            overall_scores = [6.5, 7.2, 6.8, 7.0, 7.5, 6.9, 7.1, 6.7, 7.3, 6.6]  # 샘플 데이터
+        if len(valid_data) > 0:
+            # 유효한 데이터가 있으면 실제 데이터 사용
+            engagement_scores = valid_data['engagement_score'].tolist()
+            authenticity_scores = valid_data['authenticity_score'].tolist()
+            overall_scores = valid_data['overall_score'].tolist()
+        else:
+            # 유효한 데이터가 없으면 기본값 사용 (더 많은 샘플 데이터)
+            engagement_scores = [3.5, 4.2, 5.1, 4.8, 6.2, 5.5, 4.9, 5.8, 4.5, 5.3, 5.7, 4.6, 6.1, 5.4, 4.8, 5.9, 5.2, 6.0, 4.7, 5.6]
+            authenticity_scores = [6.2, 7.1, 5.8, 6.9, 7.5, 6.4, 7.2, 6.1, 6.8, 7.0, 6.3, 7.3, 5.9, 6.7, 7.4, 6.0, 6.6, 7.1, 5.7, 6.5]
+            overall_scores = [6.5, 7.2, 6.8, 7.0, 7.5, 6.9, 7.1, 6.7, 7.3, 6.6, 6.4, 7.4, 6.2, 6.9, 7.2, 6.1, 6.8, 7.0, 5.9, 6.7]
         
         # 팔로워/팔로잉 비율 계산 (0으로 나누기 방지)
-        follower_ratios = []
-        for _, row in df.iterrows():
-            followers = row['followers']
-            followings = row['followings']
-            if followings > 0:
-                ratio = followers / followings
-                # 비율이 너무 극단적이면 제한 (0.01 ~ 100 범위)
-                ratio = max(0.01, min(100, ratio))
-                follower_ratios.append(ratio)
-            else:
-                # 팔로잉이 0인 경우 팔로워 수를 그대로 사용 (하지만 합리적인 범위로 제한)
-                ratio = min(100, followers / 1000) if followers > 0 else 0.01
-                follower_ratios.append(ratio)
-        
-        # 비율 데이터가 없으면 기본값 사용
-        if not follower_ratios:
-            follower_ratios = [2.5, 1.8, 3.2, 2.1, 4.5, 1.9, 2.8, 3.1, 2.3, 1.7]  # 샘플 데이터
+        if len(valid_data) > 0:
+            # 유효한 데이터가 있으면 실제 데이터 사용
+            follower_ratios = []
+            for _, row in valid_data.iterrows():
+                followers = row['followers']
+                followings = row['followings']
+                if followings > 0:
+                    ratio = followers / followings
+                    # 비율이 너무 극단적이면 제한 (0.01 ~ 100 범위)
+                    ratio = max(0.01, min(100, ratio))
+                    follower_ratios.append(ratio)
+                else:
+                    # 팔로잉이 0인 경우 팔로워 수를 그대로 사용 (하지만 합리적인 범위로 제한)
+                    ratio = min(100, followers / 1000) if followers > 0 else 0.01
+                    follower_ratios.append(ratio)
+        else:
+            # 유효한 데이터가 없으면 기본값 사용 (더 많은 샘플 데이터)
+            follower_ratios = [2.5, 1.8, 3.2, 2.1, 4.5, 1.9, 2.8, 3.1, 2.3, 1.7, 3.5, 2.0, 4.2, 1.6, 3.8, 2.4, 3.0, 4.0, 1.9, 2.7]
         
         multi_metric_distribution = {
-            'engagement_rates': engagement_rates,
+            'engagement_scores': engagement_scores,
             'authenticity_scores': authenticity_scores,
             'overall_scores': overall_scores,
             'follower_ratios': follower_ratios
@@ -1188,7 +1413,7 @@ def get_comprehensive_analysis_data():
         for category in df['category'].unique():
             cat_data = df[df['category'] == category]
             category_performance[category] = {
-                'avg_engagement': cat_data['engagement_rate'].mean(),
+                'avg_engagement': cat_data['engagement_score'].mean(),
                 'avg_authenticity': cat_data['authenticity_score'].mean(),
                 'avg_overall': cat_data['overall_score'].mean()
             }
@@ -1220,132 +1445,210 @@ def get_comprehensive_analysis_data():
         return None
 
 def get_statistical_insights_data():
-    """통계적 인사이트 데이터 조회"""
+    """통계적 인사이트 데이터 조회 - 페이징으로 모든 데이터 가져오기"""
     try:
         client = simple_client.get_client()
         if not client:
             return None
         
-        response = client.table("ai_influencer_analyses").select(
-            "followers, followings, evaluation, follow_network_analysis, analyzed_at"
-        ).execute()
+        all_data = []
+        page_size = 1000
+        offset = 0
         
-        if not response.data:
+        while True:
+            response = client.table("ai_influencer_analyses").select(
+                "followers, followings, evaluation, follow_network_analysis, comment_authenticity_analysis, engagement_score, overall_score, analyzed_at"
+            ).range(offset, offset + page_size - 1).execute()
+            
+            if not response.data or len(response.data) == 0:
+                break
+            
+            all_data.extend(response.data)
+            
+            # 더 이상 데이터가 없으면 중단
+            if len(response.data) < page_size:
+                break
+                
+            offset += page_size
+        
+        if not all_data:
             return None
         
-        # 데이터 수집
+        # 데이터 수집 - 테이블의 generated column 우선 사용
         data_points = []
-        for item in response.data:
+        for item in all_data:
             evaluation = item.get("evaluation", {})
             network_analysis = item.get("follow_network_analysis", {})
             
-            if isinstance(evaluation, dict) and isinstance(network_analysis, dict):
-                data_point = {
-                    'followers': item.get('followers', 0),
-                    'engagement_rate': network_analysis.get('est_engagement_rate_last5', 0),
-                    'authenticity_score': network_analysis.get('influence_authenticity_score', 0),
-                    'overall_score': evaluation.get('overall_score', 0),
-                    'analyzed_at': item.get('analyzed_at', '')
-                }
-                data_points.append(data_point)
+            # 기본값 설정
+            followers = item.get('followers', 0) or 0
+            followings = item.get('followings', 0) or 0
+            
+            # 참여율 계산: engagement_score를 참여율로 사용
+            engagement_rate = 0
+            engagement_score = item.get('engagement_score', 0) or 0
+            
+            if engagement_score > 0:
+                # 0-10 점수를 0-5% 참여율로 변환 (10점 = 5% 참여율)
+                engagement_rate = (engagement_score / 10) * 5.0
+            else:
+                # engagement_score가 없으면 network_analysis에서 찾기
+                if isinstance(network_analysis, dict):
+                    engagement_rate = (
+                        network_analysis.get('est_engagement_rate_last5') or
+                        network_analysis.get('engagement_rate') or
+                        network_analysis.get('avg_engagement_rate') or
+                        network_analysis.get('engagement_percentage') or
+                        0
+                    )
+                    
+                    # 참여율이 없으면 팔로워/팔로잉 비율로 추정
+                    if engagement_rate == 0 and followers > 0 and followings > 0:
+                        ratio = followers / followings
+                        engagement_rate = min(5.0, ratio / 10)  # 최대 5%로 제한
+            
+            # 진정성 점수 계산: 테이블의 generated column 우선 사용
+            authenticity_score = 0
+            
+            # comment_authenticity_analysis에서 진정성 점수 추출
+            comment_analysis = item.get("comment_authenticity_analysis", {})
+            if isinstance(comment_analysis, dict):
+                # 여러 가능한 필드명에서 진정성 점수 찾기
+                authenticity_score = (
+                    comment_analysis.get('authenticity_score') or
+                    comment_analysis.get('influence_authenticity_score') or
+                    comment_analysis.get('overall_authenticity') or
+                    0
+                )
+                
+                # 진정성 점수가 없으면 ratio_estimation에서 추정
+                if authenticity_score == 0:
+                    ratio_estimation = comment_analysis.get('ratio_estimation', {})
+                    if isinstance(ratio_estimation, dict):
+                        authentic_ratio_str = ratio_estimation.get('authentic_comments_ratio', '')
+                        if authentic_ratio_str:
+                            try:
+                                import re
+                                match = re.search(r'(\d+(?:\.\d+)?)', str(authentic_ratio_str))
+                                if match:
+                                    # 진정성 비율을 0-10 점수로 변환
+                                    ratio = float(match.group(1))
+                                    authenticity_score = min(10.0, ratio * 0.1)  # 100% = 10점
+                            except (ValueError, TypeError):
+                                pass
+            
+            # 종합점수는 테이블의 generated column에서 직접 가져오기
+            overall_score = item.get('overall_score', 0) or 0
+            
+            # 점수들이 없으면 evaluation에서 가져오기
+            if overall_score == 0 and isinstance(evaluation, dict):
+                overall_score = (
+                    evaluation.get('overall_score') or
+                    evaluation.get('overall') or
+                    0
+                )
+            
+            if engagement_score == 0 and isinstance(evaluation, dict):
+                engagement_score = evaluation.get('engagement', 0) or 0
+            
+            if authenticity_score == 0 and isinstance(network_analysis, dict):
+                authenticity_score = network_analysis.get('influence_authenticity_score', 0) or 0
+            
+            data_point = {
+                'followers': followers,
+                'followings': followings,
+                'engagement_rate': engagement_rate,
+                'authenticity_score': authenticity_score,
+                'overall_score': overall_score,
+                'engagement_score': engagement_score,
+                'analyzed_at': item.get('analyzed_at', '')
+            }
+            data_points.append(data_point)
         
         if not data_points:
             return None
         
-        try:
-            from sklearn.cluster import KMeans
-            from sklearn.preprocessing import StandardScaler
-            sklearn_available = True
-        except ImportError:
-            sklearn_available = False
+        # 디버깅 정보
+        print(f"Statistical insights - Total data points: {len(data_points)}")
+        if data_points:
+            sample_point = data_points[0]
+            print(f"Sample data point keys: {list(sample_point.keys())}")
+            print(f"Sample engagement_rate: {sample_point.get('engagement_rate', 'N/A')}")
+            print(f"Sample authenticity_score: {sample_point.get('authenticity_score', 'N/A')}")
+            print(f"Sample overall_score: {sample_point.get('overall_score', 'N/A')}")
+            
+            # 데이터 분포 분석
+            df = pd.DataFrame(data_points)
+            print(f"DataFrame shape: {df.shape}")
+            print(f"Engagement rate > 0: {(df['engagement_rate'] > 0).sum()}")
+            print(f"Authenticity score > 0: {(df['authenticity_score'] > 0).sum()}")
+            print(f"Overall score > 0: {(df['overall_score'] > 0).sum()}")
+            print(f"Followers > 0: {(df['followers'] > 0).sum()}")
+            
+        
         
         df = pd.DataFrame(data_points)
         
-        # 이상치 탐지 (IQR 방법)
+        # 이상치 탐지 (IQR 방법) - 0이 아닌 값들만 사용
         def detect_outliers(series):
-            Q1 = series.quantile(0.25)
-            Q3 = series.quantile(0.75)
+            # 0이 아닌 값들만 필터링
+            non_zero_series = series[series > 0]
+            if len(non_zero_series) < 4:  # 최소 4개 이상의 데이터가 필요
+                return pd.Series([False] * len(series), index=series.index)
+            
+            Q1 = non_zero_series.quantile(0.25)
+            Q3 = non_zero_series.quantile(0.75)
             IQR = Q3 - Q1
             lower_bound = Q1 - 1.5 * IQR
             upper_bound = Q3 + 1.5 * IQR
             return (series < lower_bound) | (series > upper_bound)
         
+        # 0이 아닌 값들만으로 이상치 계산
+        engagement_non_zero = df[df['engagement_rate'] > 0]['engagement_rate']
+        authenticity_non_zero = df[df['authenticity_score'] > 0]['authenticity_score']
+        overall_non_zero = df[df['overall_score'] > 0]['overall_score']
+        
         engagement_outliers = detect_outliers(df['engagement_rate']).sum()
         authenticity_outliers = detect_outliers(df['authenticity_score']).sum()
         overall_outliers = detect_outliers(df['overall_score']).sum()
         
+        print(f"Outlier detection - Engagement non-zero: {len(engagement_non_zero)}, Authenticity non-zero: {len(authenticity_non_zero)}, Overall non-zero: {len(overall_non_zero)}")
+        print(f"Outliers - Engagement: {engagement_outliers}, Authenticity: {authenticity_outliers}, Overall: {overall_outliers}")
+        
+        # 이상치 탐지 함수를 전역으로 사용할 수 있도록 저장
+        global detect_outliers_single_series
+        def detect_outliers_single_series(series):
+            """단일 시리즈에 대한 이상치 탐지"""
+            # 0이 아닌 값들만 필터링
+            non_zero_series = series[series > 0]
+            if len(non_zero_series) < 4:  # 최소 4개 이상의 데이터가 필요
+                return pd.Series([False] * len(series), index=series.index)
+            
+            Q1 = non_zero_series.quantile(0.25)
+            Q3 = non_zero_series.quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            return (series < lower_bound) | (series > upper_bound)
+        
         # 이상치 시각화 데이터
         df['is_outlier'] = detect_outliers(df['engagement_rate'])
-        outlier_visualization = df[['followers', 'engagement_rate', 'overall_score', 'is_outlier']].copy()
+        outlier_visualization = df[['followers', 'engagement_rate', 'authenticity_score', 'overall_score', 'is_outlier']].copy()
         
         # NaN 값 처리 - 기본값으로 대체
         outlier_visualization['followers'] = outlier_visualization['followers'].fillna(1000)
         outlier_visualization['engagement_rate'] = outlier_visualization['engagement_rate'].fillna(1.0)
+        outlier_visualization['authenticity_score'] = outlier_visualization['authenticity_score'].fillna(5.0)
         outlier_visualization['overall_score'] = outlier_visualization['overall_score'].fillna(5.0)
         
-        # 클러스터링 분석
-        if sklearn_available:
-            features = ['engagement_rate', 'authenticity_score', 'overall_score']
-            X = df[features].fillna(0)
-            
-            scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X)
-            
-            # 최적 클러스터 수 찾기 (간단한 방법)
-            optimal_clusters = 3  # 기본값
-            
-            try:
-                kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
-                clusters = kmeans.fit_predict(X_scaled)
-                df['cluster'] = clusters
-                
-                # 클러스터 시각화 데이터
-                cluster_visualization = df[['engagement_rate', 'authenticity_score', 'followers', 'cluster']].copy()
-                
-                # NaN 값 처리 - 기본값으로 대체
-                cluster_visualization['engagement_rate'] = cluster_visualization['engagement_rate'].fillna(1.0)
-                cluster_visualization['authenticity_score'] = cluster_visualization['authenticity_score'].fillna(5.0)
-                cluster_visualization['followers'] = cluster_visualization['followers'].fillna(1000)
-                
-                # 클러스터별 특성
-                cluster_characteristics = {}
-                for cluster_id in range(optimal_clusters):
-                    cluster_data = df[df['cluster'] == cluster_id]
-                    cluster_characteristics[cluster_id] = {
-                        '평균 참여율': f"{cluster_data['engagement_rate'].mean():.2f}%",
-                        '평균 진정성 점수': f"{cluster_data['authenticity_score'].mean():.2f}",
-                        '평균 종합점수': f"{cluster_data['overall_score'].mean():.2f}",
-                        '평균 팔로워 수': f"{cluster_data['followers'].mean():,.0f}",
-                        '인플루언서 수': len(cluster_data)
-                    }
-            except:
-                cluster_visualization = None
-                cluster_characteristics = None
-        else:
-            optimal_clusters = 3
-            cluster_visualization = None
-            cluster_characteristics = None
         
-        # 트렌드 분석 (시뮬레이션)
-        trend_analysis = {
-            'time_periods': ['1월', '2월', '3월', '4월', '5월', '6월'],
-            'metrics': {
-                '평균 참여율': [2.1, 2.3, 2.0, 2.4, 2.2, 2.5],
-                '평균 진정성 점수': [6.2, 6.4, 6.1, 6.3, 6.5, 6.6],
-                '평균 종합점수': [6.8, 7.0, 6.7, 7.1, 6.9, 7.2]
-            },
-            'trend_summary': {
-                '평균 참여율': '상승',
-                '평균 진정성 점수': '상승',
-                '평균 종합점수': '상승'
-            }
-        }
         
         # 핵심 인사이트 (실제 데이터 기반)
         avg_engagement = df['engagement_rate'].mean()
         avg_authenticity = df['authenticity_score'].mean()
         avg_overall = df['overall_score'].mean()
         corr_authenticity_followers = df['authenticity_score'].corr(df['followers'])
+        
         
         # 참여율 평가
         if avg_engagement >= 3.0:
@@ -1392,8 +1695,7 @@ def get_statistical_insights_data():
         key_insights = [
             f"전체 인플루언서의 평균 참여율은 {avg_engagement:.2f}%로, {engagement_assessment} 수준입니다.",
             f"평균 진정성 점수는 {avg_authenticity:.2f}점으로 {authenticity_assessment} 수준이며, 팔로워 수와의 상관관계는 {correlation_strength} 수준입니다 (상관계수: {corr_authenticity_followers:.3f}).",
-            outlier_insight,
-            f"클러스터링 결과 {optimal_clusters}개의 주요 그룹으로 분류되며, 각 그룹별로 차별화된 마케팅 전략이 필요합니다."
+            outlier_insight
         ]
         
         return {
@@ -1403,59 +1705,22 @@ def get_statistical_insights_data():
                 'overall_outliers': overall_outliers
             },
             'outlier_visualization': outlier_visualization,
-            'prediction_model': {
-                'accuracy': 0.85,  # 시뮬레이션
-                'top_features': ['참여율', '진정성 점수', '팔로워 수'],
-                'prediction_vs_actual': None  # 시뮬레이션 데이터 생략
-            },
-            'clustering': {
-                'optimal_clusters': optimal_clusters,
-                'cluster_visualization': cluster_visualization,
-                'cluster_characteristics': cluster_characteristics
-            },
-            'trend_analysis': trend_analysis,
             'key_insights': key_insights
         }
         
     except Exception as e:
         st.error(f"통계적 인사이트 데이터 조회 중 오류: {str(e)}")
-        # sklearn이 없는 경우 기본 인사이트 제공
-        if "No module named 'sklearn'" in str(e):
-            return {
-                'outliers': {
-                    'engagement_outliers': 0,
-                    'authenticity_outliers': 0,
-                    'overall_outliers': 0
-                },
-                'outlier_visualization': None,
-                'prediction_model': {
-                    'accuracy': 0.0,
-                    'top_features': ['참여율', '진정성 점수', '팔로워 수'],
-                    'prediction_vs_actual': None
-                },
-                'clustering': {
-                    'optimal_clusters': 3,
-                    'cluster_visualization': None,
-                    'cluster_characteristics': None
-                },
-                'trend_analysis': {
-                    'time_periods': ['1월', '2월', '3월', '4월', '5월', '6월'],
-                    'metrics': {
-                        '평균 참여율': [2.1, 2.3, 2.0, 2.4, 2.2, 2.5],
-                        '평균 진정성 점수': [6.2, 6.4, 6.1, 6.3, 6.5, 6.6],
-                        '평균 종합점수': [6.8, 7.0, 6.7, 7.1, 6.9, 7.2]
-                    },
-                    'trend_summary': {
-                        '평균 참여율': '상승',
-                        '평균 진정성 점수': '상승',
-                        '평균 종합점수': '상승'
-                    }
-                },
-                'key_insights': [
-                    "⚠️ scikit-learn이 설치되지 않아 고급 분석 기능을 사용할 수 없습니다.",
-                    "💡 pip install scikit-learn 명령으로 설치 후 다시 시도해주세요.",
-                    "📊 기본 통계 정보는 여전히 확인할 수 있습니다.",
-                    "🔧 고급 분석을 위해서는 클러스터링, 이상치 탐지 등의 기능이 필요합니다."
-                ]
-            }
-        return None
+        # 기본 인사이트 제공
+        return {
+            'outliers': {
+                'engagement_outliers': 0,
+                'authenticity_outliers': 0,
+                'overall_outliers': 0
+            },
+            'outlier_visualization': None,
+            'key_insights': [
+                "⚠️ 데이터 분석 중 오류가 발생했습니다.",
+                "💡 데이터베이스 연결 상태를 확인해주세요.",
+                "📊 기본 통계 정보는 여전히 확인할 수 있습니다."
+            ]
+        }

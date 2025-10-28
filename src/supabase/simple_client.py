@@ -844,3 +844,8 @@ class SimpleSupabaseClient:
 
 # 전역 인스턴스
 simple_client = SimpleSupabaseClient()
+
+# 편의 함수들
+def get_client():
+    """Supabase 클라이언트 반환"""
+    return simple_client.get_client()
