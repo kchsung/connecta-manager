@@ -30,7 +30,7 @@ def render_advanced_visualizations():
                 title="인플루언서 지표 간 상관관계 히트맵",
                 color_continuous_scale="RdBu_r"
             )
-            st.plotly_chart(fig, width='stretch', key="advanced_correlation_heatmap")
+            st.plotly_chart(fig, width='stretch')
         
         # 2. 2D 산점도 분석 (팔로워 수 vs 참여율)
         st.markdown("#### 📊 팔로워 수 vs 참여율 분석")
@@ -77,7 +77,7 @@ def render_advanced_visualizations():
                     yaxis_title="참여 점수",
                     xaxis_type="log"
                 )
-                st.plotly_chart(fig, width='stretch', key="advanced_2d_scatter")
+                st.plotly_chart(fig, width='stretch')
             else:
                 st.warning("유효한 산점도 데이터가 없습니다.")
         
@@ -125,7 +125,7 @@ def render_advanced_visualizations():
                     xaxis_title="참여 점수",
                     yaxis_title="진정성 점수"
                 )
-                st.plotly_chart(fig, width='stretch', key="engagement_authenticity_scatter")
+                st.plotly_chart(fig, width='stretch')
             else:
                 st.warning("유효한 참여율-진정성 분석 데이터가 없습니다.")
         
@@ -222,7 +222,7 @@ def render_advanced_visualizations():
                 )
             
             fig.update_layout(height=600, showlegend=False, title_text="다중 지표 분포 비교")
-            st.plotly_chart(fig, width='stretch', key="advanced_multi_metric_distribution")
+            st.plotly_chart(fig, width='stretch')
         
         
         # 지표 설명 섹션

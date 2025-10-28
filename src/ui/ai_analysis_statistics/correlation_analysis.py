@@ -58,9 +58,7 @@ def get_campaign_performance_data(campaign_id):
         sns_ids = [m['sns_id'] for m in mappings.data if m['sns_id']]
         platforms = [m['platform'] for m in mappings.data if m['platform']]
         
-        print(f"Debug - Found {len(mappings.data)} mappings")
-        print(f"Debug - SNS IDs: {sns_ids[:5]}...")  # 처음 5개만 출력
-        print(f"Debug - Platforms: {platforms[:5]}...")  # 처음 5개만 출력
+    # Debug 메시지 제거
         
         ai_analyses = []
         if sns_ids and platforms:
@@ -73,9 +71,8 @@ def get_campaign_performance_data(campaign_id):
                 
                 if ai_data.data:
                     ai_analyses.extend(ai_data.data)
-                    print(f"Debug - Found AI data for {sns_id} ({platform}): {len(ai_data.data)} records")
         
-        print(f"Debug - Total AI analyses found: {len(ai_analyses)}")
+        # Debug 메시지 제거
         
         # 5. 데이터 병합
         performance_data = []
@@ -104,9 +101,6 @@ def get_campaign_performance_data(campaign_id):
                                   if a['influencer_id'] == mapping['sns_id']), None)
                 if ai_analysis:
                     ai_data_count += 1
-                    print(f"Debug - Found AI analysis for {mapping['sns_id']}: {ai_analysis.get('overall_score', 'N/A')}")
-                else:
-                    print(f"Debug - No AI analysis found for {mapping['sns_id']} ({mapping['platform']})")
             
             # 데이터 포인트 생성
             data_point = {
@@ -152,8 +146,7 @@ def get_campaign_performance_data(campaign_id):
             
             performance_data.append(data_point)
         
-        print(f"Debug - Final performance data count: {len(performance_data)}")
-        print(f"Debug - AI data matched count: {ai_data_count}")
+        # Debug 메시지 제거
         
         return pd.DataFrame(performance_data)
             
@@ -212,12 +205,19 @@ def render_correlation_analysis():
     # 1. AI 점수와 실제 성과 상관관계 분석
     st.markdown("#### 📊 AI 점수와 실제 성과 상관관계")
     
-    # 상관관계 계산 (shares 제외)
+    # 상관관계 계산 (shares 제외) - 0으로 나누기 방지
     correlation_columns = ['engagement_score', 'activity_score', 'communication_score', 
                           'growth_potential_score', 'overall_score', 'likes', 'comments', 
                           'views', 'clicks', 'conversions']
     
-    correlation_data = ai_data[correlation_columns].corr()
+    # NaN 값과 무한대 값 제거
+    correlation_data_clean = ai_data[correlation_columns].replace([np.inf, -np.inf], np.nan).dropna()
+    
+    if len(correlation_data_clean) > 1:
+        correlation_data = correlation_data_clean.corr()
+    else:
+        # 데이터가 부족한 경우 빈 상관관계 매트릭스 생성
+        correlation_data = pd.DataFrame(index=correlation_columns, columns=correlation_columns)
     
     # AI 점수와 성과 지표 간 상관관계만 추출 (shares 제외)
     ai_scores = ['engagement_score', 'activity_score', 'communication_score', 'growth_potential_score', 'overall_score']
@@ -234,7 +234,7 @@ def render_correlation_analysis():
         title="AI 점수와 실제 성과 간 상관관계",
         labels=dict(color="상관계수")
     )
-    st.plotly_chart(fig, width='stretch', key="ai_performance_correlation")
+    st.plotly_chart(fig, width='stretch')
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -272,7 +272,7 @@ def render_correlation_analysis():
         title="AI 종합점수 구간별 평균 성과",
         labels={'value': '평균 성과', 'variable': '성과 지표'}
     )
-    st.plotly_chart(fig, width='stretch', key="score_performance_analysis")
+    st.plotly_chart(fig, width='stretch')
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -296,7 +296,7 @@ def render_correlation_analysis():
         title="참여도 점수 vs 좋아요 수",
         labels={'engagement_score': '참여도 점수', 'likes': '좋아요 수'}
     )
-    st.plotly_chart(fig1, width='stretch', key="engagement_likes_scatter")
+    st.plotly_chart(fig1, width='stretch')
     
     # 종합점수와 조회수
     fig2 = px.scatter(
@@ -308,7 +308,7 @@ def render_correlation_analysis():
         title="종합점수 vs 조회수",
         labels={'overall_score': '종합점수', 'views': '조회수'}
     )
-    st.plotly_chart(fig2, width='stretch', key="overall_views_scatter")
+    st.plotly_chart(fig2, width='stretch')
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -327,9 +327,15 @@ def render_correlation_analysis():
     ai_metrics = ['engagement_score', 'activity_score', 'communication_score', 'growth_potential_score', 'overall_score']
     performance_metrics = ['likes', 'comments', 'views', 'clicks', 'conversions']
     
-    # 상관관계 계산
-    correlation_matrix = ai_data[ai_metrics + performance_metrics].corr()
-    ai_performance_corr = correlation_matrix.loc[ai_metrics, performance_metrics]
+    # 상관관계 계산 - 0으로 나누기 방지
+    correlation_data_clean = ai_data[ai_metrics + performance_metrics].replace([np.inf, -np.inf], np.nan).dropna()
+    
+    if len(correlation_data_clean) > 1:
+        correlation_matrix = correlation_data_clean.corr()
+        ai_performance_corr = correlation_matrix.loc[ai_metrics, performance_metrics]
+    else:
+        # 데이터가 부족한 경우 빈 상관관계 매트릭스 생성
+        ai_performance_corr = pd.DataFrame(index=ai_metrics, columns=performance_metrics)
     
     # 상관관계 히트맵
     fig = px.imshow(
@@ -340,7 +346,7 @@ def render_correlation_analysis():
         title="AI 지표와 성과 지표 간 상관관계 매트릭스",
         labels=dict(color="상관계수")
     )
-    st.plotly_chart(fig, width='stretch', key="ai_metrics_correlation_matrix")
+    st.plotly_chart(fig, width='stretch')
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -362,11 +368,15 @@ def render_correlation_analysis():
         correlations = []
         for perf_metric in performance_metrics:
             # 0으로 나누기 방지를 위해 유효한 데이터만 사용
-            valid_data = ai_data[[ai_metric, perf_metric]].dropna()
+            valid_data = ai_data[[ai_metric, perf_metric]].replace([np.inf, -np.inf], np.nan).dropna()
             if len(valid_data) > 1:  # 최소 2개 데이터 필요
-                corr = valid_data[ai_metric].corr(valid_data[perf_metric])
-                if not pd.isna(corr) and not np.isinf(corr):
-                    correlations.append(abs(corr))  # 절댓값으로 강도 측정
+                try:
+                    corr = valid_data[ai_metric].corr(valid_data[perf_metric])
+                    if not pd.isna(corr) and not np.isinf(corr):
+                        correlations.append(abs(corr))  # 절댓값으로 강도 측정
+                except Exception:
+                    # 상관관계 계산 실패 시 건너뛰기
+                    continue
         ai_prediction_power[ai_metric] = np.mean(correlations) if correlations else 0
     
     # 예측력 순위 정렬
@@ -391,7 +401,7 @@ def render_correlation_analysis():
         color_continuous_scale=px.colors.sequential.Viridis
     )
     fig.update_layout(xaxis_tickangle=-45)
-    st.plotly_chart(fig, width='stretch', key="ai_prediction_ranking")
+    st.plotly_chart(fig, width='stretch')
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -432,15 +442,19 @@ def render_correlation_analysis():
         metric_correlations = []
         for perf_metric in performance_metrics:
             # 0으로 나누기 방지를 위해 유효한 데이터만 사용
-            valid_data = ai_data[[ai_metric, perf_metric]].dropna()
+            valid_data = ai_data[[ai_metric, perf_metric]].replace([np.inf, -np.inf], np.nan).dropna()
             if len(valid_data) > 1:  # 최소 2개 데이터 필요
-                corr = valid_data[ai_metric].corr(valid_data[perf_metric])
-                if not pd.isna(corr) and not np.isinf(corr):
-                    metric_correlations.append({
-                        '성과지표': perf_metric,
-                        '상관계수': corr,
-                        '절댓값': abs(corr)
-                    })
+                try:
+                    corr = valid_data[ai_metric].corr(valid_data[perf_metric])
+                    if not pd.isna(corr) and not np.isinf(corr):
+                        metric_correlations.append({
+                            '성과지표': perf_metric,
+                            '상관계수': corr,
+                            '절댓값': abs(corr)
+                        })
+                except Exception:
+                    # 상관관계 계산 실패 시 건너뛰기
+                    continue
         
         if metric_correlations:
             metric_df = pd.DataFrame(metric_correlations).sort_values('절댓값', ascending=False)
@@ -550,7 +564,7 @@ def render_correlation_analysis():
             color='R² 점수',
             color_continuous_scale=px.colors.sequential.Viridis
         )
-        st.plotly_chart(fig, width='stretch', key="performance_prediction_r2")
+        st.plotly_chart(fig, width='stretch')
         
         # 해석 추가
         with st.expander("📈 해석", expanded=False):
