@@ -52,7 +52,7 @@ def render_evaluation_scores_statistics():
                 annotation_text=f"평균: {avg_overall:.1f}",
                 annotation_position="top"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # 추론 신뢰도 분포
         if score_stats['inference_confidence_distribution']:
@@ -71,7 +71,7 @@ def render_evaluation_scores_statistics():
                 annotation_text=f"평균: {avg_confidence:.1f}",
                 annotation_position="top"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # 개별 점수 분포들
         st.markdown("#### 📊 개별 점수 분포")
@@ -95,7 +95,7 @@ def render_evaluation_scores_statistics():
                     annotation_text=f"평균: {score_stats['avg_engagement']:.1f}",
                     annotation_position="top"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             with col2:
                 fig = px.histogram(
@@ -112,7 +112,7 @@ def render_evaluation_scores_statistics():
                     annotation_text=f"평균: {score_stats['avg_activity']:.1f}",
                     annotation_position="top"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
         
         # 소통력과 성장성 분포
         if score_stats['communication_score_distribution']:
@@ -133,7 +133,7 @@ def render_evaluation_scores_statistics():
                     annotation_text=f"평균: {score_stats['avg_communication']:.1f}",
                     annotation_position="top"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             with col2:
                 fig = px.histogram(
@@ -150,7 +150,7 @@ def render_evaluation_scores_statistics():
                     annotation_text=f"평균: {score_stats['avg_growth_potential']:.1f}",
                     annotation_position="top"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
         
         # 상관관계 분석
         if score_stats['correlation_data'] is not None:
@@ -163,7 +163,7 @@ def render_evaluation_scores_statistics():
                 aspect="auto",
                 title="점수 간 상관관계 매트릭스"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # 통계 해석 가이드
         st.markdown("---")

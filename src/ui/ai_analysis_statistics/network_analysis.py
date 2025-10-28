@@ -48,7 +48,7 @@ def render_network_analysis_statistics():
                 fig.add_vline(x=network_stats['avg_authenticity_score'], 
                              line_dash="dash", line_color="red",
                              annotation_text=f"평균: {network_stats['avg_authenticity_score']:.1f}")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             with col2:
                 st.markdown("#### 📊 진정성 점수 박스플롯")
@@ -57,7 +57,7 @@ def render_network_analysis_statistics():
                     title="진정성 점수 분포 (박스플롯)",
                     labels={'y': '진정성 점수'}
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
         
         # 네트워크 유형별 상세 분석
         if network_stats['network_type_distribution']:
@@ -70,7 +70,7 @@ def render_network_analysis_statistics():
                     names=list(network_stats['network_type_distribution'].keys()),
                     title="네트워크 유형 분포"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             with col2:
                 st.markdown("#### 📊 네트워크 유형별 진정성 점수")
@@ -85,7 +85,7 @@ def render_network_analysis_statistics():
                         labels={'x': '네트워크 유형', 'y': '평균 진정성 점수'}
                     )
                     fig.update_layout(xaxis_tickangle=45)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
         
         # 팔로워/팔로잉 비율 분석
         if network_stats['follower_following_ratio']:
@@ -106,7 +106,7 @@ def render_network_analysis_statistics():
                 title="팔로워/팔로잉 비율 분포",
                 labels={'x': '팔로워/팔로잉 비율', 'y': '빈도'}
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # 진정성 점수와 팔로워 수 상관관계
         if network_stats['authenticity_follower_correlation']:
@@ -121,7 +121,7 @@ def render_network_analysis_statistics():
                 trendline="ols"
             )
             fig.update_layout(xaxis_type="log")  # 로그 스케일로 표시
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
             # 상관계수 표시
             correlation_coef = network_stats.get('authenticity_follower_correlation_coef', 0)
@@ -138,7 +138,7 @@ def render_network_analysis_statistics():
                 color=list(network_stats['network_quality_grades'].keys()),
                 color_discrete_sequence=['#00cc88', '#88cc00', '#ffaa00', '#ff8800', '#ff4444']
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # 통계 해석 가이드
         st.markdown("---")

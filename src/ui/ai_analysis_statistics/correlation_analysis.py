@@ -234,7 +234,7 @@ def render_correlation_analysis():
         title="AI 점수와 실제 성과 간 상관관계",
         labels=dict(color="상관계수")
     )
-    st.plotly_chart(fig, use_container_width=True, key="ai_performance_correlation")
+    st.plotly_chart(fig, width='stretch', key="ai_performance_correlation")
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -272,7 +272,7 @@ def render_correlation_analysis():
         title="AI 종합점수 구간별 평균 성과",
         labels={'value': '평균 성과', 'variable': '성과 지표'}
     )
-    st.plotly_chart(fig, use_container_width=True, key="score_performance_analysis")
+    st.plotly_chart(fig, width='stretch', key="score_performance_analysis")
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -296,7 +296,7 @@ def render_correlation_analysis():
         title="참여도 점수 vs 좋아요 수",
         labels={'engagement_score': '참여도 점수', 'likes': '좋아요 수'}
     )
-    st.plotly_chart(fig1, use_container_width=True, key="engagement_likes_scatter")
+    st.plotly_chart(fig1, width='stretch', key="engagement_likes_scatter")
     
     # 종합점수와 조회수
     fig2 = px.scatter(
@@ -308,7 +308,7 @@ def render_correlation_analysis():
         title="종합점수 vs 조회수",
         labels={'overall_score': '종합점수', 'views': '조회수'}
     )
-    st.plotly_chart(fig2, use_container_width=True, key="overall_views_scatter")
+    st.plotly_chart(fig2, width='stretch', key="overall_views_scatter")
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -340,7 +340,7 @@ def render_correlation_analysis():
         title="AI 지표와 성과 지표 간 상관관계 매트릭스",
         labels=dict(color="상관계수")
     )
-    st.plotly_chart(fig, use_container_width=True, key="ai_metrics_correlation_matrix")
+    st.plotly_chart(fig, width='stretch', key="ai_metrics_correlation_matrix")
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -391,7 +391,7 @@ def render_correlation_analysis():
         color_continuous_scale=px.colors.sequential.Viridis
     )
     fig.update_layout(xaxis_tickangle=-45)
-    st.plotly_chart(fig, use_container_width=True, key="ai_prediction_ranking")
+    st.plotly_chart(fig, width='stretch', key="ai_prediction_ranking")
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -550,7 +550,7 @@ def render_correlation_analysis():
             color='R² 점수',
             color_continuous_scale=px.colors.sequential.Viridis
         )
-        st.plotly_chart(fig, use_container_width=True, key="performance_prediction_r2")
+        st.plotly_chart(fig, width='stretch', key="performance_prediction_r2")
         
         # 해석 추가
         with st.expander("📈 해석", expanded=False):
@@ -610,17 +610,17 @@ def render_correlation_analysis():
         '값': [
             len(performance_data),
             len(ai_data),
-            f"{safe_mean(ai_data['overall_score']):.2f}",
-            f"{safe_mean(ai_data['likes']):.0f}",
-            f"{safe_mean(ai_data['views']):.0f}",
-            f"{safe_mean(ai_data['comments']):.0f}",
-            f"{safe_mean(ai_data['clicks']):.0f}",
-            f"{safe_mean(ai_data['conversions']):.0f}"
+            round(safe_mean(ai_data['overall_score']), 2),
+            round(safe_mean(ai_data['likes']), 0),
+            round(safe_mean(ai_data['views']), 0),
+            round(safe_mean(ai_data['comments']), 0),
+            round(safe_mean(ai_data['clicks']), 0),
+            round(safe_mean(ai_data['conversions']), 0)
         ]
     }
     
     summary_df = pd.DataFrame(summary_data)
-    st.dataframe(summary_df, use_container_width=True)
+    st.dataframe(summary_df, width='stretch')
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):

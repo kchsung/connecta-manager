@@ -140,7 +140,7 @@ def render_basic_statistics():
         #                 showlegend=False,
         #                 coloraxis_showscale=False
         #             )
-        #             st.plotly_chart(fig, use_container_width=True)
+        #             st.plotly_chart(fig, width='stretch')
         #         
         #         # 상세 태그 통계
         #         col1, col2 = st.columns(2)
@@ -230,7 +230,7 @@ def render_basic_statistics():
             fig.update_yaxes(title_text="분석 수", secondary_y=False)
             fig.update_yaxes(title_text="평균 점수 (/10)", secondary_y=True)
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
             # 카테고리별 태그 분석
             st.markdown("**카테고리별 태그 분석:**")
@@ -272,7 +272,7 @@ def render_basic_statistics():
                                 coloraxis_showscale=False
                             )
                             fig.update_traces(text=[count for tag, count in top_tags], textposition='outside')
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, width='stretch')
                     
                     with tab2:
                         # 상위 태그 메트릭
@@ -318,7 +318,7 @@ def render_basic_statistics():
                             }
                             for i, (tag, count) in enumerate(tag_counts.most_common(), 1)
                         ])
-                        st.dataframe(df, use_container_width=True)
+                        st.dataframe(df, width='stretch')
                 else:
                     st.info(f"'{selected_category}' 카테고리의 태그 데이터를 찾을 수 없습니다.")
             

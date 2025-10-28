@@ -84,7 +84,7 @@ def render_activity_metrics_statistics():
                     trendline="ols"
                 )
                 fig.update_layout(xaxis_type="log", yaxis_type="log")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             with col2:
                 # 상관계수와 통계 정보
@@ -106,7 +106,7 @@ def render_activity_metrics_statistics():
                     names=list(activity_stats['posting_pace_distribution'].keys()),
                     title="게시 빈도 분포"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             with col2:
                 st.markdown("#### 📊 게시 빈도별 평균 참여율")
@@ -121,7 +121,7 @@ def render_activity_metrics_statistics():
                         labels={'x': '게시 빈도', 'y': '평균 참여율 (%)'}
                     )
                     fig.update_layout(xaxis_tickangle=45)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
         
         # 참여율 분포 및 통계
         if activity_stats['engagement_rate_distribution']:
@@ -139,7 +139,7 @@ def render_activity_metrics_statistics():
                 fig.add_vline(x=activity_stats['avg_engagement_rate'], 
                              line_dash="dash", line_color="red",
                              annotation_text=f"평균: {activity_stats['avg_engagement_rate']:.2f}%")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             with col2:
                 st.markdown("#### 📊 참여율 박스플롯")
@@ -148,7 +148,7 @@ def render_activity_metrics_statistics():
                     title="참여율 분포 (박스플롯)",
                     labels={'y': '참여율 (%)'}
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
         
         # 활동성 등급 분포
         if activity_stats['activity_grade_distribution']:
@@ -161,7 +161,7 @@ def render_activity_metrics_statistics():
                 color=list(activity_stats['activity_grade_distribution'].keys()),
                 color_discrete_sequence=['#27ae60', '#2ecc71', '#f1c40f', '#f39c12', '#e74c3c']
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # 참여율 트렌드 분석 (시뮬레이션)
         if activity_stats['engagement_rate_distribution']:
@@ -193,7 +193,7 @@ def render_activity_metrics_statistics():
                 names=list(engagement_ranges.keys()),
                 title="참여율 구간별 분포"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # 활동성 등급 분포 계산식 설명
         st.markdown("---")

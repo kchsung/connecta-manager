@@ -10,8 +10,8 @@ def render_login_form() -> Dict[str, Any]:
         email = st.text_input("이메일", placeholder="your@email.com")
         password = st.text_input("비밀번호", type="password")
         
-        login_submitted = st.form_submit_button("로그인", type="primary", use_container_width=True)
-        forgot_password = st.form_submit_button("비밀번호 찾기", use_container_width=True)
+        login_submitted = st.form_submit_button("로그인", type="primary", width='stretch')
+        forgot_password = st.form_submit_button("비밀번호 찾기", width='stretch')
         
         if login_submitted:
             if not email or not password:
@@ -56,7 +56,7 @@ def render_signup_form() -> Dict[str, Any]:
         password = st.text_input("비밀번호", type="password")
         confirm_password = st.text_input("비밀번호 확인", type="password")
         
-        signup_submitted = st.form_submit_button("회원가입", type="primary", use_container_width=True)
+        signup_submitted = st.form_submit_button("회원가입", type="primary", width='stretch')
         
         if signup_submitted:
             if not email or not password or not confirm_password:
@@ -92,7 +92,7 @@ def render_auth_sidebar():
             user = supabase_auth.get_current_user()
             st.success(f"로그인됨: {user.email}")
             
-            if st.button("로그아웃", type="secondary", use_container_width=True):
+            if st.button("로그아웃", type="secondary", width='stretch'):
                 result = supabase_auth.sign_out()
                 if result["success"]:
                     st.success(result["message"])

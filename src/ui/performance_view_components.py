@@ -323,7 +323,7 @@ def render_performance_view_tab():
         edited_df = st.data_editor(
             df,
             column_config=column_config,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             key="performance_data_editor",
             on_change=None  # 변경 시 자동 갱신 방지
@@ -432,7 +432,7 @@ def render_performance_detail_modal():
                 }
             )
         df_history = pd.DataFrame(history_data)
-        st.dataframe(df_history, use_container_width=True, hide_index=True)
+        st.dataframe(df_history, width='stretch', hide_index=True)
 
     if st.button("❌ 닫기", key=f"close_performance_detail_{influencer['id']}"):
         st.session_state.pop("viewing_performance", None)
@@ -531,7 +531,7 @@ def preview_performance_changes(original_df, edited_df):
         if changes:
             st.markdown("#### 📋 변경사항 미리보기")
             changes_df = pd.DataFrame(changes)
-            st.dataframe(changes_df, use_container_width=True, hide_index=True)
+            st.dataframe(changes_df, width='stretch', hide_index=True)
             st.success(f"✅ {len(changes)}개 항목에 변경사항이 있습니다.")
         else:
             st.info("💡 변경된 데이터가 없습니다.")
@@ -662,7 +662,7 @@ def save_performance_changes(original_df, edited_df, participation_mapping):
             if changed_items:
                 with st.expander("📋 변경된 성과 데이터", expanded=True):
                     changes_df = pd.DataFrame(changed_items)
-                    st.dataframe(changes_df, use_container_width=True, hide_index=True)
+                    st.dataframe(changes_df, width='stretch', hide_index=True)
         
         if error_count > 0:
             st.error(f"❌ {error_count}개의 데이터 저장에 실패했습니다.")
