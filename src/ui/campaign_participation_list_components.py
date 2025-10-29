@@ -227,6 +227,9 @@ def render_influencer_cards(participations):
 
 def render_participation_detail_form(participation, selected_campaign):
     """선택된 인플루언서의 상세 정보 편집 폼"""
+    # 선택된 인플루언서 ID를 key에 포함하여 동적으로 생성
+    participation_id = participation.get('id', 'unknown')
+    
     st.markdown(f"**선택된 인플루언서:** {participation.get('influencer_name', 'N/A')} ({participation.get('platform', 'N/A')})")
     
     # connecta_influencers 테이블 정보 (읽기 전용)
@@ -234,15 +237,15 @@ def render_participation_detail_form(participation, selected_campaign):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.text_input("플랫폼", value=participation.get('platform', ''), disabled=True, key="readonly_platform")
-        st.text_input("SNS ID", value=participation.get('sns_id', ''), disabled=True, key="readonly_sns_id")
-        st.text_input("인플루언서명", value=participation.get('influencer_name', ''), disabled=True, key="readonly_name")
+        st.text_input("플랫폼", value=participation.get('platform', ''), disabled=True, key=f"readonly_platform_{participation_id}")
+        st.text_input("SNS ID", value=participation.get('sns_id', ''), disabled=True, key=f"readonly_sns_id_{participation_id}")
+        st.text_input("인플루언서명", value=participation.get('influencer_name', ''), disabled=True, key=f"readonly_name_{participation_id}")
         
         # SNS URL을 클릭 가능한 링크로 표시
         sns_url = participation.get('sns_url', '')
         
         # 디버깅 정보 표시 (개발용)
-        if st.checkbox("🔍 디버깅 정보 표시", key="debug_info"):
+        if st.checkbox("🔍 디버깅 정보 표시", key=f"debug_info_{participation_id}"):
             st.markdown("**Participation 데이터 구조:**")
             st.json(participation)
             st.markdown(f"**SNS URL 값:** `{repr(sns_url)}`")
@@ -250,7 +253,7 @@ def render_participation_detail_form(participation, selected_campaign):
             st.markdown(f"**SNS URL 길이:** `{len(sns_url) if sns_url else 0}`")
             
             # 캐시 초기화 버튼
-            if st.button("🔄 캐시 초기화 및 새로고침", key="clear_cache"):
+            if st.button("🔄 캐시 초기화 및 새로고침", key=f"clear_cache_{participation_id}"):
                 # 모든 캐시 초기화
                 if "participations_cache" in st.session_state:
                     del st.session_state["participations_cache"]
@@ -260,20 +263,20 @@ def render_participation_detail_form(participation, selected_campaign):
         if sns_url and sns_url.strip():
             st.markdown(f"**SNS URL:** [{sns_url}]({sns_url})")
         else:
-            st.text_input("SNS URL", value="등록되지 않음", disabled=True, key="readonly_url")
+            st.text_input("SNS URL", value="등록되지 않음", disabled=True, key=f"readonly_url_{participation_id}")
             st.caption("⚠️ 이 인플루언서의 SNS URL이 데이터베이스에 등록되지 않았습니다.")
     
     with col2:
-        st.number_input("팔로워 수", value=participation.get('followers_count', 0), disabled=True, key="readonly_followers")
-        st.text_input("연락방법", value=participation.get('contact_method', ''), disabled=True, key="readonly_contact")
-        st.text_input("전화번호", value=participation.get('phone_number', ''), disabled=True, key="readonly_phone")
-        st.text_input("이메일", value=participation.get('email', ''), disabled=True, key="readonly_email")
+        st.number_input("팔로워 수", value=participation.get('followers_count', 0), disabled=True, key=f"readonly_followers_{participation_id}")
+        st.text_input("연락방법", value=participation.get('contact_method', ''), disabled=True, key=f"readonly_contact_{participation_id}")
+        st.text_input("전화번호", value=participation.get('phone_number', ''), disabled=True, key=f"readonly_phone_{participation_id}")
+        st.text_input("이메일", value=participation.get('email', ''), disabled=True, key=f"readonly_email_{participation_id}")
     
     
     # campaign_influencer_participations 테이블 정보 (편집 가능)
     st.markdown("##### ✏️ 캠페인 참여 정보")
     
-    with st.form("participation_edit_form"):
+    with st.form(f"participation_edit_form_{participation_id}"):
         # 샘플 상태
         sample_status_options = ["요청", "발송준비", "발송완료", "수령"]
         current_sample_status = participation.get('sample_status', '요청')
@@ -283,14 +286,14 @@ def render_participation_detail_form(participation, selected_campaign):
             "샘플 상태",
             sample_status_options,
             index=sample_status_index,
-            key="detail_sample_status"
+            key=f"detail_sample_status_{participation_id}"
         )
         
         # 업로드 완료 여부
         content_uploaded = st.checkbox(
             "콘텐츠 업로드 완료",
             value=participation.get('content_uploaded', False),
-            key="detail_content_uploaded"
+            key=f"detail_content_uploaded_{participation_id}"
         )
         
         # 비용
@@ -299,35 +302,35 @@ def render_participation_detail_form(participation, selected_campaign):
             min_value=0,
             value=int(participation.get('cost_krw', 0)) if participation.get('cost_krw') else 0,
             step=1000,
-            key="detail_cost_krw"
+            key=f"detail_cost_krw_{participation_id}"
         )
         
         # 텍스트 필드들
         manager_comment = st.text_area(
             "매니저 코멘트",
             value=participation.get('manager_comment', ''),
-            key="detail_manager_comment",
+            key=f"detail_manager_comment_{participation_id}",
             max_chars=500
         )
         
         influencer_requests = st.text_area(
             "인플루언서 요청사항",
             value=participation.get('influencer_requests', ''),
-            key="detail_influencer_requests",
+            key=f"detail_influencer_requests_{participation_id}",
             max_chars=500
         )
         
         influencer_feedback = st.text_area(
             "인플루언서 피드백",
             value=participation.get('influencer_feedback', ''),
-            key="detail_influencer_feedback",
+            key=f"detail_influencer_feedback_{participation_id}",
             max_chars=500
         )
         
         memo = st.text_area(
             "메모",
             value=participation.get('memo', ''),
-            key="detail_memo",
+            key=f"detail_memo_{participation_id}",
             max_chars=500
         )
         
@@ -378,7 +381,7 @@ def render_campaign_performance_section(participation):
 
 def render_add_content_form(participation_id):
     """새 콘텐츠 추가 폼"""
-    with st.form("add_content_form"):
+    with st.form(f"add_content_form_{participation_id}"):
         st.markdown("**새 콘텐츠 성과 정보 입력**")
         
         col1, col2 = st.columns(2)
@@ -388,28 +391,28 @@ def render_add_content_form(participation_id):
                 "콘텐츠 URL *",
                 placeholder="https://instagram.com/p/...",
                 help="콘텐츠의 URL을 입력하세요",
-                key="new_content_url"
+                key=f"new_content_url_{participation_id}"
             )
             
             posted_at = st.date_input(
                 "게시일",
                 value=None,
                 help="콘텐츠가 게시된 날짜",
-                key="new_posted_at"
+                key=f"new_posted_at_{participation_id}"
             )
             
             caption = st.text_area(
                 "캡션",
                 placeholder="콘텐츠의 캡션 내용",
                 max_chars=1000,
-                key="new_caption"
+                key=f"new_caption_{participation_id}"
             )
             
             qualitative_note = st.text_area(
                 "정성평가",
                 placeholder="콘텐츠에 대한 정성적 평가",
                 max_chars=500,
-                key="new_qualitative_note"
+                key=f"new_qualitative_note_{participation_id}"
             )
         
         with col2:
@@ -417,49 +420,49 @@ def render_add_content_form(participation_id):
                 "좋아요 수",
                 min_value=0,
                 value=0,
-                key="new_likes"
+                key=f"new_likes_{participation_id}"
             )
             
             comments = st.number_input(
                 "댓글 수",
                 min_value=0,
                 value=0,
-                key="new_comments"
+                key=f"new_comments_{participation_id}"
             )
             
             shares = st.number_input(
                 "공유 수",
                 min_value=0,
                 value=0,
-                key="new_shares"
+                key=f"new_shares_{participation_id}"
             )
             
             views = st.number_input(
                 "조회 수",
                 min_value=0,
                 value=0,
-                key="new_views"
+                key=f"new_views_{participation_id}"
             )
             
             clicks = st.number_input(
                 "클릭 수",
                 min_value=0,
                 value=0,
-                key="new_clicks"
+                key=f"new_clicks_{participation_id}"
             )
             
             conversions = st.number_input(
                 "전환 수",
                 min_value=0,
                 value=0,
-                key="new_conversions"
+                key=f"new_conversions_{participation_id}"
             )
             
             is_rels = st.number_input(
                 "REL 수",
                 min_value=0,
                 value=0,
-                key="new_is_rels"
+                key=f"new_is_rels_{participation_id}"
             )
         
         if st.form_submit_button("➕ 콘텐츠 추가", type="primary"):
