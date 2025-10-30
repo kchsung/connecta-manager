@@ -10,6 +10,10 @@ from .common_functions import (
     format_campaign_status,
     validate_campaign_data
 )
+from .campaign_participation_list_components import (
+    get_cached_participations,
+    render_participation_list_table,
+)
 
 def render_campaign_list():
     """캠페인 목록 조회 및 관리"""
@@ -195,4 +199,16 @@ def render_campaign_edit_form(campaign):
                 else:
                     st.error(f"캠페인 삭제 실패: {result['message']}")
 
+
+    # 참여 리스트 테이블 뷰
+    st.markdown("---")
+    st.markdown("### 👥 참여 리스트")
+    try:
+        participations = get_cached_participations(campaign.get('id', ''))
+        if participations:
+            render_participation_list_table(participations)
+        else:
+            st.info("이 캠페인의 참여자가 없습니다.")
+    except Exception as e:
+        st.error(f"참여 리스트 조회 중 오류가 발생했습니다: {str(e)}")
 

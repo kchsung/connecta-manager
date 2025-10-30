@@ -682,8 +682,8 @@ def save_participation_detail(participation, update_data):
         st.code(traceback.format_exc())
 
 def render_participation_list_table(participations):
-    """참여 인플루언서 목록 테이블 (편집 가능)"""
-    # 참여 인플루언서 목록을 편집 가능한 테이블로 표시
+    """참여 인플루언서 목록 테이블 (보기 전용)"""
+    # 참여 인플루언서 목록을 보기 전용 테이블로 표시
     participation_data = []
     for participation in participations:
         participation_data.append({
@@ -703,99 +703,9 @@ def render_participation_list_table(participations):
     
     if participation_data:
         df = pd.DataFrame(participation_data)
-        
-        # 컬럼 설정
-        column_config = {
-            "ID": st.column_config.NumberColumn("ID", disabled=True, help="참여 인플루언서 고유 ID"),
-            "인플루언서": st.column_config.TextColumn(
-                "인플루언서",
-                help="인플루언서 이름 (읽기 전용)",
-                disabled=True,
-            ),
-            "플랫폼": st.column_config.TextColumn(
-                "플랫폼",
-                help="SNS 플랫폼 (읽기 전용)",
-                disabled=True,
-            ),
-            "SNS ID": st.column_config.TextColumn(
-                "SNS ID", 
-                help="SNS 계정 ID (읽기 전용)",
-                disabled=True,
-            ),
-            "샘플 상태": st.column_config.SelectboxColumn(
-                "샘플 상태",
-                help="샘플 발송 상태",
-                options=["요청", "발송준비", "발송완료", "수령"],
-            ),
-            "업로드 완료": st.column_config.CheckboxColumn(
-                "업로드 완료",
-                help="콘텐츠 업로드 완료 여부",
-            ),
-            "비용": st.column_config.NumberColumn(
-                "비용 (원)",
-                help="협찬 비용",
-                min_value=0,
-                step=1,
-                format="%d원",
-            ),
-            "매니저코멘트": st.column_config.TextColumn(
-                "매니저코멘트",
-                help="매니저 코멘트",
-                max_chars=500,
-            ),
-            "인플루언서요청사항": st.column_config.TextColumn(
-                "인플루언서요청사항",
-                help="인플루언서 요청사항",
-                max_chars=500,
-            ),
-            "인플루언서피드백": st.column_config.TextColumn(
-                "인플루언서피드백",
-                help="인플루언서 피드백",
-                max_chars=500,
-            ),
-            "메모": st.column_config.TextColumn(
-                "메모",
-                help="기타 메모",
-                max_chars=500,
-            ),
-            "참여일": st.column_config.TextColumn(
-                "참여일",
-                disabled=True,
-                help="참여 등록일 (읽기 전용)",
-            ),
-        }
-        
-        # 편집 가능한 테이블 표시
-        edited_df = st.data_editor(
-            df,
-            width='stretch',
-            height=600,
-            column_config=column_config,
-            disabled=["ID", "인플루언서", "플랫폼", "SNS ID", "참여일"],  # 수정 불가능한 컬럼
-            hide_index=True,
-            key="participation_editor"
-        )
-        
-        # 저장 버튼 (변경사항 감지 없이 항상 표시)
-        st.markdown("---")
-        st.markdown("### 💾 변경사항 저장")
-        
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            if st.button("💾 변경사항 저장", type="primary", key="save_participation_changes"):
-                save_edited_participations(df, edited_df)
-        
-        with col2:
-            if st.button("🔄 새로고침", key="refresh_participation_data"):
-                st.session_state.participation_data_refresh_requested = True  # 참여 데이터 새로고침 요청 플래그
-                st.rerun()
-        
-        st.info("💡 테이블에서 데이터를 편집한 후 '변경사항 저장' 버튼을 클릭하여 저장하세요.")
-        
-        # 총 개수 표시 및 편집 안내
+        # 보기 전용 테이블 렌더링
+        st.dataframe(df, use_container_width=True, hide_index=True)
         st.caption(f"총 {len(participations)}명의 참여 인플루언서가 표시됩니다.")
-        st.info("💡 **편집 가능한 필드**: 샘플 상태, 업로드 완료, 비용, 매니저코멘트, 인플루언서요청사항, 인플루언서피드백, 메모  \n📖 **읽기 전용 필드**: 인플루언서, 플랫폼, SNS ID, 참여일")
     else:
         st.info("표시할 참여 인플루언서가 없습니다.")
 
