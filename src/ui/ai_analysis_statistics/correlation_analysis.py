@@ -234,7 +234,7 @@ def render_correlation_analysis():
         title="AI 점수와 실제 성과 간 상관관계",
         labels=dict(color="상관계수")
     )
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -272,7 +272,7 @@ def render_correlation_analysis():
         title="AI 종합점수 구간별 평균 성과",
         labels={'value': '평균 성과', 'variable': '성과 지표'}
     )
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -296,7 +296,7 @@ def render_correlation_analysis():
         title="참여도 점수 vs 좋아요 수",
         labels={'engagement_score': '참여도 점수', 'likes': '좋아요 수'}
     )
-    st.plotly_chart(fig1, width='stretch')
+    st.plotly_chart(fig1, use_container_width=True)
     
     # 종합점수와 조회수
     fig2 = px.scatter(
@@ -308,7 +308,7 @@ def render_correlation_analysis():
         title="종합점수 vs 조회수",
         labels={'overall_score': '종합점수', 'views': '조회수'}
     )
-    st.plotly_chart(fig2, width='stretch')
+    st.plotly_chart(fig2, use_container_width=True)
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -346,7 +346,7 @@ def render_correlation_analysis():
         title="AI 지표와 성과 지표 간 상관관계 매트릭스",
         labels=dict(color="상관계수")
     )
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -401,7 +401,7 @@ def render_correlation_analysis():
         color_continuous_scale=px.colors.sequential.Viridis
     )
     fig.update_layout(xaxis_tickangle=-45)
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
     
     # 해석 추가
     with st.expander("📈 해석", expanded=False):
@@ -564,7 +564,7 @@ def render_correlation_analysis():
             color='R² 점수',
             color_continuous_scale=px.colors.sequential.Viridis
         )
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
         
         # 해석 추가
         with st.expander("📈 해석", expanded=False):

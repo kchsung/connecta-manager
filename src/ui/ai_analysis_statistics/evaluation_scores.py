@@ -52,7 +52,7 @@ def render_evaluation_scores_statistics():
                 annotation_text=f"평균: {avg_overall:.1f}",
                 annotation_position="top"
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         # 추론 신뢰도 분포
         if score_stats['inference_confidence_distribution']:

@@ -25,7 +25,7 @@ def render_comment_authenticity_statistics():
                 names=list(authenticity_stats['authenticity_level_distribution'].keys()),
                 title="댓글 진정성 등급 분포"
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         # 진정성 비율 통계
         st.markdown("#### 📈 진정성 비율 통계")
@@ -49,7 +49,7 @@ def render_comment_authenticity_statistics():
                 title="진정성 비율 분포",
                 labels={'x': '진정성 비율 (%)', 'y': '빈도'}
             )
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         # 통계 해석 가이드
         st.markdown("---")

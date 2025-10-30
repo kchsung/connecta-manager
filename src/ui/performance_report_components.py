@@ -315,7 +315,7 @@ def render_performance_metrics_analysis(campaign_data, participations_by_campaig
             y="좋아요", 
             title="캠페인별 총 좋아요 수"
         )
-        st.plotly_chart(fig_likes, width='stretch')
+        st.plotly_chart(fig_likes, use_container_width=True)
     
     with col2:
         fig_engagement = px.bar(
@@ -324,7 +324,7 @@ def render_performance_metrics_analysis(campaign_data, participations_by_campaig
             y="참여율", 
             title="캠페인별 평균 참여율"
         )
-        st.plotly_chart(fig_engagement, width='stretch')
+        st.plotly_chart(fig_engagement, use_container_width=True)
     
     # 플랫폼별 성과 비교
     col_title, col_help = st.columns([4, 1])

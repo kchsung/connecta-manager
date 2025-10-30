@@ -105,7 +105,7 @@ def render_statistical_insights():
                         )
                     )
                     
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, use_container_width=True)
                     
                     # 선택된 기준에 따른 이상치 통계 표시
                     outlier_count = outlier_viz_clean['is_outlier'].sum()

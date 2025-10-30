@@ -230,7 +230,7 @@ def render_basic_statistics():
             fig.update_yaxes(title_text="분석 수", secondary_y=False)
             fig.update_yaxes(title_text="평균 점수 (/10)", secondary_y=True)
             
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
             
             # 카테고리별 태그 분석
             st.markdown("**카테고리별 태그 분석:**")
@@ -272,7 +272,7 @@ def render_basic_statistics():
                                 coloraxis_showscale=False
                             )
                             fig.update_traces(text=[count for tag, count in top_tags], textposition='outside')
-                            st.plotly_chart(fig, width='stretch')
+                            st.plotly_chart(fig, use_container_width=True)
                     
                     with tab2:
                         # 상위 태그 메트릭
