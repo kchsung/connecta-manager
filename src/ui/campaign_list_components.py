@@ -44,7 +44,6 @@ def render_campaign_list():
     campaign_data = []
     for campaign in campaigns:
         campaign_data.append({
-            "ID": campaign.get('id', 'N/A'),
             "캠페인 이름": campaign.get('campaign_name', 'N/A'),
             "유형": format_campaign_type(campaign.get('campaign_type', '')),
             "상태": format_campaign_status(campaign.get('status', 'planned')),

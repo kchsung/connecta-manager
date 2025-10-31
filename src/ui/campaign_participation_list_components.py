@@ -687,7 +687,6 @@ def render_participation_list_table(participations):
     participation_data = []
     for participation in participations:
         participation_data.append({
-            "ID": participation.get('id'),  # 숨겨진 ID 필드
             "인플루언서": participation.get('influencer_name', participation.get('sns_id', '')),
             "플랫폼": participation.get('platform', 'instagram'),
             "SNS ID": participation.get('sns_id', ''),
