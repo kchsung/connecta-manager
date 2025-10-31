@@ -107,12 +107,12 @@ def render_campaign_calendar():
     - 텍스트: 캠페인명 | 유형 | 상태
     """
     st.markdown("### 📅 캠페인 캘린더")
-    view_mode = st.segmented_control(
+    view_mode = st.radio(
         "보기 방식",
         options=["달력", "타임라인"],
-        selection_mode="single",
-        default="달력",
+        index=0,  # 기본값: 달력
         key="campaign_calendar_view_mode",
+        horizontal=True,
     )
 
     try:

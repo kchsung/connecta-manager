@@ -2,11 +2,11 @@
 캠페인 관리 관련 컴포넌트들
 """
 import streamlit as st
-from .campaign_creation_components import render_campaign_creation
-from .campaign_list_components import render_campaign_list
-from .campaign_participation_add_components import render_participation_add
-from .campaign_participation_list_components import render_participation_list
-from .campaign_calendar_components import render_campaign_calendar
+from src.ui.campaign_creation_components import render_campaign_creation
+from src.ui.campaign_list_components import render_campaign_list
+from src.ui.campaign_participation_add_components import render_participation_add
+from src.ui.campaign_participation_list_components import render_participation_list
+from src.ui.campaign_calendar_components import render_campaign_calendar
 
 def render_campaign_management():
     """캠페인 관리 컴포넌트"""
