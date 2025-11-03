@@ -3,7 +3,20 @@
 """
 import streamlit as st
 import plotly.express as px
+import pandas as pd
+import numpy as np
 from .common_functions import get_enhanced_activity_metrics_statistics
+
+def filter_valid_data(data):
+    """histogram에 사용할 데이터에서 NaN과 무효값 제거"""
+    if not data:
+        return []
+    # NaN, None, inf 값 필터링
+    filtered = [
+        x for x in data 
+        if x is not None and pd.notna(x) and np.isfinite(x)
+    ]
+    return filtered
 
 def render_activity_metrics_statistics():
     """활동성/반응성 메트릭 통계 - 고도화된 버전"""
@@ -129,26 +142,35 @@ def render_activity_metrics_statistics():
             
             with col1:
                 st.markdown("#### 📈 참여율 분포")
-                fig = px.histogram(
-                    x=activity_stats['engagement_rate_distribution'],
-                    nbins=20,
-                    title="참여율 분포",
-                    labels={'x': '참여율 (%)', 'y': '빈도'},
-                    color_discrete_sequence=['#2ecc71']
-                )
-                fig.add_vline(x=activity_stats['avg_engagement_rate'], 
-                             line_dash="dash", line_color="red",
-                             annotation_text=f"평균: {activity_stats['avg_engagement_rate']:.2f}%")
-                st.plotly_chart(fig, use_container_width=True)
+                engagement_data = filter_valid_data(activity_stats['engagement_rate_distribution'])
+                if engagement_data:
+                    fig = px.histogram(
+                        x=engagement_data,
+                        nbins=20,
+                        title="참여율 분포",
+                        labels={'x': '참여율 (%)', 'y': '빈도'},
+                        color_discrete_sequence=['#2ecc71']
+                    )
+                    if pd.notna(activity_stats['avg_engagement_rate']) and np.isfinite(activity_stats['avg_engagement_rate']):
+                        fig.add_vline(x=activity_stats['avg_engagement_rate'], 
+                                     line_dash="dash", line_color="red",
+                                     annotation_text=f"평균: {activity_stats['avg_engagement_rate']:.2f}%")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("참여율 데이터가 없습니다.")
             
             with col2:
                 st.markdown("#### 📊 참여율 박스플롯")
-                fig = px.box(
-                    y=activity_stats['engagement_rate_distribution'],
-                    title="참여율 분포 (박스플롯)",
-                    labels={'y': '참여율 (%)'}
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                engagement_data = filter_valid_data(activity_stats['engagement_rate_distribution'])
+                if engagement_data:
+                    fig = px.box(
+                        y=engagement_data,
+                        title="참여율 분포 (박스플롯)",
+                        labels={'y': '참여율 (%)'}
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("참여율 데이터가 없습니다.")
         
         # 활동성 등급 분포
         if activity_stats['activity_grade_distribution']:

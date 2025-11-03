@@ -3,7 +3,20 @@
 """
 import streamlit as st
 import plotly.express as px
+import pandas as pd
+import numpy as np
 from .common_functions import get_enhanced_network_analysis_statistics
+
+def filter_valid_data(data):
+    """histogram에 사용할 데이터에서 NaN과 무효값 제거"""
+    if not data:
+        return []
+    # NaN, None, inf 값 필터링
+    filtered = [
+        x for x in data 
+        if x is not None and pd.notna(x) and np.isfinite(x)
+    ]
+    return filtered
 
 def render_network_analysis_statistics():
     """네트워크 분석 통계 - 고도화된 버전"""
@@ -38,26 +51,35 @@ def render_network_analysis_statistics():
             
             with col1:
                 st.markdown("#### 📈 진정성 점수 분포")
-                fig = px.histogram(
-                    x=network_stats['authenticity_distribution'],
-                    nbins=20,
-                    title="영향력 진정성 점수 분포",
-                    labels={'x': '진정성 점수', 'y': '빈도'},
-                    color_discrete_sequence=['#1f77b4']
-                )
-                fig.add_vline(x=network_stats['avg_authenticity_score'], 
-                             line_dash="dash", line_color="red",
-                             annotation_text=f"평균: {network_stats['avg_authenticity_score']:.1f}")
-                st.plotly_chart(fig, use_container_width=True)
+                authenticity_data = filter_valid_data(network_stats['authenticity_distribution'])
+                if authenticity_data:
+                    fig = px.histogram(
+                        x=authenticity_data,
+                        nbins=20,
+                        title="영향력 진정성 점수 분포",
+                        labels={'x': '진정성 점수', 'y': '빈도'},
+                        color_discrete_sequence=['#1f77b4']
+                    )
+                    if pd.notna(network_stats['avg_authenticity_score']) and np.isfinite(network_stats['avg_authenticity_score']):
+                        fig.add_vline(x=network_stats['avg_authenticity_score'], 
+                                     line_dash="dash", line_color="red",
+                                     annotation_text=f"평균: {network_stats['avg_authenticity_score']:.1f}")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("진정성 점수 데이터가 없습니다.")
             
             with col2:
                 st.markdown("#### 📊 진정성 점수 박스플롯")
-                fig = px.box(
-                    y=network_stats['authenticity_distribution'],
-                    title="진정성 점수 분포 (박스플롯)",
-                    labels={'y': '진정성 점수'}
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                authenticity_data = filter_valid_data(network_stats['authenticity_distribution'])
+                if authenticity_data:
+                    fig = px.box(
+                        y=authenticity_data,
+                        title="진정성 점수 분포 (박스플롯)",
+                        labels={'y': '진정성 점수'}
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("진정성 점수 데이터가 없습니다.")
         
         # 네트워크 유형별 상세 분석
         if network_stats['network_type_distribution']:
@@ -100,13 +122,17 @@ def render_network_analysis_statistics():
                 st.metric("최대 팔로워/팔로잉 비율", f"{network_stats['max_follower_following_ratio']:.2f}")
             
             # 팔로워/팔로잉 비율 분포
-            fig = px.histogram(
-                x=network_stats['follower_following_ratio'],
-                nbins=30,
-                title="팔로워/팔로잉 비율 분포",
-                labels={'x': '팔로워/팔로잉 비율', 'y': '빈도'}
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            ratio_data = filter_valid_data(network_stats['follower_following_ratio'])
+            if ratio_data:
+                fig = px.histogram(
+                    x=ratio_data,
+                    nbins=30,
+                    title="팔로워/팔로잉 비율 분포",
+                    labels={'x': '팔로워/팔로잉 비율', 'y': '빈도'}
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("팔로워/팔로잉 비율 데이터가 없습니다.")
         
         # 진정성 점수와 팔로워 수 상관관계
         if network_stats['authenticity_follower_correlation']:

@@ -497,18 +497,35 @@ def get_evaluation_scores_statistics():
             except:
                 correlation_data = None
         
+        # NaN 값 필터링
+        def filter_nan_values(data_list):
+            """NaN, None, inf 값을 제거한 유효한 데이터만 반환"""
+            if not data_list:
+                return []
+            return [
+                x for x in data_list 
+                if x is not None and pd.notna(x) and np.isfinite(x)
+            ]
+        
+        engagement_scores_clean = filter_nan_values(engagement_scores)
+        activity_scores_clean = filter_nan_values(activity_scores)
+        communication_scores_clean = filter_nan_values(communication_scores)
+        growth_potential_scores_clean = filter_nan_values(growth_potential_scores)
+        overall_scores_clean = filter_nan_values(overall_scores)
+        inference_confidences_clean = filter_nan_values(inference_confidences)
+        
         return {
-            "avg_engagement": sum(engagement_scores) / len(engagement_scores) if engagement_scores else 0,
-            "avg_activity": sum(activity_scores) / len(activity_scores) if activity_scores else 0,
-            "avg_communication": sum(communication_scores) / len(communication_scores) if communication_scores else 0,
-            "avg_growth_potential": sum(growth_potential_scores) / len(growth_potential_scores) if growth_potential_scores else 0,
-            "avg_overall": sum(overall_scores) / len(overall_scores) if overall_scores else 0,
-            "engagement_score_distribution": engagement_scores,
-            "activity_score_distribution": activity_scores,
-            "communication_score_distribution": communication_scores,
-            "growth_potential_score_distribution": growth_potential_scores,
-            "overall_score_distribution": overall_scores,
-            "inference_confidence_distribution": inference_confidences,
+            "avg_engagement": sum(engagement_scores_clean) / len(engagement_scores_clean) if engagement_scores_clean else 0,
+            "avg_activity": sum(activity_scores_clean) / len(activity_scores_clean) if activity_scores_clean else 0,
+            "avg_communication": sum(communication_scores_clean) / len(communication_scores_clean) if communication_scores_clean else 0,
+            "avg_growth_potential": sum(growth_potential_scores_clean) / len(growth_potential_scores_clean) if growth_potential_scores_clean else 0,
+            "avg_overall": sum(overall_scores_clean) / len(overall_scores_clean) if overall_scores_clean else 0,
+            "engagement_score_distribution": engagement_scores_clean,
+            "activity_score_distribution": activity_scores_clean,
+            "communication_score_distribution": communication_scores_clean,
+            "growth_potential_score_distribution": growth_potential_scores_clean,
+            "overall_score_distribution": overall_scores_clean,
+            "inference_confidence_distribution": inference_confidences_clean,
             "correlation_data": correlation_data
         }
     except Exception as e:
@@ -1051,7 +1068,7 @@ def get_enhanced_activity_metrics_statistics():
                 "std_recency_span": std_recency_span,
                 "posting_pace_distribution": posting_pace_dist,
                 "posting_pace_engagement": posting_pace_avg_engagement,
-                "engagement_rate_distribution": engagement_rates,
+                "engagement_rate_distribution": [x for x in engagement_rates if x is not None and pd.notna(x) and np.isfinite(x)],
                 "likes_comments_correlation": likes_comments_correlation,
                 "likes_comments_correlation_coef": likes_comments_correlation_coef,
                 "engagement_likes_correlation_coef": engagement_likes_correlation_coef,

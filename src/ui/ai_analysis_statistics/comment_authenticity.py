@@ -3,7 +3,20 @@
 """
 import streamlit as st
 import plotly.express as px
+import pandas as pd
+import numpy as np
 from .common_functions import get_comment_authenticity_statistics
+
+def filter_valid_data(data):
+    """histogram에 사용할 데이터에서 NaN과 무효값 제거"""
+    if not data:
+        return []
+    # NaN, None, inf 값 필터링
+    filtered = [
+        x for x in data 
+        if x is not None and pd.notna(x) and np.isfinite(x)
+    ]
+    return filtered
 
 def render_comment_authenticity_statistics():
     """댓글 진정성 통계"""
@@ -43,13 +56,17 @@ def render_comment_authenticity_statistics():
         # 진정성 비율 분포
         if authenticity_stats['authentic_ratio_distribution']:
             st.markdown("#### 📊 진정성 비율 분포")
-            fig = px.histogram(
-                x=authenticity_stats['authentic_ratio_distribution'],
-                nbins=20,
-                title="진정성 비율 분포",
-                labels={'x': '진정성 비율 (%)', 'y': '빈도'}
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            ratio_data = filter_valid_data(authenticity_stats['authentic_ratio_distribution'])
+            if ratio_data:
+                fig = px.histogram(
+                    x=ratio_data,
+                    nbins=20,
+                    title="진정성 비율 분포",
+                    labels={'x': '진정성 비율 (%)', 'y': '빈도'}
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("진정성 비율 데이터가 없습니다.")
         
         # 통계 해석 가이드
         st.markdown("---")
