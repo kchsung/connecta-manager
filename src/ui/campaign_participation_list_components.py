@@ -92,148 +92,104 @@ def render_participation_list_with_cards(participations, selected_campaign):
     with col1:
         st.markdown("#### 👥 참여 인플루언서 목록")
         render_influencer_cards(participations)
-    
-    with col2:
-        st.markdown("#### ✏️ 상세 정보 편집")
+        
+        # 좌측 하단: 인플루언서 기본 정보 (읽기 전용)
+        st.markdown("---")
+        st.markdown("#### 📋 인플루언서 기본 정보")
+        st.caption("⚠️ 이 섹션은 읽기 전용입니다. 수정할 수 없습니다.")
+        
         if st.session_state.selected_participation_id:
             selected_participation = next(
                 (p for p in participations if p.get('id') == st.session_state.selected_participation_id), 
                 None
             )
             if selected_participation:
-                render_participation_detail_form(selected_participation, selected_campaign)
+                render_influencer_basic_info(selected_participation)
+            else:
+                st.info("선택된 인플루언서 정보를 찾을 수 없습니다.")
+        else:
+            st.info("위에서 편집할 인플루언서를 선택해주세요.")
+    
+    with col2:
+        st.markdown("#### ✏️ 캠페인 정보 편집")
+        st.caption("💡 이 섹션은 편집 가능합니다. 캠페인 참여 정보와 성과 정보를 수정할 수 있습니다.")
+        
+        if st.session_state.selected_participation_id:
+            selected_participation = next(
+                (p for p in participations if p.get('id') == st.session_state.selected_participation_id), 
+                None
+            )
+            if selected_participation:
+                render_participation_edit_section(selected_participation, selected_campaign)
             else:
                 st.info("선택된 인플루언서 정보를 찾을 수 없습니다.")
         else:
             st.info("좌측에서 편집할 인플루언서를 선택해주세요.")
 
 def render_influencer_cards(participations):
-    """인플루언서 목록을 카드 형태로 표시"""
+    """인플루언서 목록을 드롭다운 메뉴로 표시"""
     if not participations:
         st.info("참여 인플루언서가 없습니다.")
         return
     
-    # 스크롤 가능한 컨테이너
-    with st.container():
-        for i, participation in enumerate(participations):
-            # 카드 스타일 적용
-            is_selected = st.session_state.selected_participation_id == participation.get('id')
-            
-            if is_selected:
-                card_style = """
-                <div style="
-                    background-color: #e3f2fd;
-                    border: 2px solid #2196f3;
-                    border-radius: 12px;
-                    padding: 16px;
-                    margin: 12px 0;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
-                ">
-                """
-            else:
-                card_style = """
-                <div style="
-                    background-color: #ffffff;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 12px;
-                    padding: 16px;
-                    margin: 12px 0;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                ">
-                """
-            
-            # 카드 자체를 버튼으로 만들기
-            influencer_name = participation.get('influencer_name', 'N/A')
-            sns_id = participation.get('sns_id', 'N/A')
-            platform = participation.get('platform', 'N/A').upper()
-            status = "✅ 완료" if participation.get('content_uploaded', False) else "⏳ 대기"
-            
-            # 카드 내용을 버튼 텍스트로 구성
-            button_text = f"👤 {influencer_name}  📱 {sns_id}  🌐 {platform}  {status}"
-            
-            # 카드 스타일을 버튼에 적용 (너비 일정하게)
-            button_style = """
-            <style>
-            .stButton > button {
-                width: 100% !important;
-                min-width: 100% !important;
-                max-width: 100% !important;
-                height: 60px;
-                border-radius: 12px;
-                border: 1px solid #e0e0e0;
-                background-color: #ffffff;
-                color: #333333;
-                font-weight: bold;
-                font-size: 14px;
-                text-align: left;
-                padding: 16px;
-                margin: 12px 0;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                transition: all 0.3s ease;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            .stButton > button:hover {
-                background-color: #f5f5f5;
-                border-color: #2196f3;
-                box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
-            }
-            </style>
-            """
-            
-            # 선택된 카드 스타일
-            if is_selected:
-                button_style = """
-                <style>
-                .stButton > button {
-                    width: 100% !important;
-                    min-width: 100% !important;
-                    max-width: 100% !important;
-                    height: 60px;
-                    border-radius: 12px;
-                    border: 2px solid #2196f3;
-                    background-color: #e3f2fd;
-                    color: #333333;
-                    font-weight: bold;
-                    font-size: 14px;
-                    text-align: left;
-                    padding: 16px;
-                    margin: 12px 0;
-                    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
-                    transition: all 0.3s ease;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-                .stButton > button:hover {
-                    background-color: #bbdefb;
-                    border-color: #1976d2;
-                    box-shadow: 0 6px 16px rgba(33, 150, 243, 0.4);
-                }
-                </style>
-                """
-            
-            st.markdown(button_style, unsafe_allow_html=True)
-            
-            # 카드 전체를 클릭 가능한 버튼으로 만들기
-            if st.button(button_text, key=f"card_button_{participation.get('id')}", help="이 인플루언서를 선택하여 편집"):
-                st.session_state.selected_participation_id = participation.get('id')
-                st.rerun()
+    # 드롭다운 옵션 생성
+    participation_options = {}
+    default_index = 0
+    
+    for i, participation in enumerate(participations):
+        participation_id = participation.get('id')
+        influencer_name = participation.get('influencer_name', 'N/A')
+        sns_id = participation.get('sns_id', 'N/A')
+        platform = participation.get('platform', 'N/A').upper()
+        status = "✅ 완료" if participation.get('content_uploaded', False) else "⏳ 대기"
+        
+        # 드롭다운에 표시할 텍스트
+        option_text = f"👤 {influencer_name}  📱 {sns_id}  🌐 {platform}  {status}"
+        participation_options[option_text] = participation_id
+        
+        # 현재 선택된 인플루언서의 인덱스 찾기
+        if st.session_state.selected_participation_id == participation_id:
+            default_index = i
+    
+    # "인플루언서를 선택하세요" 옵션 추가
+    option_list = ["인플루언서를 선택하세요"] + list(participation_options.keys())
+    
+    # 기본 선택값 설정 (현재 선택된 인플루언서가 있으면 해당 인덱스, 없으면 0)
+    if st.session_state.selected_participation_id:
+        selected_option = next(
+            (opt for opt in participation_options.keys() 
+             if participation_options[opt] == st.session_state.selected_participation_id),
+            option_list[0]
+        )
+        if selected_option in option_list:
+            selected_index = option_list.index(selected_option)
+        else:
+            selected_index = 0
+    else:
+        selected_index = 0
+    
+    # 드롭다운 메뉴 표시
+    selected_option_text = st.selectbox(
+        "참여 인플루언서를 선택하세요",
+        option_list,
+        index=selected_index,
+        key="participation_dropdown",
+        help="편집할 인플루언서를 선택하세요"
+    )
+    
+    # 선택된 옵션이 변경되면 세션 상태 업데이트
+    if selected_option_text and selected_option_text != "인플루언서를 선택하세요":
+        if selected_option_text in participation_options:
+            st.session_state.selected_participation_id = participation_options[selected_option_text]
+    else:
+        st.session_state.selected_participation_id = None
 
-def render_participation_detail_form(participation, selected_campaign):
-    """선택된 인플루언서의 상세 정보 편집 폼"""
-    # 선택된 인플루언서 ID를 key에 포함하여 동적으로 생성
+def render_influencer_basic_info(participation):
+    """인플루언서 기본 정보를 읽기 전용으로 표시 (좌측 하단)"""
     participation_id = participation.get('id', 'unknown')
     
     st.markdown(f"**선택된 인플루언서:** {participation.get('influencer_name', 'N/A')} ({participation.get('platform', 'N/A')})")
     
-    # connecta_influencers 테이블 정보 (읽기 전용)
-    st.markdown("##### 📋 인플루언서 기본 정보")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -243,23 +199,6 @@ def render_participation_detail_form(participation, selected_campaign):
         
         # SNS URL을 클릭 가능한 링크로 표시
         sns_url = participation.get('sns_url', '')
-        
-        # 디버깅 정보 표시 (개발용)
-        if st.checkbox("🔍 디버깅 정보 표시", key=f"debug_info_{participation_id}"):
-            st.markdown("**Participation 데이터 구조:**")
-            st.json(participation)
-            st.markdown(f"**SNS URL 값:** `{repr(sns_url)}`")
-            st.markdown(f"**SNS URL 타입:** `{type(sns_url)}`")
-            st.markdown(f"**SNS URL 길이:** `{len(sns_url) if sns_url else 0}`")
-            
-            # 캐시 초기화 버튼
-            if st.button("🔄 캐시 초기화 및 새로고침", key=f"clear_cache_{participation_id}"):
-                # 모든 캐시 초기화
-                if "participations_cache" in st.session_state:
-                    del st.session_state["participations_cache"]
-                st.cache_data.clear()
-                st.rerun()
-        
         if sns_url and sns_url.strip():
             st.markdown(f"**SNS URL:** [{sns_url}]({sns_url})")
         else:
@@ -271,9 +210,12 @@ def render_participation_detail_form(participation, selected_campaign):
         st.text_input("연락방법", value=participation.get('contact_method', ''), disabled=True, key=f"readonly_contact_{participation_id}")
         st.text_input("전화번호", value=participation.get('phone_number', ''), disabled=True, key=f"readonly_phone_{participation_id}")
         st.text_input("이메일", value=participation.get('email', ''), disabled=True, key=f"readonly_email_{participation_id}")
+
+def render_participation_edit_section(participation, selected_campaign):
+    """캠페인 참여 정보 및 성과 정보 편집 섹션 (우측)"""
+    participation_id = participation.get('id', 'unknown')
     
-    
-    # campaign_influencer_participations 테이블 정보 (편집 가능)
+    # 캠페인 참여 정보 편집
     st.markdown("##### ✏️ 캠페인 참여 정보")
     
     with st.form(f"participation_edit_form_{participation_id}"):
@@ -335,7 +277,7 @@ def render_participation_detail_form(participation, selected_campaign):
         )
         
         # 버튼들
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         
         with col1:
             if st.form_submit_button("💾 저장", type="primary"):
@@ -352,11 +294,6 @@ def render_participation_detail_form(participation, selected_campaign):
         with col2:
             if st.form_submit_button("🔄 새로고침"):
                 st.rerun()
-        
-        with col3:
-            if st.form_submit_button("❌ 선택 해제"):
-                st.session_state.selected_participation_id = None
-                st.rerun()
     
     # 캠페인 성과 정보 입력 섹션
     st.markdown("---")
@@ -370,14 +307,14 @@ def render_campaign_performance_section(participation):
     # 기존 콘텐츠 데이터 조회
     existing_contents = db_manager.get_campaign_influencer_contents(participation_id)
     
-    # 콘텐츠 추가/편집 탭
-    tab1, tab2 = st.tabs(["📝 콘텐츠 추가", "📋 기존 콘텐츠 관리"])
+    # 콘텐츠 추가/편집 탭 (기존 콘텐츠 관리가 먼저 나오도록 변경)
+    tab1, tab2 = st.tabs(["📋 기존 콘텐츠 관리", "📝 콘텐츠 추가"])
     
     with tab1:
-        render_add_content_form(participation_id)
+        render_existing_contents(existing_contents)
     
     with tab2:
-        render_existing_contents(existing_contents)
+        render_add_content_form(participation_id)
 
 def render_add_content_form(participation_id):
     """새 콘텐츠 추가 폼"""
