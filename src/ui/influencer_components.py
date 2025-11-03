@@ -468,6 +468,12 @@ def render_influencer_registration_form():
     """인플루언서 등록 폼 (우측) - 모든 필드 포함"""
     st.markdown("### 📝 인플루언서 등록")
     
+    # 등록 완료 플래그 체크하여 성공 메시지 표시
+    if st.session_state.get("registration_completed", False):
+        st.success("✅ 인플루언서가 성공적으로 등록되었습니다!")
+        # 플래그 초기화
+        del st.session_state["registration_completed"]
+    
     with st.form("create_influencer_form"):
         # 기본 정보 섹션
         st.markdown("#### 📝 기본 정보")
@@ -724,7 +730,6 @@ def render_influencer_registration_form():
                     
                     result = db_manager.create_influencer(influencer)
                     if result["success"]:
-                        st.success("인플루언서가 성공적으로 등록되었습니다!")
                         # 캐시 초기화
                         if "influencers_data" in st.session_state:
                             del st.session_state["influencers_data"]
@@ -732,7 +737,8 @@ def render_influencer_registration_form():
                         if "registration_search_result" in st.session_state:
                             del st.session_state["registration_search_result"]
                         st.session_state.registration_completed = True  # 등록 완료 플래그
-                        # 리렌더링 없이 상태 기반 UI 업데이트
+                        # 폼 초기화를 위해 페이지 리렌더링 (성공 메시지는 플래그로 표시됨)
+                        st.rerun()
                     else:
                         st.error(f"인플루언서 등록 실패: {result['message']}")
         
