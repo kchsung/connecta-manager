@@ -30,6 +30,3 @@ def render_campaign_management():
     
     with tab4:
         render_participation_list()
-
-
-
