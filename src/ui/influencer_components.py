@@ -405,14 +405,28 @@ def render_influencer_search_for_registration():
         search_clicked = st.form_submit_button("🔍 검색", type="primary")
     
     if search_clicked:
-        if not search_term:
+        # 검색 버튼 클릭 시점의 입력값 보존
+        # st.text_input의 key를 사용하여 세션 상태에서 직접 값 가져오기
+        # 만약 세션 상태에 값이 없으면 search_term 사용 (폴백)
+        session_search_term = st.session_state.get('registration_search_input', '')
+        
+        # search_term과 세션 상태 값을 비교하여 더 정확한 값 사용
+        # 일반적으로 세션 상태의 값이 더 정확함 (폼 제출 시점의 값)
+        actual_search_term = session_search_term if session_search_term else search_term
+        
+        if not actual_search_term:
             st.error("검색어를 입력해주세요.")
         else:
+            # 원본 검색어 보존 (메시지 표시용) - 실제 입력값 사용
+            original_search_term = actual_search_term
+            # 검색에는 search_term 사용 (공백 제거 등 처리된 값)
+            search_term_for_query = search_term
+            
             # 플랫폼별 단일 인플루언서 검색
             if search_platform == "전체":
-                search_response = search_single_influencer(search_term)
+                search_response = search_single_influencer(search_term_for_query)
             else:
-                search_response = search_single_influencer_by_platform(search_term, search_platform)
+                search_response = search_single_influencer_by_platform(search_term_for_query, search_platform)
             
             if search_response and search_response.get("success") and search_response.get("data"):
                 search_data = search_response["data"]
@@ -444,23 +458,23 @@ def render_influencer_search_for_registration():
                 else:
                     # 검색 결과가 없으면 등록 가능
                     st.session_state.registration_search_result = None
-                    st.success(f"✅ '{search_term}'은(는) 등록되지 않은 인플루언서입니다. 등록이 가능합니다.")
+                    st.success(f"✅ `{original_search_term}`은(는) 등록되지 않은 인플루언서입니다. 등록이 가능합니다.")
                     st.info("💡 우측에서 새로운 인플루언서를 등록할 수 있습니다.")
                     
                     # 등록 가능한 인플루언서 정보 표시
                     with st.expander("📝 등록 가능한 인플루언서", expanded=True):
-                        st.info(f"**SNS ID:** {search_term}")
+                        st.info(f"**SNS ID:** `{original_search_term}`")
                         st.info(f"**플랫폼:** {search_platform if search_platform != '전체' else '선택 필요'}")
                         st.info("**상태:** 등록 가능 ✅")
             else:
                 # 검색 결과가 없으면 등록 가능
                 st.session_state.registration_search_result = None
-                st.success(f"✅ '{search_term}'은(는) 등록되지 않은 인플루언서입니다. 등록이 가능합니다.")
+                st.success(f"✅ `{original_search_term}`은(는) 등록되지 않은 인플루언서입니다. 등록이 가능합니다.")
                 st.info("💡 우측에서 새로운 인플루언서를 등록할 수 있습니다.")
                 
                 # 등록 가능한 인플루언서 정보 표시
                 with st.expander("📝 등록 가능한 인플루언서", expanded=True):
-                    st.info(f"**SNS ID:** {search_term}")
+                    st.info(f"**SNS ID:** `{original_search_term}`")
                     st.info(f"**플랫폼:** {search_platform if search_platform != '전체' else '선택 필요'}")
                     st.info("**상태:** 등록 가능 ✅")
 

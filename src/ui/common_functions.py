@@ -119,11 +119,15 @@ def search_single_influencer(search_term: str):
                 "data": None
             }
         
-        # 서버 코드와 동일한 검색 로직 사용 (공백 제거된 검색어 사용)
+        # SQL LIKE 패턴에서 와일드카드 문자(_와 %)를 이스케이프 처리
+        # _는 단일 문자 와일드카드, %는 0개 이상 문자 와일드카드
+        escaped_search_term = clean_search_term.replace("\\", "\\\\").replace("_", "\\_").replace("%", "\\%")
+        
+        # 서버 코드와 동일한 검색 로직 사용 (공백 제거된 검색어 사용, 와일드카드 이스케이프 처리)
         search_response = client.table("connecta_influencers")\
             .select("*")\
             .order("created_at", desc=True)\
-            .or_(f"influencer_name.ilike.%{clean_search_term}%,sns_id.ilike.%{clean_search_term}%")\
+            .or_(f"influencer_name.ilike.%{escaped_search_term}%,sns_id.ilike.%{escaped_search_term}%")\
             .execute()
         
         if search_response.data:
@@ -170,12 +174,16 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
                 "data": None
             }
         
-        # 서버 코드와 동일한 검색 로직 사용 (플랫폼 필터 포함, 공백 제거된 검색어 사용)
+        # SQL LIKE 패턴에서 와일드카드 문자(_와 %)를 이스케이프 처리
+        # _는 단일 문자 와일드카드, %는 0개 이상 문자 와일드카드
+        escaped_search_term = clean_search_term.replace("\\", "\\\\").replace("_", "\\_").replace("%", "\\%")
+        
+        # 서버 코드와 동일한 검색 로직 사용 (플랫폼 필터 포함, 공백 제거된 검색어 사용, 와일드카드 이스케이프 처리)
         search_response = client.table("connecta_influencers")\
             .select("*")\
             .order("created_at", desc=True)\
             .eq("platform", platform)\
-            .or_(f"influencer_name.ilike.%{clean_search_term}%,sns_id.ilike.%{clean_search_term}%")\
+            .or_(f"influencer_name.ilike.%{escaped_search_term}%,sns_id.ilike.%{escaped_search_term}%")\
             .execute()
         
         if search_response.data:
