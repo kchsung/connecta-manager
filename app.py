@@ -71,6 +71,7 @@ from src.ui.performance_components import render_performance_management, render_
 from src.ui.influencer_components import render_influencer_management
 from src.ui.influencer_statistics_management_components import render_influencer_statistics_management
 from src.ui.ai_analysis_components import render_ai_analysis_management
+from src.ui.influencer_matching_components import render_influencer_matching
 
 
 # ── CSS ──────────────────────────────────────────────────────
@@ -338,6 +339,7 @@ def render_sidebar():
             'influencer_analysis': '📊 인플루언서 분석',
             'ai_analysis': '🤖 인공지능 분석',
             'campaign_management': '📁 캠페인 관리',
+            'influencer_matching': '🎯 인플루언서 매칭',
             'performance_management': '📊 성과 관리'
         }
         
@@ -384,6 +386,8 @@ def render_main_content():
         render_influencer_statistics_management()
     elif current_page == 'ai_analysis':
         render_ai_analysis_management()
+    elif current_page == 'influencer_matching':
+        render_influencer_matching()
     else:
         # 기본값으로 인플루언서 관리 표시
         render_influencer_management()
