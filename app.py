@@ -60,7 +60,14 @@ warnings.filterwarnings("ignore", message=".*event_based_path_watcher.*")
 warnings.filterwarnings("ignore", message=".*handle_path_change_event.*")
 
 # ── Path ─────────────────────────────────────────────────────
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Streamlit Cloud 호환성을 위한 경로 설정
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+# src 디렉토리를 Python 경로에 추가
+src_dir = os.path.join(current_dir, 'src')
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
 # 분리된 컴포넌트들 import
 from src.ui.project_components import (
