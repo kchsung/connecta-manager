@@ -119,22 +119,45 @@ def search_single_influencer(search_term: str):
                 "data": None
             }
         
-        # SQL LIKE 패턴에서 와일드카드 문자(_와 %)를 이스케이프 처리
-        # _는 단일 문자 와일드카드, %는 0개 이상 문자 와일드카드
-        escaped_search_term = clean_search_term.replace("\\", "\\\\").replace("_", "\\_").replace("%", "\\%")
+        # 검색어에 와일드카드 문자(_ 또는 %)가 있는지 확인
+        has_wildcards = '_' in clean_search_term or '%' in clean_search_term
         
-        # 서버 코드와 동일한 검색 로직 사용 (공백 제거된 검색어 사용, 와일드카드 이스케이프 처리)
-        search_response = client.table("connecta_influencers")\
-            .select("*")\
-            .order("created_at", desc=True)\
-            .or_(f"influencer_name.ilike.%{escaped_search_term}%,sns_id.ilike.%{escaped_search_term}%")\
-            .execute()
+        if has_wildcards:
+            # 와일드카드 문자가 있으면 정확한 매칭만 사용 (PostgREST ilike 이스케이프 문제 방지)
+            # Python에서 부분 검색 수행
+            all_influencers = client.table("connecta_influencers")\
+                .select("*")\
+                .order("created_at", desc=True)\
+                .execute()
+            
+            if all_influencers.data:
+                # Python에서 필터링 (대소문자 구분 없이)
+                search_term_lower = clean_search_term.lower()
+                filtered_results = []
+                for inf in all_influencers.data:
+                    sns_id = (inf.get('sns_id') or '').lower()
+                    influencer_name = (inf.get('influencer_name') or '').lower()
+                    
+                    if search_term_lower in sns_id or search_term_lower in influencer_name:
+                        filtered_results.append(inf)
+                
+                search_response_data = filtered_results
+            else:
+                search_response_data = []
+        else:
+            # 와일드카드 문자가 없으면 기존 ilike 검색 사용
+            search_response = client.table("connecta_influencers")\
+                .select("*")\
+                .order("created_at", desc=True)\
+                .or_(f"influencer_name.ilike.%{clean_search_term}%,sns_id.ilike.%{clean_search_term}%")\
+                .execute()
+            search_response_data = search_response.data if search_response.data else []
         
-        if search_response.data:
+        if search_response_data:
             return {
                 "success": True,
-                "message": f"✅ 검색 결과: {len(search_response.data)}명의 인플루언서를 찾았습니다.",
-                "data": search_response.data
+                "message": f"✅ 검색 결과: {len(search_response_data)}명의 인플루언서를 찾았습니다.",
+                "data": search_response_data
             }
         
         return {
@@ -174,23 +197,47 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
                 "data": None
             }
         
-        # SQL LIKE 패턴에서 와일드카드 문자(_와 %)를 이스케이프 처리
-        # _는 단일 문자 와일드카드, %는 0개 이상 문자 와일드카드
-        escaped_search_term = clean_search_term.replace("\\", "\\\\").replace("_", "\\_").replace("%", "\\%")
+        # 검색어에 와일드카드 문자(_ 또는 %)가 있는지 확인
+        has_wildcards = '_' in clean_search_term or '%' in clean_search_term
         
-        # 서버 코드와 동일한 검색 로직 사용 (플랫폼 필터 포함, 공백 제거된 검색어 사용, 와일드카드 이스케이프 처리)
-        search_response = client.table("connecta_influencers")\
-            .select("*")\
-            .order("created_at", desc=True)\
-            .eq("platform", platform)\
-            .or_(f"influencer_name.ilike.%{escaped_search_term}%,sns_id.ilike.%{escaped_search_term}%")\
-            .execute()
+        if has_wildcards:
+            # 와일드카드 문자가 있으면 정확한 매칭만 사용 (PostgREST ilike 이스케이프 문제 방지)
+            # Python에서 부분 검색 수행
+            all_influencers = client.table("connecta_influencers")\
+                .select("*")\
+                .eq("platform", platform)\
+                .order("created_at", desc=True)\
+                .execute()
+            
+            if all_influencers.data:
+                # Python에서 필터링 (대소문자 구분 없이)
+                search_term_lower = clean_search_term.lower()
+                filtered_results = []
+                for inf in all_influencers.data:
+                    sns_id = (inf.get('sns_id') or '').lower()
+                    influencer_name = (inf.get('influencer_name') or '').lower()
+                    
+                    if search_term_lower in sns_id or search_term_lower in influencer_name:
+                        filtered_results.append(inf)
+                
+                search_response_data = filtered_results
+            else:
+                search_response_data = []
+        else:
+            # 와일드카드 문자가 없으면 기존 ilike 검색 사용
+            search_response = client.table("connecta_influencers")\
+                .select("*")\
+                .order("created_at", desc=True)\
+                .eq("platform", platform)\
+                .or_(f"influencer_name.ilike.%{clean_search_term}%,sns_id.ilike.%{clean_search_term}%")\
+                .execute()
+            search_response_data = search_response.data if search_response.data else []
         
-        if search_response.data:
+        if search_response_data:
             return {
                 "success": True,
-                "message": f"✅ {platform}에서 {len(search_response.data)}명의 인플루언서를 찾았습니다.",
-                "data": search_response.data
+                "message": f"✅ {platform}에서 {len(search_response_data)}명의 인플루언서를 찾았습니다.",
+                "data": search_response_data
             }
         
         return {
