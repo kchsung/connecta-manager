@@ -96,7 +96,7 @@ def perform_crawling(platform: str, url: str, sns_id: str, debug_mode: bool, sav
     }
 
 def search_single_influencer(search_term: str):
-    """단일 인플루언서 검색 - 개선된 검색 로직 (전체 플랫폼)"""
+    """단일 인플루언서 검색 - 등록 시 중복체크와 동일한 로직 사용 (전체 플랫폼)"""
     try:
         # 검색어에서 앞뒤 공백 제거
         clean_search_term = search_term.strip() if search_term else ""
@@ -119,12 +119,48 @@ def search_single_influencer(search_term: str):
                 "data": None
             }
         
+        # 등록 시 중복체크와 동일한 방식: @ 제거 및 공백 제거
+        clean_sns_id = clean_search_term.replace('@', '').strip()
+        
+        # 1단계: 정확한 매칭 시도 (등록 시 중복체크와 동일한 방식) - 모든 플랫폼에서
+        platforms = ["instagram", "youtube", "tiktok", "twitter"]
+        exact_match_results = []
+        
+        for platform in platforms:
+            exact_match_response = client.table("connecta_influencers")\
+                .select("*")\
+                .eq("platform", platform)\
+                .eq("sns_id", clean_sns_id)\
+                .execute()
+            
+            if exact_match_response.data:
+                exact_match_results.extend(exact_match_response.data)
+        
+        # 원본 검색어로도 정확한 매칭 시도
+        if not exact_match_results:
+            for platform in platforms:
+                exact_match_original = client.table("connecta_influencers")\
+                    .select("*")\
+                    .eq("platform", platform)\
+                    .eq("sns_id", clean_search_term)\
+                    .execute()
+                
+                if exact_match_original.data:
+                    exact_match_results.extend(exact_match_original.data)
+        
+        if exact_match_results:
+            return {
+                "success": True,
+                "message": f"✅ 검색 결과: {len(exact_match_results)}명의 인플루언서를 찾았습니다.",
+                "data": exact_match_results
+            }
+        
+        # 2단계: 부분 일치 검색 (기존 로직 유지)
         # 검색어에 와일드카드 문자(_ 또는 %)가 있는지 확인
         has_wildcards = '_' in clean_search_term or '%' in clean_search_term
         
         if has_wildcards:
-            # 와일드카드 문자가 있으면 정확한 매칭만 사용 (PostgREST ilike 이스케이프 문제 방지)
-            # Python에서 부분 검색 수행
+            # 와일드카드 문자가 있으면 Python에서 부분 검색 수행
             all_influencers = client.table("connecta_influencers")\
                 .select("*")\
                 .order("created_at", desc=True)\
@@ -145,7 +181,7 @@ def search_single_influencer(search_term: str):
             else:
                 search_response_data = []
         else:
-            # 와일드카드 문자가 없으면 기존 ilike 검색 사용
+            # 와일드카드 문자가 없으면 ilike 검색 사용
             search_response = client.table("connecta_influencers")\
                 .select("*")\
                 .order("created_at", desc=True)\
@@ -174,7 +210,7 @@ def search_single_influencer(search_term: str):
         }
 
 def search_single_influencer_by_platform(search_term: str, platform: str):
-    """특정 플랫폼에서 단일 인플루언서 검색"""
+    """특정 플랫폼에서 단일 인플루언서 검색 - 등록 시 중복체크와 동일한 로직 사용"""
     try:
         # 검색어에서 앞뒤 공백 제거
         clean_search_term = search_term.strip() if search_term else ""
@@ -197,12 +233,43 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
                 "data": None
             }
         
+        # 등록 시 중복체크와 동일한 방식: @ 제거 및 공백 제거
+        clean_sns_id = clean_search_term.replace('@', '').strip()
+        
+        # 1단계: 정확한 매칭 시도 (등록 시 중복체크와 동일한 방식)
+        exact_match_response = client.table("connecta_influencers")\
+            .select("*")\
+            .eq("platform", platform)\
+            .eq("sns_id", clean_sns_id)\
+            .execute()
+        
+        if exact_match_response.data and len(exact_match_response.data) > 0:
+            return {
+                "success": True,
+                "message": f"✅ {platform}에서 인플루언서를 찾았습니다.",
+                "data": exact_match_response.data
+            }
+        
+        # 2단계: 원본 검색어로도 정확한 매칭 시도 (DB에 @가 포함되어 있을 수 있음)
+        exact_match_original = client.table("connecta_influencers")\
+            .select("*")\
+            .eq("platform", platform)\
+            .eq("sns_id", clean_search_term)\
+            .execute()
+        
+        if exact_match_original.data and len(exact_match_original.data) > 0:
+            return {
+                "success": True,
+                "message": f"✅ {platform}에서 인플루언서를 찾았습니다.",
+                "data": exact_match_original.data
+            }
+        
+        # 3단계: 부분 일치 검색 (기존 로직 유지)
         # 검색어에 와일드카드 문자(_ 또는 %)가 있는지 확인
         has_wildcards = '_' in clean_search_term or '%' in clean_search_term
         
         if has_wildcards:
-            # 와일드카드 문자가 있으면 정확한 매칭만 사용 (PostgREST ilike 이스케이프 문제 방지)
-            # Python에서 부분 검색 수행
+            # 와일드카드 문자가 있으면 Python에서 부분 검색 수행
             all_influencers = client.table("connecta_influencers")\
                 .select("*")\
                 .eq("platform", platform)\
@@ -224,7 +291,7 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
             else:
                 search_response_data = []
         else:
-            # 와일드카드 문자가 없으면 기존 ilike 검색 사용
+            # 와일드카드 문자가 없으면 ilike 검색 사용
             search_response = client.table("connecta_influencers")\
                 .select("*")\
                 .order("created_at", desc=True)\

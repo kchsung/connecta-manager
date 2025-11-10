@@ -10,7 +10,8 @@ from ..db.models import Influencer
 from .common_functions import (
     search_single_influencer, 
     search_single_influencer_by_platform,
-    safe_int_conversion
+    safe_int_conversion,
+    check_database_for_influencer
 )
 # 통계 기능은 별도 메뉴로 분리됨
 
@@ -419,53 +420,43 @@ def render_influencer_search_for_registration():
         else:
             # 원본 검색어 보존 (메시지 표시용) - 실제 입력값 사용
             original_search_term = actual_search_term
-            # 검색에는 search_term 사용 (공백 제거 등 처리된 값)
-            search_term_for_query = search_term
             
-            # 플랫폼별 단일 인플루언서 검색
+            # 등록 시 중복체크와 동일한 로직 사용: 정확한 매칭만 수행
             if search_platform == "전체":
-                search_response = search_single_influencer(search_term_for_query)
+                # 전체 플랫폼에서 검색
+                platforms = ["instagram", "youtube", "tiktok", "twitter"]
+                search_result = None
+                
+                for platform in platforms:
+                    result = check_database_for_influencer(platform, actual_search_term)
+                    if result.get("success") and result.get("exists"):
+                        search_result = result.get("data")
+                        break
             else:
-                search_response = search_single_influencer_by_platform(search_term_for_query, search_platform)
-            
-            if search_response and search_response.get("success") and search_response.get("data"):
-                search_data = search_response["data"]
-                # search_data가 리스트인 경우 첫 번째 요소를 사용
-                if isinstance(search_data, list) and len(search_data) > 0:
-                    search_result = search_data[0]
-                elif isinstance(search_data, dict):
-                    search_result = search_data
+                # 특정 플랫폼에서 검색
+                result = check_database_for_influencer(search_platform, actual_search_term)
+                if result.get("success") and result.get("exists"):
+                    search_result = result.get("data")
                 else:
                     search_result = None
+            
+            if search_result:
+                # 검색 결과를 세션에 저장
+                st.session_state.registration_search_result = search_result
+                active_status = "활성" if search_result.get('active', True) else "비활성"
+                st.warning(f"⚠️ 이미 등록된 인플루언서입니다: {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')}) [{active_status}]")
+                st.info("💡 우측에서 인플루언서 정보를 수정할 수 있습니다.")
                 
-                if search_result:
-                    # 검색 결과를 세션에 저장
-                    st.session_state.registration_search_result = search_result
-                    active_status = "활성" if search_result.get('active', True) else "비활성"
-                    st.warning(f"⚠️ 이미 등록된 인플루언서입니다: {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')}) [{active_status}]")
-                    st.info("💡 우측에서 인플루언서 정보를 수정할 수 있습니다.")
-                
-                    # 검색된 인플루언서 정보 표시
-                    with st.expander("📋 검색된 인플루언서 정보", expanded=True):
-                        st.markdown(f"**SNS ID:** {search_result['sns_id']}")
-                        st.markdown(f"**이름:** {search_result.get('influencer_name', 'N/A')}")
-                        st.markdown(f"**플랫폼:** {search_result['platform']}")
-                        st.markdown(f"**카테고리:** {search_result.get('content_category', 'N/A')}")
-                        st.markdown(f"**팔로워 수:** {search_result.get('followers_count', 'N/A'):,}" if search_result.get('followers_count') else "**팔로워 수:** N/A")
-                        st.markdown(f"**등록일:** {search_result.get('created_at', 'N/A')}")
-                        if search_result.get('sns_url'):
-                            st.markdown(f"**SNS URL:** [{search_result['sns_url']}]({search_result['sns_url']})")
-                else:
-                    # 검색 결과가 없으면 등록 가능
-                    st.session_state.registration_search_result = None
-                    st.success(f"✅ `{original_search_term}`은(는) 등록되지 않은 인플루언서입니다. 등록이 가능합니다.")
-                    st.info("💡 우측에서 새로운 인플루언서를 등록할 수 있습니다.")
-                    
-                    # 등록 가능한 인플루언서 정보 표시
-                    with st.expander("📝 등록 가능한 인플루언서", expanded=True):
-                        st.info(f"**SNS ID:** `{original_search_term}`")
-                        st.info(f"**플랫폼:** {search_platform if search_platform != '전체' else '선택 필요'}")
-                        st.info("**상태:** 등록 가능 ✅")
+                # 검색된 인플루언서 정보 표시
+                with st.expander("📋 검색된 인플루언서 정보", expanded=True):
+                    st.markdown(f"**SNS ID:** {search_result['sns_id']}")
+                    st.markdown(f"**이름:** {search_result.get('influencer_name', 'N/A')}")
+                    st.markdown(f"**플랫폼:** {search_result['platform']}")
+                    st.markdown(f"**카테고리:** {search_result.get('content_category', 'N/A')}")
+                    st.markdown(f"**팔로워 수:** {search_result.get('followers_count', 'N/A'):,}" if search_result.get('followers_count') else "**팔로워 수:** N/A")
+                    st.markdown(f"**등록일:** {search_result.get('created_at', 'N/A')}")
+                    if search_result.get('sns_url'):
+                        st.markdown(f"**SNS URL:** [{search_result['sns_url']}]({search_result['sns_url']})")
             else:
                 # 검색 결과가 없으면 등록 가능
                 st.session_state.registration_search_result = None
@@ -712,8 +703,11 @@ def render_influencer_registration_form():
                 elif not sns_url:
                     st.error("SNS URL을 입력해주세요.")
                 else:
-                    # 별칭이 비어있으면 SNS ID를 사용
-                    final_influencer_name = influencer_name.strip() if influencer_name else sns_id
+                    # SNS ID 정규화: @ 제거 및 공백 제거 (중복체크와 동일한 방식)
+                    clean_sns_id = sns_id.replace('@', '').strip() if sns_id else ''
+                    
+                    # 별칭이 비어있으면 정규화된 SNS ID를 사용
+                    final_influencer_name = influencer_name.strip() if influencer_name else clean_sns_id
                     
                     # 선택된 값들을 데이터베이스 값으로 변환
                     selected_contact_method_db = contact_method_db_values[contact_method_options.index(contact_method)]
@@ -721,7 +715,7 @@ def render_influencer_registration_form():
                     
                     influencer = Influencer(
                         platform=platform,
-                        sns_id=sns_id,
+                        sns_id=clean_sns_id,
                         influencer_name=final_influencer_name,
                         sns_url=sns_url,
                         contact_method=selected_contact_method_db,
