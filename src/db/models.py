@@ -38,7 +38,7 @@ class Campaign(BaseModel):
 class Influencer(BaseModel):
     """인플루언서 데이터 모델"""
     # id 필드는 제거 - 데이터베이스에서 자동으로 생성됨
-    platform: str  # instagram, youtube, tiktok, twitter
+    platform: str  # instagram, youtube, tiktok, x, blog, facebook
     content_category: str
     influencer_name: Optional[str] = ""
     sns_id: str

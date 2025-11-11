@@ -22,7 +22,9 @@ def render_influencer_detail_form(influencer):
             "instagram": "📸 Instagram",
             "youtube": "📺 YouTube", 
             "tiktok": "🎵 TikTok",
-            "twitter": "🐦 Twitter"
+            "x": "🐦 X (Twitter)",
+            "blog": "📝 블로그",
+            "facebook": "👥 Facebook"
         }
         platform_display = platform_icons.get(influencer['platform'], f"🌐 {influencer['platform']}")
         st.metric("플랫폼", platform_display)

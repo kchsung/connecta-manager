@@ -97,7 +97,7 @@ interface Campaign {
 
 interface Influencer {
   id?: string
-  platform: 'instagram' | 'youtube' | 'tiktok' | 'twitter'
+  platform: 'instagram' | 'youtube' | 'tiktok' | 'x' | 'blog' | 'facebook'
   content_category: string
   influencer_name?: string
   sns_id: string
@@ -938,12 +938,13 @@ serve(async (req) => {
     const type = url.searchParams.get('type') || 'overview'
     
     // API 요청 정보 (로그 출력 제거)
-      action,
-      method: req.method,
-      id,
-      campaign_id: url.searchParams.get('campaign_id'),
-      userId: user.id
-    })
+    // console.log({
+    //   action,
+    //   method: req.method,
+    //   id,
+    //   campaign_id: url.searchParams.get('campaign_id'),
+    //   userId: user.id
+    // })
 
     // 라우팅 처리
     switch (action) {

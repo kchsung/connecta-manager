@@ -57,6 +57,9 @@ def render_overall_statistics():
         total_followers = sum(followers_data)
         avg_followers = total_followers / len(followers_data) if followers_data else 0
         
+        # 게시물 수 통계
+        post_count_data = [inf.get('post_count', 0) or 0 for inf in influencers if inf.get('post_count') is not None]
+        
         # 가격 통계
         price_data = [inf.get('price_krw', 0) or 0 for inf in influencers if inf.get('price_krw')]
         total_price = sum(price_data)
@@ -81,9 +84,9 @@ def render_overall_statistics():
         
         with col3:
             st.metric(
-                "총 예산", 
-                f"{total_price:,.0f}원",
-                delta=f"평균: {avg_price:,.0f}원"
+                "평균 팔로워 수", 
+                f"{avg_followers:,.0f}명",
+                delta=f"총: {total_followers:,}명"
             )
         
         with col4:
@@ -123,15 +126,39 @@ def render_overall_statistics():
                 st.plotly_chart(fig, use_container_width=True)
             
             with col2:
-                st.markdown("#### 팔로워 수 히스토그램")
-                fig = px.histogram(
-                    followers_df, 
-                    x='팔로워수',
-                    nbins=20,
-                    title="팔로워 수 히스토그램",
-                    labels={'팔로워수': '팔로워 수', 'count': '인플루언서 수'}
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                st.markdown("#### 게시물 수 분포")
+                if post_count_data:
+                    # 게시물 수 구간별 분포
+                    post_count_df = pd.DataFrame({'게시물수': post_count_data})
+                    
+                    # 게시물 수 구간 설정 (데이터 분포에 맞게 조정)
+                    max_post = max(post_count_data) if post_count_data else 0
+                    if max_post <= 100:
+                        bins = [0, 10, 20, 30, 50, 100, float('inf')]
+                        labels = ['10개 미만', '10-20개', '20-30개', '30-50개', '50-100개', '100개+']
+                    elif max_post <= 500:
+                        bins = [0, 50, 100, 200, 300, 500, float('inf')]
+                        labels = ['50개 미만', '50-100개', '100-200개', '200-300개', '300-500개', '500개+']
+                    elif max_post <= 1000:
+                        bins = [0, 100, 200, 300, 500, 1000, float('inf')]
+                        labels = ['100개 미만', '100-200개', '200-300개', '300-500개', '500-1000개', '1000개+']
+                    else:
+                        bins = [0, 100, 500, 1000, 2000, 5000, float('inf')]
+                        labels = ['100개 미만', '100-500개', '500-1000개', '1000-2000개', '2000-5000개', '5000개+']
+                    
+                    post_count_df['구간'] = pd.cut(post_count_df['게시물수'], bins=bins, labels=labels, right=False)
+                    post_count_dist = post_count_df['구간'].value_counts().sort_index()
+                    
+                    fig = px.bar(
+                        x=post_count_dist.index, 
+                        y=post_count_dist.values,
+                        title="게시물 수 구간별 분포",
+                        labels={'x': '게시물 수 구간', 'y': '인플루언서 수'}
+                    )
+                    fig.update_layout(showlegend=False)
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("게시물 수 데이터가 없습니다.")
         
         # 등록일별 추이
         st.markdown("#### 등록일별 인플루언서 추가 추이")
@@ -342,7 +369,9 @@ def render_platform_analysis():
             "instagram": "📸 Instagram",
             "youtube": "📺 YouTube",
             "tiktok": "🎵 TikTok",
-            "twitter": "🐦 Twitter"
+            "x": "🐦 X (Twitter)",
+            "blog": "📝 블로그",
+            "facebook": "👥 Facebook"
         }
         
         platform_df['플랫폼_표시'] = platform_df['플랫폼'].map(platform_icons).fillna(platform_df['플랫폼'])

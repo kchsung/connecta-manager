@@ -12,7 +12,7 @@ from typing import Dict, List, Any
 
 def generate_influencer_data(count: int = 10) -> List[Dict[str, Any]]:
     """인플루언서 테스트 데이터 생성"""
-    platforms = ['instagram', 'youtube', 'tiktok', 'twitter']
+    platforms = ['instagram', 'youtube', 'tiktok', 'x', 'blog', 'facebook']
     contact_methods = ['dm', 'email', 'phone', 'kakao', 'form', 'other']
     categories = ['뷰티', '패션', '푸드', '여행', '라이프스타일', '테크', '게임', '스포츠']
     

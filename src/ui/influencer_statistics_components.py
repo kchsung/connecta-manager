@@ -81,9 +81,9 @@ def render_overall_statistics():
         
         with col3:
             st.metric(
-                "총 예산", 
-                f"{total_price:,.0f}원",
-                delta=f"평균: {avg_price:,.0f}원"
+                "평균 팔로워 수", 
+                f"{avg_followers:,.0f}명",
+                delta=f"총: {total_followers:,}명"
             )
         
         with col4:
@@ -124,11 +124,13 @@ def render_overall_statistics():
             
             with col2:
                 st.markdown("#### 팔로워 수 히스토그램")
+                # 100만 이하만 필터링
+                followers_df_filtered = followers_df[followers_df['팔로워수'] <= 1000000]
                 fig = px.histogram(
-                    followers_df, 
+                    followers_df_filtered, 
                     x='팔로워수',
                     nbins=20,
-                    title="팔로워 수 히스토그램",
+                    title="팔로워 수 히스토그램 (100만 이하)",
                     labels={'팔로워수': '팔로워 수', 'count': '인플루언서 수'}
                 )
                 st.plotly_chart(fig, use_container_width=True)
@@ -342,7 +344,9 @@ def render_platform_analysis():
             "instagram": "📸 Instagram",
             "youtube": "📺 YouTube",
             "tiktok": "🎵 TikTok",
-            "twitter": "🐦 Twitter"
+            "x": "🐦 X (Twitter)",
+            "blog": "📝 블로그",
+            "facebook": "👥 Facebook"
         }
         
         platform_df['플랫폼_표시'] = platform_df['플랫폼'].map(platform_icons).fillna(platform_df['플랫폼'])

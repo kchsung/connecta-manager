@@ -51,36 +51,65 @@ def render_influencer_search_section():
     # 검색 섹션 - 폼 구조로 변경
     with st.form("add_influencer_search_form"):
         search_term = st.text_input("인플루언서 검색", placeholder="SNS ID 또는 이름을 입력하세요", key="add_influencer_search", help="등록자 검색")
-        search_platform = st.selectbox("플랫폼", ["전체", "instagram", "youtube", "tiktok", "twitter"], key="add_influencer_platform")
+        search_platform = st.selectbox(
+            "플랫폼", 
+            ["전체", "instagram", "youtube", "tiktok", "x", "blog", "facebook"], 
+            key="add_influencer_platform",
+            format_func=lambda x: {
+                "전체": "🌐 전체",
+                "instagram": "📸 Instagram",
+                "youtube": "📺 YouTube",
+                "tiktok": "🎵 TikTok",
+                "x": "🐦 X (Twitter)",
+                "blog": "📝 블로그",
+                "facebook": "👥 Facebook"
+            }.get(x, x)
+        )
         
         search_clicked = st.form_submit_button("🔍 검색", type="primary", key="search_influencer_for_add")
     
     if search_clicked:
-        if not search_term:
+        # 세션 상태에서 검색어 가져오기 (폼 제출 시점의 값)
+        session_search_term = st.session_state.get('add_influencer_search', '')
+        actual_search_term = session_search_term if session_search_term else search_term
+        
+        if not actual_search_term:
             st.error("검색어를 입력해주세요.")
         else:
             # 인플루언서 검색 로직
             if search_platform == "전체":
-                search_response = search_single_influencer(search_term)
+                search_response = search_single_influencer(actual_search_term)
             else:
-                search_response = search_single_influencer_by_platform(search_term, search_platform)
+                search_response = search_single_influencer_by_platform(actual_search_term, search_platform)
             
-            if search_response and search_response.get("success") and search_response.get("data"):
-                search_data = search_response["data"]
-                if isinstance(search_data, list) and len(search_data) > 0:
-                    search_result = search_data[0]
-                elif isinstance(search_data, dict):
-                    search_result = search_data
-                else:
-                    search_result = None
+            # 검색 응답 확인 및 처리
+            if search_response and search_response.get("success"):
+                search_data = search_response.get("data")
                 
-                if search_result:
-                    st.session_state.add_influencer_search_result = search_result
-                    st.success(f"✅ 인플루언서를 찾았습니다: {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')})")
+                # 검색 결과가 있는지 확인
+                if search_data:
+                    # 리스트인 경우 첫 번째 요소 사용
+                    if isinstance(search_data, list) and len(search_data) > 0:
+                        search_result = search_data[0]
+                    # 딕셔너리인 경우 그대로 사용
+                    elif isinstance(search_data, dict):
+                        search_result = search_data
+                    else:
+                        search_result = None
+                    
+                    if search_result:
+                        st.session_state.add_influencer_search_result = search_result
+                        st.success(f"✅ 인플루언서를 찾았습니다: {search_result.get('influencer_name') or search_result['sns_id']} ({search_result.get('platform')})")
+                    else:
+                        st.error(f"❌ '{actual_search_term}'을(를) 찾을 수 없습니다.")
                 else:
-                    st.error(f"❌ '{search_term}'을(를) 찾을 수 없습니다.")
+                    # 검색 결과가 없는 경우
+                    error_message = search_response.get("message", f"'{actual_search_term}'을(를) 찾을 수 없습니다.")
+                    st.error(f"❌ {error_message}")
             else:
-                st.error(f"❌ '{search_term}'을(를) 찾을 수 없습니다.")
+                # 검색 실패
+                error_message = search_response.get("message", f"'{actual_search_term}' 검색 중 오류가 발생했습니다.") if search_response else f"'{actual_search_term}' 검색 중 오류가 발생했습니다."
+                st.error(f"❌ {error_message}")
     
     # 검색 결과 표시
     if 'add_influencer_search_result' in st.session_state:

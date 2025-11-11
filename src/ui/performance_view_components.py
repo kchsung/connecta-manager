@@ -129,7 +129,7 @@ def render_performance_view_tab():
     with col3:
         platform_filter = st.selectbox(
             "플랫폼",
-            ["전체", "instagram", "youtube", "tiktok", "twitter"],
+            ["전체", "instagram", "youtube", "tiktok", "x", "blog", "facebook"],
             key="platform_filter_performance",
             help="플랫폼에 따라 필터링합니다",
             format_func=lambda x: {
@@ -137,7 +137,9 @@ def render_performance_view_tab():
                 "instagram": "📸 Instagram",
                 "youtube": "📺 YouTube",
                 "tiktok": "🎵 TikTok",
-                "twitter": "🐦 Twitter",
+                "x": "🐦 X (Twitter)",
+                "blog": "📝 블로그",
+                "facebook": "👥 Facebook",
             }.get(x, x),
         )
     with col4:

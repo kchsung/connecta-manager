@@ -81,7 +81,7 @@ def render_influencer_edit_form_for_registration(influencer):
         col1, col2 = st.columns(2)
         
         with col1:
-            platform_options = ["instagram", "youtube", "tiktok", "twitter"]
+            platform_options = ["instagram", "youtube", "tiktok", "x", "blog", "facebook"]
             current_platform = influencer.get('platform', 'instagram')
             try:
                 platform_index = platform_options.index(current_platform)
@@ -97,8 +97,10 @@ def render_influencer_edit_form_for_registration(influencer):
                     "instagram": "📸 Instagram",
                     "youtube": "📺 YouTube",
                     "tiktok": "🎵 TikTok",
-                    "twitter": "🐦 Twitter"
-                }[x]
+                    "x": "🐦 X (Twitter)",
+                    "blog": "📝 블로그",
+                    "facebook": "👥 Facebook"
+                }.get(x, x)
             )
             sns_id = st.text_input("SNS ID", value=influencer.get('sns_id', ''), key=f"edit_reg_sns_id_{influencer['id']}")
         
@@ -392,15 +394,17 @@ def render_influencer_search_for_registration():
         with col1:
             search_platform = st.selectbox(
                 "플랫폼",
-                ["전체", "instagram", "youtube", "tiktok", "twitter"],
+                ["전체", "instagram", "youtube", "tiktok", "x", "blog", "facebook"],
                 key="registration_search_platform",
                 format_func=lambda x: {
                     "전체": "🌐 전체",
                     "instagram": "📸 Instagram",
                     "youtube": "📺 YouTube",
                     "tiktok": "🎵 TikTok",
-                    "twitter": "🐦 Twitter"
-                }[x]
+                    "x": "🐦 X (Twitter)",
+                    "blog": "📝 블로그",
+                    "facebook": "👥 Facebook"
+                }.get(x, x)
             )
         
         with col2:
@@ -427,7 +431,7 @@ def render_influencer_search_for_registration():
             # 등록 시 중복체크와 동일한 로직 사용: 정확한 매칭만 수행
             if search_platform == "전체":
                 # 전체 플랫폼에서 검색
-                platforms = ["instagram", "youtube", "tiktok", "twitter"]
+                platforms = ["instagram", "youtube", "tiktok", "x", "blog", "facebook"]
                 search_result = None
                 
                 for platform in platforms:
@@ -490,14 +494,16 @@ def render_influencer_registration_form():
         with col1:
             platform = st.selectbox(
                 "플랫폼",
-                ["instagram", "youtube", "tiktok", "twitter"],
+                ["instagram", "youtube", "tiktok", "x", "blog", "facebook"],
                 key="create_influencer_platform",
                 format_func=lambda x: {
                     "instagram": "📸 Instagram",
                     "youtube": "📺 YouTube",
                     "tiktok": "🎵 TikTok",
-                    "twitter": "🐦 Twitter"
-                }[x]
+                    "x": "🐦 X (Twitter)",
+                    "blog": "📝 블로그",
+                    "facebook": "👥 Facebook"
+                }.get(x, x)
             )
             sns_id = st.text_input("SNS ID", placeholder="@username 또는 username")
         
@@ -781,15 +787,17 @@ def render_influencer_search_for_inquiry():
         with col1:
             search_platform = st.selectbox(
                 "플랫폼",
-                ["전체", "instagram", "youtube", "tiktok", "twitter"],
+                ["전체", "instagram", "youtube", "tiktok", "x", "blog", "facebook"],
                 key="inquiry_search_platform",
                 format_func=lambda x: {
                     "전체": "🌐 전체",
                     "instagram": "📸 Instagram",
                     "youtube": "📺 YouTube",
                     "tiktok": "🎵 TikTok",
-                    "twitter": "🐦 Twitter"
-                }[x]
+                    "x": "🐦 X (Twitter)",
+                    "blog": "📝 블로그",
+                    "facebook": "👥 Facebook"
+                }.get(x, x)
             )
         
         with col2:
@@ -951,7 +959,9 @@ def render_influencer_search_result(influencer):
             "instagram": "📸 Instagram",
             "youtube": "📺 YouTube", 
             "tiktok": "🎵 TikTok",
-            "twitter": "🐦 Twitter"
+            "x": "🐦 X (Twitter)",
+            "blog": "📝 블로그",
+            "facebook": "👥 Facebook"
         }
         platform_display = platform_icons.get(influencer['platform'], f"🌐 {influencer['platform']}")
         st.metric("플랫폼", platform_display)
@@ -1039,7 +1049,7 @@ def render_influencer_edit_form(influencer):
         col1, col2 = st.columns(2)
         
         with col1:
-            platform_options = ["instagram", "youtube", "tiktok", "twitter"]
+            platform_options = ["instagram", "youtube", "tiktok", "x", "blog", "facebook"]
             current_platform = influencer.get('platform', 'instagram')
             try:
                 platform_index = platform_options.index(current_platform)
@@ -1056,8 +1066,10 @@ def render_influencer_edit_form(influencer):
                     "instagram": "📸 Instagram",
                     "youtube": "📺 YouTube",
                     "tiktok": "🎵 TikTok",
-                    "twitter": "🐦 Twitter"
-                }[x]
+                    "x": "🐦 X (Twitter)",
+                    "blog": "📝 블로그",
+                    "facebook": "👥 Facebook"
+                }.get(x, x)
             )
             sns_id = st.text_input("SNS ID", value=influencer.get('sns_id', ''), key=f"edit_sns_id_{influencer['id']}")
         
@@ -1785,7 +1797,7 @@ def render_filtered_influencer_list(influencers, selected_manager):
         "플랫폼": st.column_config.SelectboxColumn(
             "플랫폼",
             help="SNS 플랫폼을 선택하세요",
-            options=["instagram", "youtube", "tiktok", "twitter"],
+            options=["instagram", "youtube", "tiktok", "x", "blog", "facebook"],
             required=True,
         ),
         "이름": st.column_config.TextColumn(

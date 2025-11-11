@@ -123,30 +123,39 @@ def search_single_influencer(search_term: str):
         clean_sns_id = clean_search_term.replace('@', '').strip()
         
         # 1단계: 정확한 매칭 시도 (등록 시 중복체크와 동일한 방식) - 모든 플랫폼에서
-        platforms = ["instagram", "youtube", "tiktok", "twitter"]
+        platforms = ["instagram", "youtube", "tiktok", "x", "blog", "facebook"]
         exact_match_results = []
         
         for platform in platforms:
-            exact_match_response = client.table("connecta_influencers")\
-                .select("*")\
-                .eq("platform", platform)\
-                .eq("sns_id", clean_sns_id)\
-                .execute()
-            
-            if exact_match_response.data:
-                exact_match_results.extend(exact_match_response.data)
+            try:
+                exact_match_response = client.table("connecta_influencers")\
+                    .select("*")\
+                    .eq("platform", platform)\
+                    .eq("sns_id", clean_sns_id)\
+                    .execute()
+                
+                if exact_match_response.data:
+                    exact_match_results.extend(exact_match_response.data)
+            except Exception as e:
+                # 특정 플랫폼에서 오류가 발생하면 해당 플랫폼은 건너뛰기
+                # (예: enum에 해당 플랫폼이 없는 경우)
+                continue
         
         # 원본 검색어로도 정확한 매칭 시도
         if not exact_match_results:
             for platform in platforms:
-                exact_match_original = client.table("connecta_influencers")\
-                    .select("*")\
-                    .eq("platform", platform)\
-                    .eq("sns_id", clean_search_term)\
-                    .execute()
-                
-                if exact_match_original.data:
-                    exact_match_results.extend(exact_match_original.data)
+                try:
+                    exact_match_original = client.table("connecta_influencers")\
+                        .select("*")\
+                        .eq("platform", platform)\
+                        .eq("sns_id", clean_search_term)\
+                        .execute()
+                    
+                    if exact_match_original.data:
+                        exact_match_results.extend(exact_match_original.data)
+                except Exception as e:
+                    # 특정 플랫폼에서 오류가 발생하면 해당 플랫폼은 건너뛰기
+                    continue
         
         if exact_match_results:
             return {
@@ -237,32 +246,54 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
         clean_sns_id = clean_search_term.replace('@', '').strip()
         
         # 1단계: 정확한 매칭 시도 (등록 시 중복체크와 동일한 방식)
-        exact_match_response = client.table("connecta_influencers")\
-            .select("*")\
-            .eq("platform", platform)\
-            .eq("sns_id", clean_sns_id)\
-            .execute()
-        
-        if exact_match_response.data and len(exact_match_response.data) > 0:
-            return {
-                "success": True,
-                "message": f"✅ {platform}에서 인플루언서를 찾았습니다.",
-                "data": exact_match_response.data
-            }
+        try:
+            exact_match_response = client.table("connecta_influencers")\
+                .select("*")\
+                .eq("platform", platform)\
+                .eq("sns_id", clean_sns_id)\
+                .execute()
+            
+            if exact_match_response.data and len(exact_match_response.data) > 0:
+                return {
+                    "success": True,
+                    "message": f"✅ {platform}에서 인플루언서를 찾았습니다.",
+                    "data": exact_match_response.data
+                }
+        except Exception as e:
+            # enum 오류인 경우 플랫폼이 지원되지 않는다는 메시지 반환
+            error_str = str(e)
+            if "enum" in error_str.lower() or "invalid input value" in error_str.lower():
+                return {
+                    "success": False,
+                    "message": f"❌ '{platform}' 플랫폼은 데이터베이스에서 지원되지 않습니다.",
+                    "data": None
+                }
+            # 다른 오류는 계속 진행
         
         # 2단계: 원본 검색어로도 정확한 매칭 시도 (DB에 @가 포함되어 있을 수 있음)
-        exact_match_original = client.table("connecta_influencers")\
-            .select("*")\
-            .eq("platform", platform)\
-            .eq("sns_id", clean_search_term)\
-            .execute()
-        
-        if exact_match_original.data and len(exact_match_original.data) > 0:
-            return {
-                "success": True,
-                "message": f"✅ {platform}에서 인플루언서를 찾았습니다.",
-                "data": exact_match_original.data
-            }
+        try:
+            exact_match_original = client.table("connecta_influencers")\
+                .select("*")\
+                .eq("platform", platform)\
+                .eq("sns_id", clean_search_term)\
+                .execute()
+            
+            if exact_match_original.data and len(exact_match_original.data) > 0:
+                return {
+                    "success": True,
+                    "message": f"✅ {platform}에서 인플루언서를 찾았습니다.",
+                    "data": exact_match_original.data
+                }
+        except Exception as e:
+            # enum 오류인 경우 플랫폼이 지원되지 않는다는 메시지 반환
+            error_str = str(e)
+            if "enum" in error_str.lower() or "invalid input value" in error_str.lower():
+                return {
+                    "success": False,
+                    "message": f"❌ '{platform}' 플랫폼은 데이터베이스에서 지원되지 않습니다.",
+                    "data": None
+                }
+            # 다른 오류는 계속 진행
         
         # 3단계: 부분 일치 검색 (기존 로직 유지)
         # 검색어에 와일드카드 문자(_ 또는 %)가 있는지 확인
@@ -270,35 +301,59 @@ def search_single_influencer_by_platform(search_term: str, platform: str):
         
         if has_wildcards:
             # 와일드카드 문자가 있으면 Python에서 부분 검색 수행
-            all_influencers = client.table("connecta_influencers")\
-                .select("*")\
-                .eq("platform", platform)\
-                .order("created_at", desc=True)\
-                .execute()
-            
-            if all_influencers.data:
-                # Python에서 필터링 (대소문자 구분 없이)
-                search_term_lower = clean_search_term.lower()
-                filtered_results = []
-                for inf in all_influencers.data:
-                    sns_id = (inf.get('sns_id') or '').lower()
-                    influencer_name = (inf.get('influencer_name') or '').lower()
-                    
-                    if search_term_lower in sns_id or search_term_lower in influencer_name:
-                        filtered_results.append(inf)
+            try:
+                all_influencers = client.table("connecta_influencers")\
+                    .select("*")\
+                    .eq("platform", platform)\
+                    .order("created_at", desc=True)\
+                    .execute()
                 
-                search_response_data = filtered_results
-            else:
+                if all_influencers.data:
+                    # Python에서 필터링 (대소문자 구분 없이)
+                    search_term_lower = clean_search_term.lower()
+                    filtered_results = []
+                    for inf in all_influencers.data:
+                        sns_id = (inf.get('sns_id') or '').lower()
+                        influencer_name = (inf.get('influencer_name') or '').lower()
+                        
+                        if search_term_lower in sns_id or search_term_lower in influencer_name:
+                            filtered_results.append(inf)
+                    
+                    search_response_data = filtered_results
+                else:
+                    search_response_data = []
+            except Exception as e:
+                # enum 오류인 경우 플랫폼이 지원되지 않는다는 메시지 반환
+                error_str = str(e)
+                if "enum" in error_str.lower() or "invalid input value" in error_str.lower():
+                    return {
+                        "success": False,
+                        "message": f"❌ '{platform}' 플랫폼은 데이터베이스에서 지원되지 않습니다.",
+                        "data": None
+                    }
+                # 다른 오류는 빈 결과로 처리
                 search_response_data = []
         else:
             # 와일드카드 문자가 없으면 ilike 검색 사용
-            search_response = client.table("connecta_influencers")\
-                .select("*")\
-                .order("created_at", desc=True)\
-                .eq("platform", platform)\
-                .or_(f"influencer_name.ilike.%{clean_search_term}%,sns_id.ilike.%{clean_search_term}%")\
-                .execute()
-            search_response_data = search_response.data if search_response.data else []
+            try:
+                search_response = client.table("connecta_influencers")\
+                    .select("*")\
+                    .order("created_at", desc=True)\
+                    .eq("platform", platform)\
+                    .or_(f"influencer_name.ilike.%{clean_search_term}%,sns_id.ilike.%{clean_search_term}%")\
+                    .execute()
+                search_response_data = search_response.data if search_response.data else []
+            except Exception as e:
+                # enum 오류인 경우 플랫폼이 지원되지 않는다는 메시지 반환
+                error_str = str(e)
+                if "enum" in error_str.lower() or "invalid input value" in error_str.lower():
+                    return {
+                        "success": False,
+                        "message": f"❌ '{platform}' 플랫폼은 데이터베이스에서 지원되지 않습니다.",
+                        "data": None
+                    }
+                # 다른 오류는 빈 결과로 처리
+                search_response_data = []
         
         if search_response_data:
             return {
@@ -399,7 +454,9 @@ def get_platform_emoji(platform: str) -> str:
         "instagram": "📷",
         "youtube": "📺",
         "tiktok": "🎵",
-        "twitter": "🐦"
+        "x": "🐦 X (Twitter)",
+        "blog": "📝 블로그",
+        "facebook": "👥 Facebook"
     }
     return platform_emojis.get(platform, "📱")
 

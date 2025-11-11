@@ -20,15 +20,17 @@ def render_influencer_search_and_filter():
         with col1:
             search_platform = st.selectbox(
                 "플랫폼",
-                ["전체", "instagram", "youtube", "tiktok", "twitter"],
+                ["전체", "instagram", "youtube", "tiktok", "x", "blog", "facebook"],
                 key="search_platform_select",
                 format_func=lambda x: {
                     "전체": "🌐 전체",
                     "instagram": "📸 Instagram",
                     "youtube": "📺 YouTube",
                     "tiktok": "🎵 TikTok",
-                    "twitter": "🐦 Twitter"
-                }[x]
+                    "x": "🐦 X (Twitter)",
+                    "blog": "📝 블로그",
+                    "facebook": "👥 Facebook"
+                }.get(x, x)
             )
         
         with col2:
@@ -182,14 +184,16 @@ def render_influencer_search_and_filter():
     # 플랫폼 필터
     platform_filter = st.selectbox(
         "플랫폼",
-        ["전체", "instagram", "youtube", "tiktok", "twitter"],
+        ["전체", "instagram", "youtube", "tiktok", "x", "blog", "facebook"],
         key="influencer_platform_filter",
         format_func=lambda x: {
             "전체": "🌐 전체",
             "instagram": "📸 Instagram",
             "youtube": "📺 YouTube",
             "tiktok": "🎵 TikTok",
-            "twitter": "🐦 Twitter"
+            "x": "🐦 X (Twitter)",
+            "blog": "📝 블로그",
+            "facebook": "👥 Facebook"
         }[x]
     )
     

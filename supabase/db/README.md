@@ -25,7 +25,7 @@ campaigns (1) ──→ (N) campaign_influencer_participations (1) ──→ (N)
 ## 주요 특징
 
 ### 1. ENUM 타입 사용
-- `platform_type`: 플랫폼 (instagram, youtube, tiktok, twitter)
+- `platform_type`: 플랫폼 (instagram, youtube, tiktok, x, blog, facebook)
 - `campaign_type`: 캠페인 타입 (seeding, promotion, sales)
 - `campaign_status`: 캠페인 상태 (planned, active, paused, completed, cancelled)
 - `contact_method`: 연락 방법 (dm, email, phone, kakao, form, other)

@@ -3,7 +3,7 @@
 -- ============================================================================
 
 -- 플랫폼 타입
-CREATE TYPE platform_type AS ENUM ('instagram', 'youtube', 'tiktok', 'twitter');
+CREATE TYPE platform_type AS ENUM ('instagram', 'youtube', 'tiktok', 'x', 'blog', 'facebook');
 
 -- 캠페인 타입
 CREATE TYPE campaign_type AS ENUM ('seeding', 'promotion', 'sales');
