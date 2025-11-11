@@ -22,8 +22,8 @@ def render_influencer_management():
     
     # 탭 간 이동 처리 (담당자별 관리에서는 수정 기능이 없으므로 제거)
     
-    # 등록, 조회 탭으로 분리 (정보 수정 탭 숨김)
-    tab_names = ["📝 인플루언서 등록", "👥 인플루언서 조회"]
+    # 등록, 조회, 검색 탭으로 분리 (정보 수정 탭 숨김)
+    tab_names = ["📝 인플루언서 등록", "✏️ 인플루언서 정보 수정", "🔍 인플루언서 검색"]
     
     # 기본 탭 인덱스 설정
     default_tab = st.session_state.get("influencer_active_tab", 0)
@@ -36,6 +36,9 @@ def render_influencer_management():
     
     with tabs[1]:
         render_manager_influencer_management()
+    
+    with tabs[2]:
+        render_influencer_search()
 
 def render_influencer_registration():
     """인플루언서 등록 탭"""
@@ -1347,7 +1350,7 @@ def render_influencer_edit_form(influencer):
 
 def render_manager_influencer_management():
     """담당자별 인플루언서 관리 탭"""
-    st.subheader("👥 인플루언서 조회")
+    st.subheader("✏️ 인플루언서 정보 수정")
     st.markdown("담당자별로 인플루언서를 필터링하고 조회합니다.")
     
     # 모든 인플루언서에서 담당자 목록 가져오기
@@ -1987,6 +1990,337 @@ def save_edited_influencers(original_df, edited_df):
         st.error(f"데이터 저장 중 오류가 발생했습니다: {e}")
         import traceback
         st.code(traceback.format_exc())
+
+def render_influencer_search():
+    """인플루언서 검색 탭"""
+    st.subheader("🔍 인플루언서 검색")
+    st.markdown("다양한 조건으로 인플루언서를 검색하고 필터링합니다.")
+    
+    try:
+        from ..supabase.simple_client import simple_client
+        
+        # 필터링 섹션
+        st.markdown("### 🎯 검색 필터")
+        
+        # 일반 필터링 섹션
+        with st.expander("📋 일반 필터링", expanded=True):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # 카테고리 필터링
+                category_options = ["전체", "일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"]
+                selected_category = st.selectbox(
+                    "카테고리",
+                    category_options,
+                    key="search_category",
+                    format_func=lambda x: {
+                        "전체": "🌐 전체",
+                        "일반": "📝 일반",
+                        "뷰티": "💄 뷰티",
+                        "패션": "👗 패션",
+                        "푸드": "🍽️ 푸드",
+                        "여행": "✈️ 여행",
+                        "라이프스타일": "🏠 라이프스타일",
+                        "테크": "💻 테크",
+                        "게임": "🎮 게임",
+                        "스포츠": "⚽ 스포츠",
+                        "애견": "🐕 애견",
+                        "기타": "🔧 기타"
+                    }[x]
+                )
+                
+                # 태그 필터링 (LIKE 검색)
+                tag_search = st.text_input(
+                    "태그 검색 (LIKE 검색)",
+                    placeholder="예: 뷰티, 패션",
+                    key="search_tag",
+                    help="태그에 포함된 키워드로 검색합니다. 쉼표로 구분된 태그 중 하나라도 포함되면 검색됩니다."
+                )
+            
+            with col2:
+                # 팔로워수 구간 필터링
+                follower_range = st.selectbox(
+                    "팔로워수 구간",
+                    ["전체", "5000 이하", "5000 ~ 1만", "1만 ~ 5만", "5만 ~ 10만", "10만 이상"],
+                    key="search_follower_range",
+                    format_func=lambda x: {
+                        "전체": "🌐 전체",
+                        "5000 이하": "👥 5,000명 이하",
+                        "5000 ~ 1만": "👥 5,000명 ~ 10,000명",
+                        "1만 ~ 5만": "👥 10,000명 ~ 50,000명",
+                        "5만 ~ 10만": "👥 50,000명 ~ 100,000명",
+                        "10만 이상": "👥 100,000명 이상"
+                    }[x]
+                )
+        
+        # AI 분석결과 필터링 섹션
+        with st.expander("🤖 인공지능 분석결과 필터링", expanded=True):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # 총점 필터링
+                overall_score_min = st.number_input(
+                    "총점 최소값",
+                    min_value=0.0,
+                    max_value=10.0,
+                    value=0.0,
+                    step=0.1,
+                    key="search_overall_score_min",
+                    help="AI 분석 결과의 총점(overall_score) 최소값을 설정합니다. (0-10)"
+                )
+                
+                overall_score_max = st.number_input(
+                    "총점 최대값",
+                    min_value=0.0,
+                    max_value=10.0,
+                    value=10.0,
+                    step=0.1,
+                    key="search_overall_score_max",
+                    help="AI 분석 결과의 총점(overall_score) 최대값을 설정합니다. (0-10)"
+                )
+            
+            with col2:
+                # 성장성 필터링
+                growth_potential_min = st.number_input(
+                    "성장성 최소값",
+                    min_value=0.0,
+                    max_value=10.0,
+                    value=0.0,
+                    step=0.1,
+                    key="search_growth_potential_min",
+                    help="AI 분석 결과의 성장성(growth_potential_score) 최소값을 설정합니다. (0-10)"
+                )
+                
+                growth_potential_max = st.number_input(
+                    "성장성 최대값",
+                    min_value=0.0,
+                    max_value=10.0,
+                    value=10.0,
+                    step=0.1,
+                    key="search_growth_potential_max",
+                    help="AI 분석 결과의 성장성(growth_potential_score) 최대값을 설정합니다. (0-10)"
+                )
+        
+        # 검색 버튼
+        if st.button("🔍 검색", type="primary", key="search_influencers_button"):
+            # 검색 실행
+            search_results = perform_influencer_search(
+                category=selected_category,
+                tag_search=tag_search,
+                follower_range=follower_range,
+                overall_score_min=overall_score_min,
+                overall_score_max=overall_score_max,
+                growth_potential_min=growth_potential_min,
+                growth_potential_max=growth_potential_max
+            )
+            
+            # 검색 결과를 세션에 저장
+            st.session_state.search_results = search_results
+            st.session_state.search_performed = True
+        
+        # 검색 결과 표시
+        if st.session_state.get("search_performed", False):
+            search_results = st.session_state.get("search_results", [])
+            
+            st.markdown("---")
+            st.markdown(f"### 📊 검색 결과 ({len(search_results)}명)")
+            
+            if search_results:
+                display_search_results(search_results)
+            else:
+                st.info("검색 조건에 맞는 인플루언서가 없습니다.")
+        
+    except Exception as e:
+        st.error(f"검색 중 오류가 발생했습니다: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
+
+def perform_influencer_search(
+    category: str = "전체",
+    tag_search: str = "",
+    follower_range: str = "전체",
+    overall_score_min: float = 0.0,
+    overall_score_max: float = 10.0,
+    growth_potential_min: float = 0.0,
+    growth_potential_max: float = 10.0
+) -> List[Dict[str, Any]]:
+    """인플루언서 검색 수행"""
+    try:
+        from ..supabase.simple_client import simple_client
+        
+        client = simple_client.get_client()
+        if not client:
+            return []
+        
+        # 1. 기본 인플루언서 데이터 조회
+        query = client.table("connecta_influencers").select("*")
+        
+        # 카테고리 필터링
+        if category != "전체":
+            query = query.eq("content_category", category)
+        
+        # 태그 필터링 (LIKE 검색)
+        if tag_search and tag_search.strip():
+            # 태그 필드에서 LIKE 검색 (PostgreSQL의 ILIKE 사용)
+            tag_keywords = [tag.strip() for tag in tag_search.split(",") if tag.strip()]
+            if tag_keywords:
+                # 여러 태그 중 하나라도 포함되면 검색
+                # Supabase의 or_ 메서드는 여러 조건을 쉼표로 구분하여 전달
+                tag_conditions = [f"tags.ilike.%{keyword}%" for keyword in tag_keywords]
+                if tag_conditions:
+                    query = query.or_(",".join(tag_conditions))
+        
+        # 팔로워수 구간 필터링
+        if follower_range != "전체":
+            if follower_range == "5000 이하":
+                query = query.lte("followers_count", 5000)
+            elif follower_range == "5000 ~ 1만":
+                query = query.gte("followers_count", 5000).lte("followers_count", 10000)
+            elif follower_range == "1만 ~ 5만":
+                query = query.gte("followers_count", 10000).lte("followers_count", 50000)
+            elif follower_range == "5만 ~ 10만":
+                query = query.gte("followers_count", 50000).lte("followers_count", 100000)
+            elif follower_range == "10만 이상":
+                query = query.gte("followers_count", 100000)
+        
+        # 인플루언서 데이터 조회
+        influencers_response = query.execute()
+        influencers = influencers_response.data if influencers_response.data else []
+        
+        # 2. AI 분석 결과와 조인하여 필터링
+        if influencers:
+            # AI 분석 결과 조회 (sns_id와 platform 기준으로 매칭)
+            ai_analyses_query = client.table("ai_influencer_analyses").select("*")
+            ai_analyses_response = ai_analyses_query.execute()
+            ai_analyses = ai_analyses_response.data if ai_analyses_response.data else []
+            
+            # AI 분석 결과를 딕셔너리로 변환 (sns_id + platform을 키로)
+            ai_analyses_dict = {}
+            for analysis in ai_analyses:
+                # alias나 influencer_id를 sns_id로 사용
+                key = None
+                if analysis.get('alias'):
+                    key = analysis['alias']
+                elif analysis.get('influencer_id'):
+                    key = analysis['influencer_id']
+                
+                if key:
+                    platform = analysis.get('platform', '')
+                    full_key = f"{platform}:{key}"
+                    ai_analyses_dict[full_key] = analysis
+            
+            # 인플루언서와 AI 분석 결과 매칭 및 필터링
+            filtered_influencers = []
+            for influencer in influencers:
+                sns_id = influencer.get('sns_id', '')
+                platform = influencer.get('platform', '')
+                full_key = f"{platform}:{sns_id}"
+                
+                # AI 분석 결과가 있는 경우 필터링 적용
+                ai_analysis = ai_analyses_dict.get(full_key)
+                
+                if ai_analysis:
+                    # 총점 필터링
+                    overall_score = ai_analysis.get('overall_score')
+                    if overall_score is not None:
+                        if overall_score < overall_score_min or overall_score > overall_score_max:
+                            continue
+                    
+                    # 성장성 필터링
+                    growth_potential_score = ai_analysis.get('growth_potential_score')
+                    if growth_potential_score is not None:
+                        if growth_potential_score < growth_potential_min or growth_potential_score > growth_potential_max:
+                            continue
+                    
+                    # AI 분석 결과를 인플루언서 데이터에 추가
+                    influencer['ai_analysis'] = ai_analysis
+                    filtered_influencers.append(influencer)
+                else:
+                    # AI 분석 결과가 없는 경우, 점수 필터가 기본값이면 포함
+                    if overall_score_min == 0.0 and overall_score_max == 10.0 and \
+                       growth_potential_min == 0.0 and growth_potential_max == 10.0:
+                        filtered_influencers.append(influencer)
+                    # AI 분석 결과가 없고 필터가 설정된 경우 제외
+                    elif overall_score_min > 0.0 or overall_score_max < 10.0 or \
+                         growth_potential_min > 0.0 or growth_potential_max < 10.0:
+                        continue
+                    else:
+                        filtered_influencers.append(influencer)
+        
+        return filtered_influencers
+        
+    except Exception as e:
+        st.error(f"검색 수행 중 오류: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
+        return []
+
+def display_search_results(results: List[Dict[str, Any]]):
+    """검색 결과 표시"""
+    if not results:
+        st.info("검색 결과가 없습니다.")
+        return
+    
+    # 결과를 데이터프레임으로 변환
+    display_data = []
+    for inf in results:
+        ai_analysis = inf.get('ai_analysis', {})
+        
+        display_data.append({
+            'SNS ID': inf.get('sns_id', 'N/A'),
+            '이름': inf.get('influencer_name', 'N/A'),
+            '플랫폼': inf.get('platform', 'N/A'),
+            '카테고리': inf.get('content_category', 'N/A'),
+            '팔로워 수': f"{inf.get('followers_count', 0):,}" if inf.get('followers_count') else 'N/A',
+            '총점': f"{ai_analysis.get('overall_score', 'N/A'):.1f}" if ai_analysis.get('overall_score') is not None else 'N/A',
+            '성장성': f"{ai_analysis.get('growth_potential_score', 'N/A'):.1f}" if ai_analysis.get('growth_potential_score') is not None else 'N/A',
+            '참여도': f"{ai_analysis.get('engagement_score', 'N/A'):.1f}" if ai_analysis.get('engagement_score') is not None else 'N/A',
+            '활동성': f"{ai_analysis.get('activity_score', 'N/A'):.1f}" if ai_analysis.get('activity_score') is not None else 'N/A',
+            '소통력': f"{ai_analysis.get('communication_score', 'N/A'):.1f}" if ai_analysis.get('communication_score') is not None else 'N/A',
+            '태그': inf.get('tags', 'N/A'),
+            '가격': f"{inf.get('price_krw', 0):,.0f}원" if inf.get('price_krw') else 'N/A',
+            '상태': "활성" if inf.get('active', True) else "비활성"
+        })
+    
+    df = pd.DataFrame(display_data)
+    
+    # 결과 테이블 표시
+    st.dataframe(
+        df,
+        width='stretch',
+        hide_index=True,
+        use_container_width=True
+    )
+    
+    # 상세 정보 표시 (확장 가능)
+    st.markdown("### 📋 상세 정보")
+    for idx, inf in enumerate(results[:10]):  # 최대 10개만 표시
+        with st.expander(f"{inf.get('influencer_name', inf.get('sns_id', 'N/A'))} ({inf.get('platform', 'N/A')})", expanded=False):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**기본 정보**")
+                st.markdown(f"- SNS ID: {inf.get('sns_id', 'N/A')}")
+                st.markdown(f"- 이름: {inf.get('influencer_name', 'N/A')}")
+                st.markdown(f"- 플랫폼: {inf.get('platform', 'N/A')}")
+                st.markdown(f"- 카테고리: {inf.get('content_category', 'N/A')}")
+                st.markdown(f"- 팔로워 수: {inf.get('followers_count', 0):,}" if inf.get('followers_count') else "- 팔로워 수: N/A")
+                st.markdown(f"- 태그: {inf.get('tags', 'N/A')}")
+            
+            with col2:
+                st.markdown("**AI 분석 결과**")
+                ai_analysis = inf.get('ai_analysis', {})
+                if ai_analysis:
+                    st.markdown(f"- 총점: {ai_analysis.get('overall_score', 'N/A')}" if ai_analysis.get('overall_score') is not None else "- 총점: N/A")
+                    st.markdown(f"- 성장성: {ai_analysis.get('growth_potential_score', 'N/A')}" if ai_analysis.get('growth_potential_score') is not None else "- 성장성: N/A")
+                    st.markdown(f"- 참여도: {ai_analysis.get('engagement_score', 'N/A')}" if ai_analysis.get('engagement_score') is not None else "- 참여도: N/A")
+                    st.markdown(f"- 활동성: {ai_analysis.get('activity_score', 'N/A')}" if ai_analysis.get('activity_score') is not None else "- 활동성: N/A")
+                    st.markdown(f"- 소통력: {ai_analysis.get('communication_score', 'N/A')}" if ai_analysis.get('communication_score') is not None else "- 소통력: N/A")
+                else:
+                    st.markdown("- AI 분석 결과 없음")
+    
+    if len(results) > 10:
+        st.info(f"총 {len(results)}명 중 상위 10명만 상세 정보로 표시됩니다.")
 
 def render_influencer_tab():
     """인플루언서 탭 - 기존 함수 유지 (호환성)"""
