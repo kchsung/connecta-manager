@@ -454,14 +454,12 @@ async function getCampaignAnalysis(supabaseClient: any, data: any) {
   }
 }
 
-// 캠페인 분석 결과 저장
+// 캠페인 분석 결과 저장 (upsert: 기존 데이터가 있으면 업데이트, 없으면 삽입)
 async function saveCampaignAnalysis(supabaseClient: any, data: any) {
   try {
-    console.log('[saveCampaignAnalysis] 시작, 받은 데이터:', JSON.stringify(data))
     const { campaign_id, analysis_result } = data
 
     if (!campaign_id || !analysis_result) {
-      console.error('[saveCampaignAnalysis] 필수 파라미터 누락:', { campaign_id: !!campaign_id, analysis_result: !!analysis_result })
       return new Response(
         JSON.stringify({ success: false, error: 'campaign_id and analysis_result are required' }),
         { 
@@ -471,10 +469,7 @@ async function saveCampaignAnalysis(supabaseClient: any, data: any) {
       )
     }
 
-    console.log('[saveCampaignAnalysis] campaign_id:', campaign_id)
-
     // 기존 데이터 확인
-    console.log('[saveCampaignAnalysis] 기존 데이터 확인 중...')
     const { data: existingData, error: checkError } = await supabaseClient
       .from('campaign_analyses')
       .select('id')
@@ -482,11 +477,8 @@ async function saveCampaignAnalysis(supabaseClient: any, data: any) {
       .single()
 
     if (checkError && checkError.code !== 'PGRST116') {
-      console.error('[saveCampaignAnalysis] 기존 데이터 확인 오류:', checkError)
       throw checkError
     }
-
-    console.log('[saveCampaignAnalysis] 기존 데이터:', existingData ? `존재 (id: ${existingData.id})` : '없음')
 
     // 데이터 준비
     // created_by는 DB 기본값(auth.uid())을 사용
@@ -498,12 +490,9 @@ async function saveCampaignAnalysis(supabaseClient: any, data: any) {
       // created_by는 명시적으로 설정하지 않음 (DB 기본값 auth.uid() 사용)
     }
 
-    console.log('[saveCampaignAnalysis] 저장할 데이터 준비 완료, analyzed_at:', analysisData.analyzed_at)
-
     let result
     if (existingData && !checkError) {
-      // 업데이트
-      console.log('[saveCampaignAnalysis] 기존 데이터 업데이트 시도...')
+      // 기존 데이터가 있으면 업데이트
       const { data: updateData, error: updateError } = await supabaseClient
         .from('campaign_analyses')
         .update(analysisData)
@@ -512,14 +501,11 @@ async function saveCampaignAnalysis(supabaseClient: any, data: any) {
         .single()
 
       if (updateError) {
-        console.error('[saveCampaignAnalysis] 업데이트 오류:', updateError)
         throw updateError
       }
-      console.log('[saveCampaignAnalysis] 업데이트 성공:', updateData)
       result = updateData
     } else {
-      // 새로 생성
-      console.log('[saveCampaignAnalysis] 새 데이터 삽입 시도...')
+      // 기존 데이터가 없으면 새로 생성
       const { data: insertData, error: insertError } = await supabaseClient
         .from('campaign_analyses')
         .insert(analysisData)
@@ -527,15 +513,11 @@ async function saveCampaignAnalysis(supabaseClient: any, data: any) {
         .single()
 
       if (insertError) {
-        console.error('[saveCampaignAnalysis] 삽입 오류:', insertError)
-        console.error('[saveCampaignAnalysis] 삽입 오류 상세:', JSON.stringify(insertError, null, 2))
         throw insertError
       }
-      console.log('[saveCampaignAnalysis] 삽입 성공:', insertData)
       result = insertData
     }
 
-    console.log('[saveCampaignAnalysis] 저장 완료')
     return new Response(
       JSON.stringify({ success: true, data: result }),
       { 
@@ -544,9 +526,7 @@ async function saveCampaignAnalysis(supabaseClient: any, data: any) {
       }
     )
   } catch (error) {
-    console.error('[saveCampaignAnalysis] 예외 발생:', error)
-    console.error('[saveCampaignAnalysis] 에러 메시지:', error.message)
-    console.error('[saveCampaignAnalysis] 에러 스택:', error.stack)
+    console.error('[saveCampaignAnalysis] 오류:', error)
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -564,27 +544,16 @@ async function saveCampaignAnalysis(supabaseClient: any, data: any) {
 // 분석된 캠페인 ID 목록 조회
 async function getAnalyzedCampaignIds(supabaseClient: any) {
   try {
-    console.log('[getAnalyzedCampaignIds] 시작')
-    
     const { data: analyses, error } = await supabaseClient
       .from('campaign_analyses')
       .select('campaign_id')
 
-    console.log('[getAnalyzedCampaignIds] 쿼리 결과:', { 
-      dataCount: analyses ? analyses.length : 0, 
-      error: error ? error.message : null 
-    })
-
     if (error) {
-      console.error('[getAnalyzedCampaignIds] 오류:', error)
       throw error
     }
 
     // campaign_id만 추출하여 배열로 반환 (문자열로 변환하여 일관성 보장)
     const campaignIds = analyses ? analyses.map((a: any) => String(a.campaign_id)) : []
-
-    console.log('[getAnalyzedCampaignIds] 반환할 캠페인 ID 개수:', campaignIds.length)
-    console.log('[getAnalyzedCampaignIds] 반환할 캠페인 ID 목록:', campaignIds)
 
     return new Response(
       JSON.stringify({ success: true, data: campaignIds }),
@@ -594,7 +563,6 @@ async function getAnalyzedCampaignIds(supabaseClient: any) {
       }
     )
   } catch (error) {
-    console.error('[getAnalyzedCampaignIds] 예외 발생:', error)
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { 

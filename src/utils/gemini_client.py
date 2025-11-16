@@ -12,6 +12,12 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
 
 def get_gemini_client():
     """Gemini API 클라이언트 반환"""
@@ -155,9 +161,53 @@ def get_valid_model_name(requested_model: str = None) -> str:
     return requested_model or default_models[0]
 
 
+def get_openai_client():
+    """OpenAI API 클라이언트 반환"""
+    if not OPENAI_AVAILABLE:
+        st.error("openai 패키지가 설치되지 않았습니다. pip install openai를 실행해주세요.")
+        return None
+    
+    # API 키 읽기 (환경변수 우선, 그 다음 secrets)
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        try:
+            # secrets에서 직접 읽기 시도
+            if hasattr(st, 'secrets') and st.secrets:
+                api_key = st.secrets.get("OPENAI_API_KEY")
+                # 만약 None이면 문자열로 시도 (TOML 형식에 따라)
+                if api_key is None:
+                    try:
+                        api_key = st.secrets["OPENAI_API_KEY"]
+                    except (KeyError, TypeError):
+                        pass
+        except (KeyError, AttributeError, TypeError) as e:
+            api_key = None
+    
+    # 키 검증
+    if not api_key:
+        st.error("OpenAI API 키가 설정되지 않았습니다.")
+        st.info("💡 `.streamlit/secrets.toml` 파일에 `OPENAI_API_KEY = \"your-api-key\"` 형식으로 추가해주세요.")
+        return None
+    
+    # 키가 문자열인지 확인하고 공백 제거
+    if isinstance(api_key, str):
+        api_key = api_key.strip()
+    
+    if not api_key or api_key == "your-openai-api-key-here" or len(api_key) < 10:
+        st.error("OpenAI API 키가 유효하지 않습니다.")
+        return None
+    
+    try:
+        client = OpenAI(api_key=api_key)
+        return client
+    except Exception as e:
+        st.error(f"OpenAI API 클라이언트 초기화 실패: {e}")
+        return None
+
+
 def analyze_campaign_with_gemini(campaign_content: str) -> Optional[Dict[str, Any]]:
     """
-    캠페인 내용을 Gemini API로 분석
+    캠페인 내용을 OpenAI 프롬프트 ID를 사용하여 분석
     
     Args:
         campaign_content: 캠페인 내용 (campaigns 테이블의 정보)
@@ -165,54 +215,43 @@ def analyze_campaign_with_gemini(campaign_content: str) -> Optional[Dict[str, An
     Returns:
         분석 결과 딕셔너리 (category, recommended_tags, details)
     """
-    client = get_gemini_client()
+    client = get_openai_client()
     if not client:
         return None
     
-    prompt = """너는 마케팅 전문가야
-
-마케팅을 위한 캠페인 정보에 따라 적절한 인플루언서를 고르기 위한 기준을 정해야해
-1. 캠페인 내용을 보고 어떤 카테고리 인플루언서들이 적절한지 파악
-2. 캠페인의 목적(홍보, 판매, 시딩)에 따라 인플루언서별로 분류되어 있는 Tag를 추출할지 파악
-3. 인플루언서가 어떤 활동을 하면 잘 맞을지 예측해서 제안
-4. 인플루언서들의 브랜드 적합성을 판단할때의 기준 제안
-
-**중요: 반드시 다음 형식의 JSON만 응답해주세요. 다른 설명이나 텍스트는 포함하지 마세요.**
-
-**카테고리는 반드시 다음 중 하나만 선택해야 합니다:**
-"일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"
-
-만약 여러 카테고리가 적합하다면, 가장 적합한 하나를 선택하거나, 여러 카테고리를 "/"로 구분하여 나열할 수 있습니다.
-예: "스포츠/라이프스타일" (이 경우 두 카테고리 모두 매칭됩니다)
-
-{{
-  "category": "카테고리명",
-  "recommended_tags": ["태그1", "태그2", "태그3"],
-  "details": "상세 분석 내용"
-}}
-
-캠페인 내용:
-{campaign_content}
-"""
-    
     try:
-        # 모델명 설정 (secrets에서 가져오거나 기본값 사용)
-        requested_model = st.secrets.get("GEMINI_MODEL", None)
-        model_name = get_valid_model_name(requested_model)
-        
-        if requested_model and requested_model != model_name:
-            st.info(f"ℹ️ 요청한 모델 '{requested_model}' 대신 사용 가능한 모델 '{model_name}'을 사용합니다.")
-        
-        model = genai.GenerativeModel(model_name)
-        response = model.generate_content(
-            prompt.format(campaign_content=campaign_content),
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.5
-            )
+        # OpenAI 프롬프트 ID를 사용하여 응답 생성
+        # campaign_content를 input 파라미터로 전달
+        response = client.responses.create(
+            prompt={
+                "id": "pmpt_691993b8a8688190bc1546a32d5a194a074f9cef6a509528"
+            },
+            input=campaign_content
         )
         
-        # 응답 텍스트 추출
-        response_text = response.text.strip()
+        # 응답 텍스트 추출 (OpenAI responses API 표준 방식)
+        response_text = None
+        
+        # 방법 1: output_text 속성 확인
+        if hasattr(response, 'output_text') and response.output_text:
+            response_text = response.output_text
+        # 방법 2: output 배열에서 content[*].text 추출
+        elif hasattr(response, 'output') and response.output:
+            chunks = []
+            for block in response.output:
+                if hasattr(block, 'content') and block.content:
+                    for c in block.content:
+                        if hasattr(c, 'text') and c.text:
+                            chunks.append(c.text)
+            if chunks:
+                response_text = "\n".join(chunks)
+        
+        if not response_text:
+            st.error("응답에서 텍스트를 찾지 못했습니다.")
+            return None
+        
+        # 문자열로 변환 및 공백 제거
+        response_text = str(response_text).strip()
         
         # JSON 형식 추출 (여러 방법 시도)
         json_text = None
@@ -282,21 +321,98 @@ def analyze_campaign_with_gemini(campaign_content: str) -> Optional[Dict[str, An
             }
         
         # 정상적으로 파싱된 경우
-        # 카테고리 정규화 (표준 카테고리 목록에 맞춤)
-        category = result.get("category", "").strip()
-        normalized_category = normalize_category(category)
-        
-        return {
-            "category": normalized_category,
-            "recommended_tags": result.get("recommended_tags", []),
-            "details": result.get("details", "")
-        }
+        # 새로운 형식인지 확인 (campaign_summary가 있으면 새로운 형식)
+        if 'campaign_summary' in result:
+            # 새로운 형식: 그대로 반환
+            # ideal_influencer_profile의 recommended_category 정규화
+            if 'ideal_influencer_profile' in result:
+                profile = result['ideal_influencer_profile']
+                if 'recommended_category' in profile:
+                    profile['recommended_category'] = normalize_category(profile['recommended_category'])
+            return result
+        else:
+            # 기존 형식: 카테고리 정규화 후 반환
+            category = result.get("category", "").strip()
+            normalized_category = normalize_category(category)
+            
+            return {
+                "category": normalized_category,
+                "recommended_tags": result.get("recommended_tags", []),
+                "details": result.get("details", "")
+            }
     
     except json.JSONDecodeError as e:
-        st.error(f"Gemini API 응답 파싱 실패: {e}")
+        st.error(f"OpenAI API 응답 파싱 실패: {e}")
         return None
     except Exception as e:
         st.error(f"캠페인 분석 중 오류 발생: {e}")
+        return None
+
+
+def generate_proposal_with_openai(
+    campaign_analysis_result: Dict[str, Any],
+    influencer_analysis: Dict[str, Any]
+) -> Optional[str]:
+    """
+    인플루언서별 캠페인 제안서 작성 (OpenAI 사용)
+    
+    Args:
+        campaign_analysis_result: 캠페인 분석 결과 (campaign_analyses 테이블의 analysis_result)
+        influencer_analysis: 인플루언서 분석 결과 (ai_influencer_analyses 테이블)
+    
+    Returns:
+        마크다운 형태의 제안서
+    """
+    client = get_openai_client()
+    if not client:
+        return None
+    
+    try:
+        # 입력 데이터 구성
+        input_data = {
+            "campaign_analysis": campaign_analysis_result,
+            "influencer_analysis": influencer_analysis
+        }
+        
+        # JSON 문자열로 변환
+        input_text = json.dumps(input_data, ensure_ascii=False, indent=2)
+        
+        # OpenAI 프롬프트 ID를 사용하여 응답 생성
+        response = client.responses.create(
+            prompt={
+                "id": "pmpt_6919ca4d95208190be84e9d60f0c8d810aab57b07dffc4a3"
+            },
+            input=input_text
+        )
+        
+        # 응답 텍스트 추출 (OpenAI responses API 표준 방식)
+        response_text = None
+        
+        # 방법 1: output_text 속성 확인
+        if hasattr(response, 'output_text') and response.output_text:
+            response_text = response.output_text
+        # 방법 2: output 배열에서 content[*].text 추출
+        elif hasattr(response, 'output') and response.output:
+            chunks = []
+            for block in response.output:
+                if hasattr(block, 'content') and block.content:
+                    for c in block.content:
+                        if hasattr(c, 'text') and c.text:
+                            chunks.append(c.text)
+            if chunks:
+                response_text = "\n".join(chunks)
+        
+        if not response_text:
+            st.error("응답에서 텍스트를 찾지 못했습니다.")
+            return None
+        
+        # 문자열로 변환 및 공백 제거
+        return str(response_text).strip()
+    
+    except Exception as e:
+        st.error(f"제안서 생성 중 오류 발생: {e}")
+        import traceback
+        st.code(traceback.format_exc())
         return None
 
 
@@ -305,7 +421,7 @@ def generate_proposal_with_gemini(
     influencer_analysis: Dict[str, Any]
 ) -> Optional[str]:
     """
-    인플루언서별 캠페인 제안서 작성
+    인플루언서별 캠페인 제안서 작성 (Gemini 사용 - 하위 호환성)
     
     Args:
         campaign_info: 캠페인 정보 (campaigns 테이블)

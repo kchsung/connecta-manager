@@ -163,6 +163,8 @@ def render_campaign_analysis_tab():
             # 캠페인 변경 시 기존 분석 결과 초기화
             if 'campaign_analysis_result' in st.session_state:
                 del st.session_state.campaign_analysis_result
+            if 'campaign_analysis_campaign_id' in st.session_state:
+                del st.session_state.campaign_analysis_campaign_id
             st.info("🔄 캠페인이 변경되어 기존 분석 결과가 초기화되었습니다.")
         
         # 세션 상태에 저장
@@ -209,17 +211,26 @@ def render_campaign_analysis_tab():
             
             # 기존 분석 결과 확인
             campaign_id = selected_campaign.get('id')
-            existing_analysis = None
-            if campaign_id:
-                existing_analysis = get_campaign_analysis_from_db(campaign_id)
             
-            # 분석 결과가 세션에 없고 DB에 있으면 로드
-            if 'campaign_analysis_result' not in st.session_state and existing_analysis:
-                st.session_state.campaign_analysis_result = existing_analysis.get('analysis_result')
-                st.info("💾 저장된 분석 결과를 불러왔습니다.")
+            # 세션 상태의 분석 결과가 현재 선택된 캠페인과 일치하는지 확인
+            analysis_campaign_id = st.session_state.get('campaign_analysis_campaign_id')
+            if analysis_campaign_id != campaign_id:
+                # 분석 결과가 다른 캠페인 것이거나 없으면 초기화
+                if 'campaign_analysis_result' in st.session_state:
+                    del st.session_state.campaign_analysis_result
+                if 'campaign_analysis_campaign_id' in st.session_state:
+                    del st.session_state.campaign_analysis_campaign_id
+            
+            # 분석 결과가 세션에 없으면 DB에서 조회
+            if 'campaign_analysis_result' not in st.session_state and campaign_id:
+                existing_analysis = get_campaign_analysis_from_db(campaign_id)
+                if existing_analysis and existing_analysis.get('analysis_result'):
+                    st.session_state.campaign_analysis_result = existing_analysis.get('analysis_result')
+                    st.session_state.campaign_analysis_campaign_id = campaign_id
+                    st.info("💾 저장된 분석 결과를 불러왔습니다.")
             
             # 분석 결과가 있으면 표시
-            if 'campaign_analysis_result' in st.session_state:
+            if 'campaign_analysis_result' in st.session_state and st.session_state.get('campaign_analysis_campaign_id') == campaign_id:
                 display_campaign_analysis_result()
                 
                 # 다시 분석 버튼
@@ -227,6 +238,8 @@ def render_campaign_analysis_tab():
                     # 세션 상태 초기화
                     if 'campaign_analysis_result' in st.session_state:
                         del st.session_state.campaign_analysis_result
+                    if 'campaign_analysis_campaign_id' in st.session_state:
+                        del st.session_state.campaign_analysis_campaign_id
                     # 강제로 다시 분석
                     analyze_campaign(selected_campaign, force_reanalyze=True)
                     st.rerun()
@@ -256,17 +269,6 @@ def render_influencer_matching_tab():
         # 분석된 캠페인 ID 목록 조회
         analyzed_campaign_ids = get_analyzed_campaign_ids()
         
-        # 디버깅: 분석된 캠페인 ID 확인
-        st.write(f"🔍 [디버그] 분석된 캠페인 ID 개수: {len(analyzed_campaign_ids)}")
-        if analyzed_campaign_ids:
-            st.write(f"🔍 [디버그] 분석된 캠페인 ID 목록: {analyzed_campaign_ids[:3]}...")  # 처음 3개만 표시
-        
-        # 디버깅: 전체 캠페인 ID 확인
-        all_campaign_ids = [str(camp.get('id')) for camp in campaigns]
-        st.write(f"🔍 [디버그] 전체 캠페인 ID 개수: {len(all_campaign_ids)}")
-        if all_campaign_ids:
-            st.write(f"🔍 [디버그] 전체 캠페인 ID 목록: {all_campaign_ids[:3]}...")  # 처음 3개만 표시
-        
         # ID를 문자열로 변환하여 비교 (UUID 형식 일치 보장)
         analyzed_campaign_ids_str = [str(cid) for cid in analyzed_campaign_ids]
         
@@ -275,8 +277,6 @@ def render_influencer_matching_tab():
             camp for camp in campaigns 
             if str(camp.get('id')) in analyzed_campaign_ids_str
         ]
-        
-        st.write(f"🔍 [디버그] 필터링된 캠페인 개수: {len(analyzed_campaigns)}")
         
         if not analyzed_campaigns:
             st.warning("⚠️ 분석된 캠페인이 없습니다. 먼저 '인공지능 캠페인 분석' 탭에서 캠페인을 분석해주세요.")
@@ -320,7 +320,7 @@ def render_influencer_matching_tab():
         
         # 캠페인이 변경되었는지 확인
         if previous_campaign_id != current_campaign_id:
-            # 캠페인 변경 시 기존 매칭 결과 초기화
+            # 캠페인 변경 시 기존 매칭 결과 및 분석 결과 초기화
             if 'matched_influencers' in st.session_state:
                 del st.session_state.matched_influencers
             if 'matching_analysis_result' in st.session_state:
@@ -329,6 +329,11 @@ def render_influencer_matching_tab():
                 del st.session_state.selected_influencer_for_proposal
             if 'generated_proposal' in st.session_state:
                 del st.session_state.generated_proposal
+            # 분석 결과도 초기화 (다른 캠페인 분석 결과가 남아있을 수 있음)
+            if 'campaign_analysis_result' in st.session_state:
+                del st.session_state.campaign_analysis_result
+            if 'campaign_analysis_campaign_id' in st.session_state:
+                del st.session_state.campaign_analysis_campaign_id
         
         # 세션 상태에 저장
         st.session_state.matching_selected_campaign = selected_campaign
@@ -346,13 +351,29 @@ def render_influencer_matching_tab():
         
         # 캠페인 분석 결과 확인 (매칭에 필요)
         campaign_id = selected_campaign.get('id')
+        
+        # 세션 상태의 분석 결과가 현재 선택된 캠페인과 일치하는지 확인
+        analysis_campaign_id = st.session_state.get('campaign_analysis_campaign_id')
+        if analysis_campaign_id != campaign_id:
+            # 분석 결과가 다른 캠페인 것이거나 없으면 초기화
+            if 'campaign_analysis_result' in st.session_state:
+                del st.session_state.campaign_analysis_result
+            if 'campaign_analysis_campaign_id' in st.session_state:
+                del st.session_state.campaign_analysis_campaign_id
+        
         if campaign_id:
-            existing_analysis = get_campaign_analysis_from_db(campaign_id)
-            if existing_analysis and existing_analysis.get('analysis_result'):
-                # 분석 결과가 있으면 매칭 가능
-                if 'campaign_analysis_result' not in st.session_state:
+            # 세션 상태에 분석 결과가 없으면 DB에서 조회
+            if 'campaign_analysis_result' not in st.session_state:
+                existing_analysis = get_campaign_analysis_from_db(campaign_id)
+                if existing_analysis and existing_analysis.get('analysis_result'):
+                    # 분석 결과가 있으면 매칭 가능
                     st.session_state.campaign_analysis_result = existing_analysis.get('analysis_result')
-            elif 'campaign_analysis_result' not in st.session_state:
+                    st.session_state.campaign_analysis_campaign_id = campaign_id
+                else:
+                    st.warning("⚠️ 먼저 '인공지능 캠페인 분석' 탭에서 캠페인을 분석해주세요.")
+                    return
+            # 세션 상태에 분석 결과가 있지만 다른 캠페인 것이면 경고
+            elif st.session_state.get('campaign_analysis_campaign_id') != campaign_id:
                 st.warning("⚠️ 먼저 '인공지능 캠페인 분석' 탭에서 캠페인을 분석해주세요.")
                 return
         
@@ -410,24 +431,13 @@ def get_analyzed_campaign_ids() -> list:
         try:
             response = requests.post(function_url, json=payload, headers=headers, timeout=10)
             
-            st.write(f"🔍 [디버그] Edge Function 응답 상태 코드: {response.status_code}")
-            
             if response.status_code == 200:
                 result = response.json()
-                st.write(f"🔍 [디버그] Edge Function 응답: {result}")
                 if result.get("success") and result.get("data"):
-                    campaign_ids = result["data"]
-                    st.write(f"🔍 [디버그] 반환된 캠페인 ID 개수: {len(campaign_ids)}")
-                    return campaign_ids
-                else:
-                    st.write(f"🔍 [디버그] 응답에 데이터가 없음: success={result.get('success')}, data={result.get('data')}")
-            else:
-                st.write(f"🔍 [디버그] Edge Function 오류 응답: {response.text}")
-        except Exception as e:
+                    return result["data"]
+        except:
             # 조회 실패는 치명적이지 않으므로 조용히 실패
-            st.write(f"🔍 [디버그] Edge Function 호출 예외: {e}")
-            import traceback
-            st.write(f"🔍 [디버그] 예외 상세: {traceback.format_exc()}")
+            pass
         
         return []
     except Exception as e:
@@ -480,9 +490,6 @@ def save_campaign_analysis_to_db(campaign_id: str, analysis_result: Dict[str, An
     try:
         import requests
         import os
-        import json
-        
-        st.write("🔍 [디버그] 저장 시작 - campaign_id:", campaign_id)
         
         supabase_url = os.getenv("SUPABASE_URL") or st.secrets.get("SUPABASE_URL")
         supabase_anon_key = os.getenv("SUPABASE_ANON_KEY") or st.secrets.get("SUPABASE_ANON_KEY")
@@ -491,9 +498,6 @@ def save_campaign_analysis_to_db(campaign_id: str, analysis_result: Dict[str, An
             st.error("❌ Supabase URL 또는 API 키가 설정되지 않았습니다.")
             st.info("💡 `.streamlit/secrets.toml` 파일에 `SUPABASE_URL`과 `SUPABASE_ANON_KEY`를 추가해주세요.")
             return False
-        
-        st.write("🔍 [디버그] Supabase URL:", supabase_url[:50] + "..." if len(supabase_url) > 50 else supabase_url)
-        st.write("🔍 [디버그] API 키 존재:", "✅" if supabase_anon_key else "❌")
         
         # Edge Function 호출
         function_url = f"{supabase_url}/functions/v1/ai-influencer-analysis"
@@ -509,23 +513,13 @@ def save_campaign_analysis_to_db(campaign_id: str, analysis_result: Dict[str, An
             }
         }
         
-        st.write("🔍 [디버그] Edge Function URL:", function_url)
-        st.write("🔍 [디버그] Payload 크기:", len(json.dumps(payload)), "bytes")
-        st.write("🔍 [디버그] analysis_result 타입:", type(analysis_result).__name__)
-        
         try:
-            st.write("🔍 [디버그] Edge Function 호출 중...")
             response = requests.post(function_url, json=payload, headers=headers, timeout=10)
-            
-            st.write("🔍 [디버그] 응답 상태 코드:", response.status_code)
-            st.write("🔍 [디버그] 응답 헤더:", dict(response.headers))
             
             if response.status_code == 200:
                 result = response.json()
-                st.write("🔍 [디버그] 응답 결과:", json.dumps(result, ensure_ascii=False, indent=2)[:500])
                 
                 if result.get("success", False):
-                    st.success("✅ 저장 성공!")
                     return True
                 else:
                     error_msg = result.get("error", "알 수 없는 오류")
@@ -536,7 +530,6 @@ def save_campaign_analysis_to_db(campaign_id: str, analysis_result: Dict[str, An
                     return False
             else:
                 error_text = response.text
-                st.write("🔍 [디버그] 에러 응답 본문:", error_text[:500])
                 try:
                     error_json = response.json()
                     error_msg = error_json.get("error", error_text)
@@ -592,6 +585,7 @@ def analyze_campaign(campaign: Dict[str, Any], force_reanalyze: bool = False):
         existing_analysis = get_campaign_analysis_from_db(campaign_id)
         if existing_analysis and existing_analysis.get('analysis_result'):
             st.session_state.campaign_analysis_result = existing_analysis['analysis_result']
+            st.session_state.campaign_analysis_campaign_id = campaign_id
             st.info("💾 저장된 분석 결과를 불러왔습니다.")
             return
     
@@ -610,6 +604,7 @@ def analyze_campaign(campaign: Dict[str, Any], force_reanalyze: bool = False):
         
         if analysis_result:
             st.session_state.campaign_analysis_result = analysis_result
+            st.session_state.campaign_analysis_campaign_id = campaign_id
             
             # Supabase에 저장
             if campaign_id:
