@@ -1111,6 +1111,29 @@ def display_matched_influencers_list():
         selected_idx = influencer_options[selected_display]
         selected_influencer = matched[selected_idx]
         
+        # SNS URL 조회
+        sns_url = None
+        platform = selected_influencer.get('platform')
+        sns_id = selected_influencer.get('sns_id') or selected_influencer.get('alias')
+        
+        if platform and sns_id:
+            try:
+                simple_client_instance = db_manager.get_client()
+                client = simple_client_instance.get_client()
+                if client:
+                    # platform과 sns_id로 connecta_influencers 테이블에서 조회
+                    response = client.table("connecta_influencers")\
+                        .select("sns_url")\
+                        .eq("platform", platform)\
+                        .eq("sns_id", sns_id)\
+                        .single()\
+                        .execute()
+                    if response.data:
+                        sns_url = response.data.get('sns_url')
+            except Exception as e:
+                # SNS URL 조회 실패는 치명적이지 않으므로 조용히 실패
+                pass
+        
         # 선택된 인플루언서 정보 표시
         st.markdown("---")
         st.markdown("#### 📋 선택된 인플루언서 정보")
@@ -1120,6 +1143,8 @@ def display_matched_influencers_list():
             st.write(f"**이름:** {selected_influencer.get('alias') or selected_influencer.get('name', 'N/A')}")
             st.write(f"**플랫폼:** {selected_influencer.get('platform', 'N/A')}")
             st.write(f"**카테고리:** {selected_influencer.get('category', 'N/A')}")
+            if sns_url:
+                st.markdown(f"**SNS URL:** [🔗 프로필 보기]({sns_url})")
             st.write(f"**팔로워:** {selected_influencer.get('followers', 0):,}" if selected_influencer.get('followers') else "**팔로워:** N/A")
         
         with col2:
@@ -1235,11 +1260,36 @@ def display_matched_influencers_list_for_matching():
         st.markdown("---")
         st.markdown("#### 📋 선택된 인플루언서 상세 정보")
         
+        # SNS URL 조회
+        sns_url = None
+        platform = selected_influencer.get('platform')
+        sns_id = selected_influencer.get('sns_id') or selected_influencer.get('alias')
+        
+        if platform and sns_id:
+            try:
+                simple_client_instance = db_manager.get_client()
+                client = simple_client_instance.get_client()
+                if client:
+                    # platform과 sns_id로 connecta_influencers 테이블에서 조회
+                    response = client.table("connecta_influencers")\
+                        .select("sns_url")\
+                        .eq("platform", platform)\
+                        .eq("sns_id", sns_id)\
+                        .single()\
+                        .execute()
+                    if response.data:
+                        sns_url = response.data.get('sns_url')
+            except Exception as e:
+                # SNS URL 조회 실패는 치명적이지 않으므로 조용히 실패
+                pass
+        
         col1, col2 = st.columns(2)
         with col1:
             st.write(f"**이름:** {selected_influencer.get('alias') or selected_influencer.get('name', 'N/A')}")
             st.write(f"**플랫폼:** {selected_influencer.get('platform', 'N/A')}")
             st.write(f"**카테고리:** {selected_influencer.get('category', 'N/A')}")
+            if sns_url:
+                st.markdown(f"**SNS URL:** [🔗 프로필 보기]({sns_url})")
             st.write(f"**팔로워:** {selected_influencer.get('followers', 0):,}" if selected_influencer.get('followers') else "**팔로워:** N/A")
             st.write(f"**팔로잉:** {selected_influencer.get('followings', 0):,}" if selected_influencer.get('followings') else "**팔로잉:** N/A")
             st.write(f"**게시물 수:** {selected_influencer.get('posts_count', 0):,}" if selected_influencer.get('posts_count') else "**게시물 수:** N/A")
