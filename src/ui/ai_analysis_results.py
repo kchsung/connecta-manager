@@ -14,7 +14,15 @@ import numpy as np
 import time
 from ..db.database import db_manager
 from ..supabase.simple_client import simple_client
+from ..constants.categories import (
+    CATEGORY_OPTIONS,
+    CATEGORY_DISPLAY_MAP_WITH_ALL,
+)
 from .streamlit_utils import display_tags
+
+
+def _format_category(option: str) -> str:
+    return CATEGORY_DISPLAY_MAP_WITH_ALL.get(option, option)
 
 def render_ai_analysis_results():
     """AI 분석 결과 탭"""
@@ -29,8 +37,11 @@ def render_ai_analysis_results():
             search_term = st.text_input("🔍 검색", placeholder="이름, 태그, ID로 검색")
         
         with col2:
-            categories = get_categories()
-            category_filter = st.selectbox("📂 카테고리", ["전체"] + categories)
+            category_filter = st.selectbox(
+                "📂 카테고리",
+                ["전체"] + get_categories(),
+                format_func=_format_category
+            )
         
         with col3:
             recommendations = ["전체", "추천", "조건부", "비추천"]
@@ -80,7 +91,7 @@ def get_ai_analysis_data(search_term="", category_filter="전체", recommendatio
             if not client:
                 return []
             
-            query = client.table("ai_influencer_analyses").select("*")
+            query = client.table("ai_influencer_analyses_new").select("*")
             
             # 검색 조건
             if search_term:
@@ -132,7 +143,7 @@ def get_ai_analysis_data(search_term="", category_filter="전체", recommendatio
                 # 임시 해결책: recommendation 필터 없이 조회
                 st.info("🔄 임시 해결책: 추천도 필터 없이 데이터를 조회합니다.")
                 try:
-                    query = client.table("ai_influencer_analyses").select("*")
+                    query = client.table("ai_influencer_analyses_new").select("*")
                     if search_term:
                         query = query.or_(f"name.ilike.%{search_term}%,tags.cs.{{{search_term}}},influencer_id.ilike.%{search_term}%")
                     if category_filter != "전체":
@@ -229,34 +240,9 @@ def get_ai_analysis_data_count(search_term="", category_filter="전체", recomme
     
     return 0
 
-def get_categories():
-    """카테고리 목록 조회 - 재시도 로직 포함"""
-    max_retries = 3
-    retry_delay = 1
-    
-    for attempt in range(max_retries):
-        try:
-            client = simple_client.get_client()
-            if not client:
-                return []
-            
-            response = client.table("ai_influencer_analyses").select("category").execute()
-            categories = list(set([item["category"] for item in response.data if item.get("category")]))
-            return sorted(categories)
-            
-        except Exception as e:
-            error_msg = str(e)
-            if "Server disconnected" in error_msg or "connection" in error_msg.lower():
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-                    continue
-                else:
-                    return []
-            else:
-                return []
-    
-    return []
+def get_categories() -> List[str]:
+    """표준 카테고리 목록 반환"""
+    return CATEGORY_OPTIONS
 
 def display_analysis_results(analysis_data, total_count, current_page, total_pages):
     """분석 결과 표시"""
@@ -345,6 +331,11 @@ def display_analysis_detail(analysis):
     if insights:
         display_analysis_section(insights, "💡 인사이트")
     
+    # 커머스 지향성 분석 섹션
+    commerce_analysis = analysis.get('commerce_orientation_analysis', {})
+    if commerce_analysis:
+        display_analysis_section(commerce_analysis, "🛒 커머스 지향성 분석")
+    
     # 네트워크 분석 섹션
     follow_network = analysis.get('follow_network_analysis', {})
     if follow_network:
@@ -400,7 +391,17 @@ def get_field_display_name(key):
         "notes": "노트",
         "additional_info": "추가 정보",
         "analysis_date": "분석 날짜",
-        "confidence_level": "신뢰도 수준"
+        "confidence_level": "신뢰도 수준",
+        
+        # 커머스 지향성
+        "interpretation": "해석",
+        "bragging_signals": "과시 신호",
+        "selling_effort_signals": "판매 노력 신호",
+        "creator_archetype": "크리에이터 유형",
+        "primary_motivation": "주요 동기",
+        "monetization_intent_level": "수익화 성향 점수",
+        "bragging_orientation_level": "과시 지향 점수",
+        "content_fit_for_selling_score": "커머스 적합도 점수"
     }
     
     return field_mapping.get(key, key)

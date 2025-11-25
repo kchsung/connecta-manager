@@ -6,8 +6,27 @@ import pandas as pd
 import numpy as np
 import time
 import statistics
+import json
+import ast
+from collections import Counter
 from datetime import datetime, timedelta
 from ...supabase.simple_client import simple_client
+from ...constants.categories import CATEGORY_OPTIONS
+
+
+def _parse_json_field(raw):
+    """문자열로 저장된 JSON 필드를 dict로 안전하게 변환"""
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except Exception:
+            try:
+                return ast.literal_eval(raw)
+            except Exception:
+                return {}
+    return {}
 
 # 기본 통계 함수들
 def get_total_analyses_count():
@@ -22,8 +41,8 @@ def get_total_analyses_count():
                 return 0
             
             # count="exact"만 사용하면 모든 레코드 수를 반환 (페이징 불필요)
-            print(f"Attempting to get total count from ai_influencer_analyses table...")
-            response = client.table("ai_influencer_analyses").select("id", count="exact").execute()
+            print(f"Attempting to get total count from ai_influencer_analyses_new table...")
+            response = client.table("ai_influencer_analyses_new").select("id", count="exact").execute()
             
             # 디버깅: 응답 확인
             print(f"Response count: {response.count}")
@@ -55,7 +74,7 @@ def get_recent_analyses_count():
         
         # 디버깅: 최근 분석 수 확인
         print(f"Getting recent analyses since: {seven_days_ago.isoformat()}")
-        response = client.table("ai_influencer_analyses").select("id", count="exact").gte("analyzed_at", seven_days_ago.isoformat()).limit(10000).execute()
+        response = client.table("ai_influencer_analyses_new").select("id", count="exact").gte("analyzed_at", seven_days_ago.isoformat()).limit(10000).execute()
         
         print(f"Recent analyses count: {response.count if response.count else 0}")
         return response.count if response.count else 0
@@ -76,7 +95,7 @@ def get_average_overall_score():
         
         while True:
             # 페이징으로 데이터 가져오기
-            response = client.table("ai_influencer_analyses").select("evaluation").range(offset, offset + page_size - 1).execute()
+            response = client.table("ai_influencer_analyses_new").select("evaluation").range(offset, offset + page_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -121,7 +140,7 @@ def get_category_average_scores():
         
         while True:
             # 페이징으로 데이터 가져오기
-            response = client.table("ai_influencer_analyses").select("category, evaluation").range(offset, offset + page_size - 1).execute()
+            response = client.table("ai_influencer_analyses_new").select("category, evaluation").range(offset, offset + page_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -175,7 +194,7 @@ def get_recommendation_distribution():
         
         while True:
             # 페이징으로 데이터 가져오기
-            response = client.table("ai_influencer_analyses").select("recommendation").range(offset, offset + page_size - 1).execute()
+            response = client.table("ai_influencer_analyses_new").select("recommendation").range(offset, offset + page_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -220,7 +239,7 @@ def get_category_distribution():
         
         while True:
             # 페이징으로 데이터 가져오기
-            response = client.table("ai_influencer_analyses").select("category").range(offset, offset + page_size - 1).execute()
+            response = client.table("ai_influencer_analyses_new").select("category").range(offset, offset + page_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -267,7 +286,7 @@ def get_analysis_rate():
         total_crawling_count = crawling_response.count if crawling_response.count else 0
         
         # ai_influencer_analyses 테이블의 총 분석 수
-        analysis_response = client.table("ai_influencer_analyses").select("id", count="exact").limit(10000).execute()
+        analysis_response = client.table("ai_influencer_analyses_new").select("id", count="exact").limit(10000).execute()
         total_analysis_count = analysis_response.count if analysis_response.count else 0
         
         analysis_rate = (total_analysis_count / total_crawling_count) * 100 if total_crawling_count > 0 else 0
@@ -292,7 +311,7 @@ def get_tags_for_wordcloud():
         
         while True:
             # 페이징으로 데이터 가져오기
-            response = client.table("ai_influencer_analyses").select("tags").range(offset, offset + page_size - 1).execute()
+            response = client.table("ai_influencer_analyses_new").select("tags").range(offset, offset + page_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -346,7 +365,7 @@ def get_category_tags(category):
         
         while True:
             # 특정 카테고리의 데이터만 페이징으로 가져오기
-            response = client.table("ai_influencer_analyses").select("tags").eq("category", category).range(offset, offset + page_size - 1).execute()
+            response = client.table("ai_influencer_analyses_new").select("tags").eq("category", category).range(offset, offset + page_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -404,7 +423,7 @@ def get_evaluation_scores_statistics():
         offset = 0
         
         while True:
-            response = client.table("ai_influencer_analyses").select("evaluation, content_analysis").range(offset, offset + page_size - 1).execute()
+            response = client.table("ai_influencer_analyses_new").select("evaluation, content_analysis").range(offset, offset + page_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -548,7 +567,7 @@ def get_enhanced_network_analysis_statistics():
             offset = 0
             
             while True:
-                response = client.table("ai_influencer_analyses").select("follow_network_analysis, followers, followings").range(offset, offset + page_size - 1).execute()
+                response = client.table("ai_influencer_analyses_new").select("follow_network_analysis, followers, followings").range(offset, offset + page_size - 1).execute()
                 
                 if not response.data or len(response.data) == 0:
                     break
@@ -727,7 +746,7 @@ def get_enhanced_activity_metrics_statistics():
             offset = 0
             
             while True:
-                response = client.table("ai_influencer_analyses").select("follow_network_analysis, comment_authenticity_analysis, followers, followings, posts_count").range(offset, offset + page_size - 1).execute()
+                response = client.table("ai_influencer_analyses_new").select("follow_network_analysis, comment_authenticity_analysis, followers, followings, posts_count").range(offset, offset + page_size - 1).execute()
                 
                 if not response.data or len(response.data) == 0:
                     break
@@ -1104,7 +1123,7 @@ def get_comment_authenticity_statistics():
         offset = 0
         
         while True:
-            response = client.table("ai_influencer_analyses").select("comment_authenticity_analysis").range(offset, offset + page_size - 1).execute()
+            response = client.table("ai_influencer_analyses_new").select("comment_authenticity_analysis").range(offset, offset + page_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -1179,6 +1198,138 @@ def get_comment_authenticity_statistics():
         st.error(f"댓글 진정성 통계 조회 중 오류: {str(e)}")
         return None
 
+def get_commerce_orientation_statistics():
+    """커머스 지향성 분석 통계 조회"""
+    try:
+        client = simple_client.get_client()
+        if not client:
+            return None
+        
+        all_data = []
+        page_size = 1000
+        offset = 0
+        
+        while True:
+            response = (
+                client.table("ai_influencer_analyses_new")
+                .select("commerce_orientation_analysis")
+                .range(offset, offset + page_size - 1)
+                .execute()
+            )
+            
+            if not response.data or len(response.data) == 0:
+                break
+            
+            all_data.extend(response.data)
+            
+            if len(response.data) < page_size:
+                break
+            
+            offset += page_size
+        
+        if not all_data:
+            return None
+        
+        monetization_scores = []
+        bragging_scores = []
+        content_fit_scores = []
+        archetype_counter = Counter()
+        motivation_counter = Counter()
+        selling_signal_counter = Counter()
+        bragging_signal_counter = Counter()
+        interpretation_samples = []
+        total_entries = 0
+        total_selling_signals = 0
+        total_bragging_signals = 0
+        
+        def add_numeric(target, value):
+            if value is None:
+                return
+            try:
+                num = float(value)
+                if np.isfinite(num):
+                    target.append(num)
+            except (ValueError, TypeError):
+                return
+        
+        for item in all_data:
+            commerce = _parse_json_field(item.get("commerce_orientation_analysis", {}))
+            if not commerce:
+                continue
+            
+            total_entries += 1
+            
+            add_numeric(monetization_scores, commerce.get("monetization_intent_level"))
+            add_numeric(bragging_scores, commerce.get("bragging_orientation_level"))
+            add_numeric(content_fit_scores, commerce.get("content_fit_for_selling_score"))
+            
+            archetype = commerce.get("creator_archetype")
+            if archetype:
+                archetype_counter[str(archetype)] += 1
+            
+            motivation = commerce.get("primary_motivation")
+            if motivation:
+                motivation_counter[str(motivation)] += 1
+            
+            bragging_signals = commerce.get("bragging_signals", [])
+            if isinstance(bragging_signals, list):
+                cleaned = [str(signal).strip() for signal in bragging_signals if str(signal).strip()]
+                bragging_signal_counter.update(cleaned)
+                total_bragging_signals += len(cleaned)
+            
+            selling_signals = commerce.get("selling_effort_signals", [])
+            if isinstance(selling_signals, list):
+                cleaned = [str(signal).strip() for signal in selling_signals if str(signal).strip()]
+                selling_signal_counter.update(cleaned)
+                total_selling_signals += len(cleaned)
+            
+            interpretation = commerce.get("interpretation")
+            if interpretation:
+                interpretation_samples.append(str(interpretation).strip())
+        
+        if total_entries == 0:
+            return None
+        
+        monetization_scores = [score for score in monetization_scores if score is not None]
+        bragging_scores = [score for score in bragging_scores if score is not None]
+        content_fit_scores = [score for score in content_fit_scores if score is not None]
+        
+        def safe_avg(values):
+            return sum(values) / len(values) if values else 0
+        
+        def safe_median(values):
+            return statistics.median(values) if values else 0
+        
+        unique_interpretations = []
+        seen = set()
+        for text in interpretation_samples:
+            if not text or text in seen:
+                continue
+            unique_interpretations.append(text)
+            seen.add(text)
+            if len(unique_interpretations) >= 5:
+                break
+        
+        return {
+            "avg_monetization_intent": safe_avg(monetization_scores),
+            "median_monetization_intent": safe_median(monetization_scores),
+            "avg_bragging_orientation": safe_avg(bragging_scores),
+            "avg_content_fit": safe_avg(content_fit_scores),
+            "monetization_distribution": monetization_scores,
+            "bragging_distribution": bragging_scores,
+            "content_fit_distribution": content_fit_scores,
+            "archetype_distribution": dict(archetype_counter),
+            "primary_motivation_distribution": dict(motivation_counter),
+            "selling_signal_counts": dict(selling_signal_counter.most_common(10)),
+            "bragging_signal_counts": dict(bragging_signal_counter.most_common(10)),
+            "avg_selling_signal_per_creator": total_selling_signals / total_entries if total_entries else 0,
+            "avg_bragging_signal_per_creator": total_bragging_signals / total_entries if total_entries else 0,
+            "sample_interpretations": unique_interpretations
+        }
+    except Exception as e:
+        st.error(f"커머스 지향성 통계 조회 중 오류: {str(e)}")
+        return None
+
 def get_comprehensive_analysis_data():
     """종합 분석 데이터 조회 - 페이징으로 모든 데이터 가져오기"""
     try:
@@ -1191,7 +1342,7 @@ def get_comprehensive_analysis_data():
         offset = 0
         
         while True:
-            response = client.table("ai_influencer_analyses").select(
+            response = client.table("ai_influencer_analyses_new").select(
                 "followers, followings, posts_count, category, evaluation, follow_network_analysis, comment_authenticity_analysis, engagement_score, activity_score, communication_score, growth_potential_score, overall_score"
             ).range(offset, offset + page_size - 1).execute()
             
@@ -1334,7 +1485,7 @@ def get_comprehensive_analysis_data():
             print("No data points found, generating sample data...")
             # 샘플 데이터 생성 (실제 데이터가 없을 때)
             import random
-            categories = ['뷰티', '패션', '라이프스타일', '푸드', '여행', '스포츠', '애견', '기타']
+            categories = CATEGORY_OPTIONS
             
             for i in range(20):  # 20개의 샘플 데이터
                 followers = random.randint(1000, 100000)
@@ -1473,7 +1624,7 @@ def get_statistical_insights_data():
         offset = 0
         
         while True:
-            response = client.table("ai_influencer_analyses").select(
+            response = client.table("ai_influencer_analyses_new").select(
                 "followers, followings, evaluation, follow_network_analysis, comment_authenticity_analysis, engagement_score, overall_score, analyzed_at"
             ).range(offset, offset + page_size - 1).execute()
             
