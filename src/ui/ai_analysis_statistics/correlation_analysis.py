@@ -65,7 +65,7 @@ def get_campaign_performance_data(campaign_id):
             # sns_id와 platform으로 AI 분석 데이터 조회
             for i, sns_id in enumerate(sns_ids):
                 platform = platforms[i] if i < len(platforms) else 'instagram'
-                ai_data = client.table("ai_influencer_analyses").select(
+                ai_data = client.table("ai_influencer_analyses_new").select(
                     "influencer_id, engagement_score, activity_score, communication_score, growth_potential_score, overall_score, followers, category, analyzed_at"
                 ).eq("influencer_id", sns_id).eq("platform", platform).execute()
                 

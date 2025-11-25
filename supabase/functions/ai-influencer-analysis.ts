@@ -129,10 +129,12 @@ async function checkRecentAnalysis(supabaseClient: any, data: any) {
     const oneMonthAgo = new Date()
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
 
+    const normalizedInfluencerId = influencer_id || 'unknown'
+
     const { data: analysisData, error } = await supabaseClient
-      .from('ai_influencer_analyses')
+      .from('ai_influencer_analyses_new')
       .select('analyzed_at')
-      .eq('influencer_id', influencer_id)
+      .eq('influencer_id', normalizedInfluencerId)
       .eq('platform', platform)
       .gte('analyzed_at', oneMonthAgo.toISOString())
 
@@ -163,21 +165,31 @@ async function saveAnalysisResult(supabaseClient: any, data: any) {
   try {
     const { crawling_data, analysis_result } = data
 
-    // 기존 데이터 확인
+    const normalizedInfluencerId = crawling_data.influencer_id || 'unknown'
+    const alias = (crawling_data.alias || analysis_result.alias || '').trim()
+    const analysisTimestamp = new Date().toISOString()
+    const analyzedOn = analysisTimestamp.split('T')[0]
+
+    if (!alias) {
+      throw new Error('alias 값이 비어 있어 ai_influencer_analyses_new에 저장할 수 없습니다.')
+    }
+
+    // 기존 데이터 확인 (동일 influencer_id + alias + analyzed_on)
     const { data: existingData, error: checkError } = await supabaseClient
-      .from('ai_influencer_analyses')
+      .from('ai_influencer_analyses_new')
       .select('id')
-      .eq('influencer_id', crawling_data.influencer_id)
-      .eq('platform', crawling_data.platform)
+      .eq('influencer_id', normalizedInfluencerId)
+      .eq('alias', alias)
+      .eq('analyzed_on', analyzedOn)
 
     if (checkError) throw checkError
 
     // 데이터 준비
     const analysisData = {
-      influencer_id: crawling_data.influencer_id,
+      influencer_id: normalizedInfluencerId,
       platform: crawling_data.platform,
       name: crawling_data.name || '',
-      alias: crawling_data.alias || '',
+      alias,
       followers: crawling_data.followers || 0,
       followings: crawling_data.followings || 0,
       posts_count: crawling_data.posts_count || 0,
@@ -186,21 +198,22 @@ async function saveAnalysisResult(supabaseClient: any, data: any) {
       follow_network_analysis: analysis_result.follow_network_analysis || {},
       comment_authenticity_analysis: analysis_result.comment_authenticity_analysis || {},
       content_analysis: analysis_result.content_analysis || {},
+      commerce_orientation_analysis: analysis_result.commerce_orientation_analysis || {},
       evaluation: analysis_result.evaluation || {},
       insights: analysis_result.insights || {},
       summary: analysis_result.summary || '',
-      recommendation: analysis_result.recommendation || '보통',
+      recommendation: analysis_result.recommendation || '조건부',
       notes: analysis_result.notes || {},
       source: 'ai_auto',
-      analyzed_at: new Date().toISOString(),
-      analyzed_on: new Date().toISOString().split('T')[0]
+      analyzed_at: analysisTimestamp,
+      analyzed_on: analyzedOn
     }
 
     let result
     if (existingData && existingData.length > 0) {
       // 업데이트
       const { data: updateData, error: updateError } = await supabaseClient
-        .from('ai_influencer_analyses')
+        .from('ai_influencer_analyses_new')
         .update(analysisData)
         .eq('id', existingData[0].id)
         .select()
@@ -210,7 +223,7 @@ async function saveAnalysisResult(supabaseClient: any, data: any) {
     } else {
       // 새로 생성
       const { data: insertData, error: insertError } = await supabaseClient
-        .from('ai_influencer_analyses')
+        .from('ai_influencer_analyses_new')
         .insert(analysisData)
         .select()
 
@@ -241,7 +254,7 @@ async function getAnalysisData(supabaseClient: any, data: any) {
   try {
     const { search_term, category_filter, recommendation_filter, limit = 1000, offset = 0 } = data
 
-    let query = supabaseClient.from('ai_influencer_analyses').select('*')
+    let query = supabaseClient.from('ai_influencer_analyses_new').select('*')
 
     // 검색 조건
     if (search_term) {
@@ -265,7 +278,7 @@ async function getAnalysisData(supabaseClient: any, data: any) {
     if (error) throw error
 
     // 전체 개수도 함께 조회
-    let countQuery = supabaseClient.from('ai_influencer_analyses').select('*', { count: 'exact', head: true })
+    let countQuery = supabaseClient.from('ai_influencer_analyses_new').select('*', { count: 'exact', head: true })
 
     // 동일한 필터 조건 적용
     if (search_term) {
@@ -311,7 +324,7 @@ async function getStatistics(supabaseClient: any) {
   try {
     // 총 분석 수
     const { count: totalCount, error: totalError } = await supabaseClient
-      .from('ai_influencer_analyses')
+      .from('ai_influencer_analyses_new')
       .select('*', { count: 'exact', head: true })
 
     if (totalError) throw totalError
@@ -321,7 +334,7 @@ async function getStatistics(supabaseClient: any) {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
     const { count: recentCount, error: recentError } = await supabaseClient
-      .from('ai_influencer_analyses')
+      .from('ai_influencer_analyses_new')
       .select('*', { count: 'exact', head: true })
       .gte('analyzed_at', sevenDaysAgo.toISOString())
 
@@ -329,7 +342,7 @@ async function getStatistics(supabaseClient: any) {
 
     // 평균 종합점수
     const { data: scoresData, error: scoresError } = await supabaseClient
-      .from('ai_influencer_analyses')
+      .from('ai_influencer_analyses_new')
       .select('overall_score')
       .not('overall_score', 'is', null)
 
@@ -341,7 +354,7 @@ async function getStatistics(supabaseClient: any) {
 
     // 추천도 분포
     const { data: recommendationsData, error: recommendationsError } = await supabaseClient
-      .from('ai_influencer_analyses')
+      .from('ai_influencer_analyses_new')
       .select('recommendation')
 
     if (recommendationsError) throw recommendationsError
@@ -357,7 +370,7 @@ async function getStatistics(supabaseClient: any) {
 
     // 카테고리별 통계
     const { data: categoriesData, error: categoriesError } = await supabaseClient
-      .from('ai_influencer_analyses')
+      .from('ai_influencer_analyses_new')
       .select('category')
 
     if (categoriesError) throw categoriesError
