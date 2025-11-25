@@ -6,6 +6,12 @@ import os
 import json
 from typing import Dict, Any, Optional
 
+from src.constants.categories import (
+    CATEGORY_OPTIONS,
+    DEFAULT_CATEGORY,
+    LEGACY_CATEGORY_KEYWORDS,
+)
+
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
@@ -84,22 +90,22 @@ def get_available_models():
 def normalize_category(category: str) -> str:
     """카테고리를 표준 카테고리로 정규화"""
     if not category:
-        return "일반"
+        return DEFAULT_CATEGORY
     
-    # 표준 카테고리 목록
-    standard_categories = [
-        "일반", "뷰티", "패션", "푸드", "여행", 
-        "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"
-    ]
+    normalized_input = category.strip()
+    category_lower = normalized_input.lower()
     
-    category_lower = category.lower().strip()
+    # 레거시 키워드 매핑
+    for legacy_keyword, mapped_category in LEGACY_CATEGORY_KEYWORDS.items():
+        if legacy_keyword.lower() in category_lower:
+            return mapped_category
     
     # 정확히 일치하는 경우
-    for std_cat in standard_categories:
+    for std_cat in CATEGORY_OPTIONS:
         if category_lower == std_cat.lower():
             return std_cat
     
-    # "/"로 구분된 경우 (예: "스포츠/러닝" → "스포츠/라이프스타일")
+    # "/"로 구분된 경우 (예: "스포츠/러닝" → "스포츠/웰빙")
     if "/" in category:
         parts = [p.strip() for p in category.split("/")]
         normalized_parts = []
@@ -108,7 +114,7 @@ def normalize_category(category: str) -> str:
             part_lower = part.lower()
             # 각 부분을 표준 카테고리로 매핑
             matched = False
-            for std_cat in standard_categories:
+            for std_cat in CATEGORY_OPTIONS:
                 if part_lower == std_cat.lower() or part_lower in std_cat.lower() or std_cat.lower() in part_lower:
                     normalized_parts.append(std_cat)
                     matched = True
@@ -121,13 +127,13 @@ def normalize_category(category: str) -> str:
         return "/".join(normalized_parts)
     
     # 부분 일치로 매핑 시도
-    for std_cat in standard_categories:
+    for std_cat in CATEGORY_OPTIONS:
         std_cat_lower = std_cat.lower()
         if category_lower in std_cat_lower or std_cat_lower in category_lower:
             return std_cat
     
     # 매핑 실패 시 원본 반환 (필터링에서 처리)
-    return category
+    return normalized_input
 
 
 def get_valid_model_name(requested_model: str = None) -> str:
@@ -315,7 +321,7 @@ def analyze_campaign_with_gemini(campaign_content: str) -> Optional[Dict[str, An
                     recommended_tags = [tag.strip().strip('"\'') for tag in tags_str.split(",")]
             
             return {
-                "category": category or "일반",
+                "category": category or DEFAULT_CATEGORY,
                 "recommended_tags": recommended_tags if recommended_tags else [],
                 "details": response_text
             }

@@ -6,7 +6,16 @@ import pandas as pd
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from ..db.database import db_manager
+from ..constants.categories import (
+    CATEGORY_OPTIONS,
+    CATEGORY_DISPLAY_MAP,
+    DEFAULT_CATEGORY,
+)
 from .common_functions import safe_int_conversion
+
+
+def _format_category(option: str) -> str:
+    return CATEGORY_DISPLAY_MAP.get(option, option)
 
 def render_influencer_detail_form(influencer):
     """인플루언서 상세 정보 폼 (기존 함수 - 호환성 유지)"""
@@ -147,8 +156,8 @@ def render_influencer_detail_form(influencer):
             if f"{form_key}_initialized" not in st.session_state:
                 st.session_state[f"edit_owner_comment_{influencer['id']}"] = influencer.get('owner_comment') or ''
                 # 컨텐츠 카테고리 초기값 설정 (매칭되는 것이 있으면 해당 값, 없으면 "기타")
-                current_category = influencer.get('content_category', '')
-                category_options = ["일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"]
+                current_category = influencer.get('content_category', DEFAULT_CATEGORY)
+                category_options = CATEGORY_OPTIONS
                 if current_category in category_options:
                     default_category = current_category
                 else:
@@ -180,10 +189,10 @@ def render_influencer_detail_form(influencer):
                 )
                 
                 # Content Category
-                category_options = ["일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"]
+                category_options = CATEGORY_OPTIONS
                 
                 # 현재 DB 값 확인
-                current_category = influencer.get('content_category', '')
+                current_category = influencer.get('content_category', DEFAULT_CATEGORY)
                 
                 # 매칭되는 카테고리가 있으면 해당 카테고리, 없으면 "기타"로 설정
                 if current_category in category_options:
@@ -194,7 +203,8 @@ def render_influencer_detail_form(influencer):
                 new_content_category = st.selectbox(
                     "📂 Content Category",
                     category_options,
-                    key=f"edit_content_category_{influencer['id']}"
+                    key=f"edit_content_category_{influencer['id']}",
+                    format_func=_format_category
                 )
                 
                 # Tags

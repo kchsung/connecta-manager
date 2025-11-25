@@ -7,12 +7,27 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from ..db.database import db_manager
 from ..db.models import Influencer
+from ..constants.categories import (
+    CATEGORY_OPTIONS,
+    CATEGORY_OPTIONS_WITH_ALL,
+    CATEGORY_DISPLAY_MAP,
+    CATEGORY_DISPLAY_MAP_WITH_ALL,
+    DEFAULT_CATEGORY,
+)
 from .common_functions import (
     search_single_influencer, 
     search_single_influencer_by_platform,
     safe_int_conversion,
     check_database_for_influencer
 )
+
+
+def _format_category(option: str) -> str:
+    return CATEGORY_DISPLAY_MAP.get(option, option)
+
+
+def _format_category_with_all(option: str) -> str:
+    return CATEGORY_DISPLAY_MAP_WITH_ALL.get(option, option)
 # 통계 기능은 별도 메뉴로 분리됨
 
 def render_influencer_management():
@@ -109,8 +124,8 @@ def render_influencer_edit_form_for_registration(influencer):
             sns_url = st.text_input("SNS URL", value=influencer.get('sns_url', ''), key=f"edit_reg_url_{influencer['id']}")
         
         # 카테고리와 Owner Comment
-        category_options = ["일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"]
-        current_category = influencer.get('content_category', '일반')
+        category_options = CATEGORY_OPTIONS
+        current_category = influencer.get('content_category', DEFAULT_CATEGORY)
         try:
             category_index = category_options.index(current_category)
         except ValueError:
@@ -121,19 +136,7 @@ def render_influencer_edit_form_for_registration(influencer):
             category_options,
             index=category_index,
             key=f"edit_reg_category_{influencer['id']}",
-            format_func=lambda x: {
-                "일반": "📝 일반",
-                "뷰티": "💄 뷰티",
-                "패션": "👗 패션",
-                "푸드": "🍽️ 푸드",
-                "여행": "✈️ 여행",
-                "라이프스타일": "🏠 라이프스타일",
-                "테크": "💻 테크",
-                "게임": "🎮 게임",
-                "스포츠": "⚽ 스포츠",
-                "애견": "🐕 애견",
-                "기타": "🔧 기타"
-            }[x]
+            format_func=_format_category
         )
         
         owner_comment = st.text_area(
@@ -514,21 +517,9 @@ def render_influencer_registration_form():
         # 카테고리
         content_category = st.selectbox(
             "카테고리",
-            ["일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"],
+            CATEGORY_OPTIONS,
             key="create_influencer_category",
-            format_func=lambda x: {
-                "일반": "📝 일반",
-                "뷰티": "💄 뷰티",
-                "패션": "👗 패션",
-                "푸드": "🍽️ 푸드",
-                "여행": "✈️ 여행",
-                "라이프스타일": "🏠 라이프스타일",
-                "테크": "💻 테크",
-                "게임": "🎮 게임",
-                "스포츠": "⚽ 스포츠",
-                "애견": "🐕 애견",
-                "기타": "🔧 기타"
-            }[x]
+            format_func=_format_category
         )
         
         # Owner Comment
@@ -698,7 +689,7 @@ def render_influencer_registration_form():
         # 태그 정보
         tags = st.text_input(
             "태그 (쉼표로 구분)", 
-            placeholder="예: 뷰티, 패션, 라이프스타일",
+            placeholder="예: 뷰티, 홈인테리어, 육아",
             key="create_tags",
             help="인플루언서를 분류할 수 있는 태그를 쉼표로 구분하여 입력하세요"
         )
@@ -1078,8 +1069,8 @@ def render_influencer_edit_form(influencer):
             sns_url = st.text_input("SNS URL", value=influencer.get('sns_url', ''), key=f"edit_url_{influencer['id']}")
         
         # 카테고리와 Owner Comment
-        category_options = ["일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"]
-        current_category = influencer.get('content_category', '일반')
+        category_options = CATEGORY_OPTIONS
+        current_category = influencer.get('content_category', DEFAULT_CATEGORY)
         try:
             category_index = category_options.index(current_category)
         except ValueError:
@@ -1091,19 +1082,7 @@ def render_influencer_edit_form(influencer):
             category_options,
             index=category_index,
             key=f"edit_category_{influencer['id']}",
-            format_func=lambda x: {
-                "일반": "📝 일반",
-                "뷰티": "💄 뷰티",
-                "패션": "👗 패션",
-                "푸드": "🍽️ 푸드",
-                "여행": "✈️ 여행",
-                "라이프스타일": "🏠 라이프스타일",
-                "테크": "💻 테크",
-                "게임": "🎮 게임",
-                "스포츠": "⚽ 스포츠",
-                "애견": "🐕 애견",
-                "기타": "🔧 기타"
-            }[x]
+            format_func=_format_category
         )
         
         owner_comment = st.text_area(
@@ -1824,7 +1803,7 @@ def render_filtered_influencer_list(influencers, selected_manager):
         "카테고리": st.column_config.SelectboxColumn(
             "카테고리",
             help="콘텐츠 카테고리",
-            options=["일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"],
+            options=CATEGORY_OPTIONS,
         ),
         "가격": st.column_config.NumberColumn(
             "가격 (원)",
@@ -2020,31 +1999,18 @@ def render_influencer_search():
             
             with col1:
                 # 카테고리 필터링
-                category_options = ["전체", "일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"]
+                category_options = CATEGORY_OPTIONS_WITH_ALL
                 selected_category = st.selectbox(
                     "카테고리",
                     category_options,
                     key="search_category",
-                    format_func=lambda x: {
-                        "전체": "🌐 전체",
-                        "일반": "📝 일반",
-                        "뷰티": "💄 뷰티",
-                        "패션": "👗 패션",
-                        "푸드": "🍽️ 푸드",
-                        "여행": "✈️ 여행",
-                        "라이프스타일": "🏠 라이프스타일",
-                        "테크": "💻 테크",
-                        "게임": "🎮 게임",
-                        "스포츠": "⚽ 스포츠",
-                        "애견": "🐕 애견",
-                        "기타": "🔧 기타"
-                    }[x]
+                    format_func=_format_category_with_all
                 )
                 
                 # 태그 필터링 (LIKE 검색)
                 tag_search = st.text_input(
                     "태그 검색 (LIKE 검색)",
-                    placeholder="예: 뷰티, 패션",
+                    placeholder="예: 뷰티, 홈쿡",
                     key="search_tag",
                     help="태그에 포함된 키워드로 검색합니다. 쉼표로 구분된 태그 중 하나라도 포함되면 검색됩니다."
                 )
@@ -2201,8 +2167,8 @@ def perform_influencer_search(
         
         # 2. AI 분석 결과와 조인하여 필터링
         if influencers:
-            # AI 분석 결과 조회 (sns_id와 platform 기준으로 매칭)
-            ai_analyses_query = client.table("ai_influencer_analyses").select("*")
+            # AI 분석 결과 조회 (sns_id와 platform 기준으로 매칭, 새 테이블 사용)
+            ai_analyses_query = client.table("ai_influencer_analyses_new").select("*")
             ai_analyses_response = ai_analyses_query.execute()
             ai_analyses = ai_analyses_response.data if ai_analyses_response.data else []
             

@@ -14,7 +14,31 @@ def generate_influencer_data(count: int = 10) -> List[Dict[str, Any]]:
     """인플루언서 테스트 데이터 생성"""
     platforms = ['instagram', 'youtube', 'tiktok', 'x', 'blog', 'facebook']
     contact_methods = ['dm', 'email', 'phone', 'kakao', 'form', 'other']
-    categories = ['뷰티', '패션', '푸드', '여행', '라이프스타일', '테크', '게임', '스포츠']
+    categories = [
+        "일반",
+        "뷰티",
+        "패션",
+        "푸드",
+        "여행",
+        "홈인테리어",
+        "가구",
+        "생활가전",
+        "생활용품",
+        "정리수납",
+        "홈쿡",
+        "먹방",
+        "자취",
+        "육아",
+        "가드닝",
+        "DIY",
+        "웰빙",
+        "공부",
+        "테크",
+        "게임",
+        "스포츠",
+        "애견",
+        "기타",
+    ]
     
     influencers = []
     for i in range(count):
@@ -32,7 +56,7 @@ def generate_influencer_data(count: int = 10) -> List[Dict[str, Any]]:
             "phone_number": f"010-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}" if random.random() > 0.5 else None,
             "email": f"test{i+1}@example.com" if random.random() > 0.3 else None,
             "shipping_address": f"서울시 강남구 테스트동 {i+1}번지" if random.random() > 0.4 else None,
-            "interested_products": random.choice(['뷰티', '패션', '푸드', '전자제품']),
+            "interested_products": random.choice(['뷰티', '패션', '푸드', '홈인테리어', '생활가전', '웰빙']),
             "owner_comment": f"테스트용 인플루언서 {i+1}입니다.",
             "manager_rating": random.randint(1, 5) if random.random() > 0.3 else None,
             "content_rating": random.randint(1, 5) if random.random() > 0.3 else None,

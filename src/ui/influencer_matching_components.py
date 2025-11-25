@@ -811,8 +811,8 @@ def match_influencers(required_count: int):
                 st.error("데이터베이스 연결 실패")
                 return
             
-            # 전체 인플루언서 조회
-            query = client.table("ai_influencer_analyses").select("*")
+            # 전체 인플루언서 조회 (새 테이블 사용)
+            query = client.table("ai_influencer_analyses_new").select("*")
             response = query.limit(10000).execute()
             all_candidates = response.data if response.data else []
             
@@ -895,7 +895,7 @@ def match_influencers(required_count: int):
                 candidate_category = candidate.get('category', '').strip()
                 if candidate_category == recommended_category:
                     brand_fit_score_10 = 10.0
-                elif candidate_category in ['라이프스타일', '푸드', '스포츠']:
+                elif candidate_category in ['웰빙', '푸드', '스포츠']:
                     brand_fit_score_10 = 7.0
                 else:
                     brand_fit_score_10 = 4.0

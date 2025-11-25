@@ -6,10 +6,18 @@ import pandas as pd
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from ..db.database import db_manager
+from ..constants.categories import (
+    CATEGORY_OPTIONS_WITH_ALL,
+    CATEGORY_DISPLAY_MAP_WITH_ALL,
+)
 from .common_functions import (
     search_single_influencer, 
     search_single_influencer_by_platform
 )
+
+
+def _format_category(option: str) -> str:
+    return CATEGORY_DISPLAY_MAP_WITH_ALL.get(option, option)
 
 def render_influencer_search_and_filter():
     """인플루언서 검색 및 필터링 (좌측) - 기존 함수 (호환성 유지)"""
@@ -200,22 +208,9 @@ def render_influencer_search_and_filter():
     # 콘텐츠 카테고리 필터
     content_category_filter = st.selectbox(
         "콘텐츠 카테고리",
-        ["전체", "일반", "뷰티", "패션", "푸드", "여행", "라이프스타일", "테크", "게임", "스포츠", "애견", "기타"],
+        CATEGORY_OPTIONS_WITH_ALL,
         key="influencer_content_category_filter",
-        format_func=lambda x: {
-            "전체": "📂 전체",
-            "일반": "📝 일반",
-            "뷰티": "💄 뷰티",
-            "패션": "👗 패션",
-            "푸드": "🍽️ 푸드",
-            "여행": "✈️ 여행",
-            "라이프스타일": "🏠 라이프스타일",
-            "테크": "💻 테크",
-            "게임": "🎮 게임",
-            "스포츠": "⚽ 스포츠",
-            "애견": "🐕 애견",
-            "기타": "🔧 기타"
-        }[x]
+        format_func=_format_category
     )
     
     # 팔로워 수 필터
