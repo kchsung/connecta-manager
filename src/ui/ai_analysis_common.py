@@ -62,20 +62,38 @@ def get_completed_crawling_data_count(client):
             if not client:
                 return 0
             
-            # ai_analysis_status 테이블에서 is_analyzed = FALSE인 ID들을 먼저 조회
-            analysis_status_response = client.table("ai_analysis_status").select("id")\
+            # ai_analysis_status 테이블에서 is_analyzed = FALSE인 항목의 count를 먼저 가져오기
+            # count="exact"를 사용하여 limit 문제를 피함
+            analysis_status_count_response = client.table("ai_analysis_status").select("id", count="exact")\
                 .eq("is_analyzed", False).execute()
             
-            if not analysis_status_response.data:
+            if not analysis_status_count_response.count or analysis_status_count_response.count == 0:
                 return 0
             
-            # 조회된 ID들로 tb_instagram_crawling 테이블에서 COMPLETE 상태인 데이터 개수 조회
-            crawling_ids = [item["id"] for item in analysis_status_response.data]
-            response = client.table("tb_instagram_crawling").select("id", count="exact")\
-                .in_("id", crawling_ids)\
-                .eq("status", "COMPLETE").execute()
+            # ai_analysis_status 테이블에서 is_analyzed = FALSE인 ID들을 배치로 조회
+            # Supabase의 기본 limit(1000)을 고려하여 배치 처리
+            total_count = 0
+            batch_size = 1000
+            total_batches = (analysis_status_count_response.count + batch_size - 1) // batch_size
             
-            return response.count if response.count else 0
+            for batch_num in range(total_batches):
+                offset = batch_num * batch_size
+                analysis_status_response = client.table("ai_analysis_status").select("id")\
+                    .eq("is_analyzed", False)\
+                    .range(offset, offset + batch_size - 1).execute()
+                
+                if not analysis_status_response.data:
+                    break
+                
+                # 조회된 ID들로 tb_instagram_crawling 테이블에서 COMPLETE 상태인 데이터 개수 조회
+                crawling_ids = [item["id"] for item in analysis_status_response.data]
+                response = client.table("tb_instagram_crawling").select("id", count="exact")\
+                    .in_("id", crawling_ids)\
+                    .eq("status", "COMPLETE").execute()
+                
+                total_count += response.count if response.count else 0
+            
+            return total_count
         except Exception as e:
             error_msg = str(e)
             if "Server disconnected" in error_msg or "connection" in error_msg.lower():
@@ -132,14 +150,22 @@ def save_ai_analysis_result(client, crawling_data, analysis_result, crawling_id)
             if "notes" in analysis_result and isinstance(analysis_result["notes"], dict):
                 analysis_result["notes"]["crawling_id"] = crawling_id
 
-            existing_response = client.table("ai_influencer_analyses").select("id")\
-                .eq("influencer_id", crawling_id).eq("platform", "instagram").execute()
+            # 새 테이블 사용 (ai_influencer_analyses_new)
+            # unique constraint: (influencer_id, alias, analyzed_on) 기준으로 중복 체크
+            analyzed_on = analysis_result.get("analyzed_on", datetime.now().date().isoformat())
+            alias = analysis_result.get("alias", "")
+            
+            existing_response = client.table("ai_influencer_analyses_new").select("id")\
+                .eq("influencer_id", crawling_id)\
+                .eq("alias", alias)\
+                .eq("analyzed_on", analyzed_on)\
+                .execute()
 
             if existing_response.data:
-                client.table("ai_influencer_analyses").update(analysis_result)\
+                client.table("ai_influencer_analyses_new").update(analysis_result)\
                     .eq("id", existing_response.data[0]["id"]).execute()
             else:
-                client.table("ai_influencer_analyses").insert(analysis_result).execute()
+                client.table("ai_influencer_analyses_new").insert(analysis_result).execute()
             
             # AI 분석 상태 업데이트 (트리거가 있지만 명시적으로도 업데이트)
             try:
@@ -199,14 +225,19 @@ def perform_ai_analysis(data):
     # 모델 명시 필수 (secrets에서 오버라이드 가능)
     model = st.secrets.get("OPENAI_MODEL", "gpt-5-mini")
     prompt_id = st.secrets.get("OPENAI_PROMPT_ID", "pmpt_68f36e44eab08196b4e75067a3074b7b0c099d8443a9dd49")
-    prompt_version = st.secrets.get("OPENAI_PROMPT_VERSION", "4")
+    prompt_version = st.secrets.get("OPENAI_PROMPT_VERSION")
+    prompt_payload = {"id": prompt_id}
+    if prompt_version:
+        prompt_payload["version"] = prompt_version
+    else:
+        st.warning("프롬프트 버전이 없어 최신 버전을 사용합니다.")
 
     input_data = json.dumps(data, ensure_ascii=False)
 
     try:
         resp = client.responses.create(
             model=model,
-            prompt={"id": prompt_id, "version": prompt_version},
+            prompt=prompt_payload,
             input=input_data,
             reasoning={"summary": "auto"},
             store=True,
@@ -251,7 +282,7 @@ def parse_ai_response(response):
         return None
 
 def transform_to_db_format(ai_input_data, ai_result, crawling_id):
-    """AI 분석 결과를 ai_influencer_analyses 테이블 구조에 맞게 변환"""
+    """AI 분석 결과를 ai_influencer_analyses_new 테이블 구조에 맞게 변환"""
     try:
         # 기본 데이터 추출 (AI 분석 결과에서 추출)
         # ai_input_data는 {"id": "", "description": "", "posts": ""} 형태
@@ -271,6 +302,7 @@ def transform_to_db_format(ai_input_data, ai_result, crawling_id):
         follow_network_analysis = ai_result.get("follow_network_analysis", {})
         comment_authenticity_analysis = ai_result.get("comment_authenticity_analysis", {})
         content_analysis = ai_result.get("content_analysis", {})
+        commerce_orientation_analysis = ai_result.get("commerce_orientation_analysis", {})
         evaluation = ai_result.get("evaluation", {})
         insights = ai_result.get("insights", {})
         summary = ai_result.get("summary", "")
@@ -321,6 +353,29 @@ def transform_to_db_format(ai_input_data, ai_result, crawling_id):
         if not isinstance(notes, dict):
             notes = {}
         
+        # commerce_orientation_analysis 점수 검증 (0-10 범위)
+        if isinstance(commerce_orientation_analysis, dict):
+            def validate_commerce_score(score, default=0):
+                try:
+                    score_val = float(score) if score is not None else default
+                    return max(0, min(10, score_val))
+                except (ValueError, TypeError):
+                    return default
+            
+            # commerce_orientation_analysis 내부 점수들 검증
+            if "monetization_intent_level" in commerce_orientation_analysis:
+                commerce_orientation_analysis["monetization_intent_level"] = validate_commerce_score(
+                    commerce_orientation_analysis.get("monetization_intent_level", 0)
+                )
+            if "bragging_orientation_level" in commerce_orientation_analysis:
+                commerce_orientation_analysis["bragging_orientation_level"] = validate_commerce_score(
+                    commerce_orientation_analysis.get("bragging_orientation_level", 0)
+                )
+            if "content_fit_for_selling_score" in commerce_orientation_analysis:
+                commerce_orientation_analysis["content_fit_for_selling_score"] = validate_commerce_score(
+                    commerce_orientation_analysis.get("content_fit_for_selling_score", 0)
+                )
+        
         # 최종 데이터 구조 생성
         db_data = {
             "influencer_id": influencer_id,
@@ -335,6 +390,7 @@ def transform_to_db_format(ai_input_data, ai_result, crawling_id):
             "follow_network_analysis": follow_network_analysis,
             "comment_authenticity_analysis": comment_authenticity_analysis,
             "content_analysis": content_analysis,
+            "commerce_orientation_analysis": commerce_orientation_analysis,
             "evaluation": evaluation,
             "insights": insights,
             "summary": summary,
