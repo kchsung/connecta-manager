@@ -79,6 +79,15 @@ def render_ai_analysis_execution():
                 with col4:
                     st.metric("📊 총 처리", result["total_count"])
                 
+                # 건너뛴 이유 상세 정보 표시
+                if result.get("skipped_count", 0) > 0:
+                    st.markdown("#### 📋 건너뛴 이유 상세")
+                    skip_col1, skip_col2 = st.columns(2)
+                    with skip_col1:
+                        st.info(f"🕐 최근 30일 이내 분석됨: **{result.get('skipped_recent_analysis', 0)}개**")
+                    with skip_col2:
+                        st.info(f"📝 posts 데이터 없음: **{result.get('skipped_no_posts', 0)}개**")
+                
                 
                 # 실패한 항목들 표시
                 if result.get("failed_items"):
@@ -116,6 +125,8 @@ def execute_ai_analysis():
 
         analyzed_count = 0
         skipped_count = 0
+        skipped_recent_analysis = 0  # 최근 분석으로 건너뛴 개수
+        skipped_no_posts = 0  # posts가 없어서 건너뛴 개수
         failed_count = 0
         processed_count = 0
         failed_items = []
@@ -135,6 +146,8 @@ def execute_ai_analysis():
                     "stopped": True,
                     "analyzed_count": analyzed_count,
                     "skipped_count": skipped_count,
+                    "skipped_recent_analysis": skipped_recent_analysis,
+                    "skipped_no_posts": skipped_no_posts,
                     "failed_count": failed_count,
                     "total_count": total_count,
                     "failed_items": failed_items
@@ -183,12 +196,14 @@ def execute_ai_analysis():
                     # 30일 체크는 선택적으로 적용 (강제 재분석 방지용)
                     if is_recently_analyzed_by_id(client, data["id"]):
                         skipped_count += 1
+                        skipped_recent_analysis += 1
                         continue
 
                     # 2) 입력 구성 (posts는 자르지 않음)
                     posts_content = data.get("posts", "") or ""
                     if not posts_content:
                         skipped_count += 1
+                        skipped_no_posts += 1
                         continue
 
                     ai_input_data = {
@@ -231,6 +246,10 @@ def execute_ai_analysis():
                                 c3.metric("❌ 실패", failed_count)
                                 c4.metric("📊 총 처리", processed_count + index + 1)
                                 
+                                # 건너뛴 이유 상세 정보
+                                if skipped_count > 0:
+                                    st.caption(f"건너뛴 이유: 최근 분석 {skipped_recent_analysis}개, posts 없음 {skipped_no_posts}개")
+                                
                                 # 중지 요청 상태 표시
                                 if st.session_state.get("ai_analysis_stop_requested", False):
                                     st.warning("🛑 분석 중지 요청됨 - 현재 항목 완료 후 중지됩니다.")
@@ -261,6 +280,15 @@ def execute_ai_analysis():
             c2.metric("⏭️ 건너뜀", skipped_count, delta=f"{(skipped_count/total_count*100):.1f}%")
             c3.metric("❌ 실패", failed_count, delta=f"{(failed_count/total_count*100):.1f}%")
             c4.metric("📊 총 처리", total_count, delta="100%")
+            
+            # 건너뛴 이유 상세 정보 표시
+            if skipped_count > 0:
+                st.markdown("#### 📋 건너뛴 이유 상세")
+                skip_col1, skip_col2 = st.columns(2)
+                with skip_col1:
+                    st.info(f"🕐 최근 30일 이내 분석됨: **{skipped_recent_analysis}개**")
+                with skip_col2:
+                    st.info(f"📝 posts 데이터 없음: **{skipped_no_posts}개**")
 
             if failed_items:
                 st.markdown("### ❌ 실패한 항목들")
@@ -272,6 +300,8 @@ def execute_ai_analysis():
             "success": True,
             "analyzed_count": analyzed_count,
             "skipped_count": skipped_count,
+            "skipped_recent_analysis": skipped_recent_analysis,
+            "skipped_no_posts": skipped_no_posts,
             "failed_count": failed_count,
             "total_count": total_count,
             "failed_items": failed_items

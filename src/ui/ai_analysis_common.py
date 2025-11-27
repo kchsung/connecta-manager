@@ -109,7 +109,7 @@ def get_completed_crawling_data_count(client):
     return 0
 
 def is_recently_analyzed_by_id(client, crawling_id):
-    """크롤링 ID 최근 분석 여부(30일) - AI 분석 상태 테이블 사용"""
+    """크롤링 ID 최근 분석 여부(30일) - ai_influencer_analyses_new 테이블에서 확인"""
     max_retries = 3
     retry_delay = 1
     for attempt in range(max_retries):
@@ -117,11 +117,13 @@ def is_recently_analyzed_by_id(client, crawling_id):
             if not client:
                 return False
             one_month_ago = datetime.now() - timedelta(days=30)
-            # ai_analysis_status 테이블에서 확인
-            response = client.table("ai_analysis_status").select("is_analyzed", "analyzed_at")\
-                .eq("id", crawling_id)\
-                .eq("is_analyzed", True)\
-                .gte("analyzed_at", one_month_ago.isoformat()).execute()
+            # ai_influencer_analyses_new 테이블에서 최근 분석 여부 확인
+            # influencer_id가 crawling_id와 일치하고, 30일 이내에 분석된 것이 있는지 확인
+            response = client.table("ai_influencer_analyses_new").select("id", "analyzed_at")\
+                .eq("influencer_id", crawling_id)\
+                .gte("analyzed_at", one_month_ago.isoformat())\
+                .order("analyzed_at", desc=True)\
+                .limit(1).execute()
             return bool(response.data)
         except Exception as e:
             error_msg = str(e)
@@ -206,7 +208,7 @@ def perform_ai_analysis(data):
     from openai import OpenAI
     import time
 
-    timeout_seconds = 90  # 5분 타임아웃
+    timeout_seconds = 300  # 5분 타임아웃
     max_retries = 3  # 최대 재시도 횟수
     retry_delay = 2  # 재시도 간격 (초)
 
