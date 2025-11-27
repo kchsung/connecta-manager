@@ -16,7 +16,13 @@ from ..db.database import db_manager
 from ..supabase.simple_client import simple_client
 
 def get_completed_crawling_data(client, limit=1000, offset=0):
-    """크롤링 완료되고 AI 분석이 필요한 데이터 조회 (페이징) - 재시도 포함"""
+    """크롤링 완료되고 AI 분석이 필요한 데이터 조회 (페이징) - 재시도 포함
+    - tb_instagram_crawling의 status='COMPLETE'인 모든 데이터
+    - ai_analysis_status 테이블에서 is_analyzed=FALSE인 것만 (TRUE인 것은 이미 분석 완료)
+    - ai_analysis_status 테이블에 없는 것도 포함 (아직 분석되지 않은 것으로 간주)
+    - posts 데이터가 있는 것만 반환
+    Supabase의 1000개 제한을 고려하여 배치 처리
+    """
     max_retries = 3
     retry_delay = 1
     for attempt in range(max_retries):
@@ -24,21 +30,62 @@ def get_completed_crawling_data(client, limit=1000, offset=0):
             if not client:
                 return []
             
-            # ai_analysis_status 테이블에서 is_analyzed = FALSE인 ID들을 먼저 조회
-            analysis_status_response = client.table("ai_analysis_status").select("id")\
-                .eq("is_analyzed", False)\
-                .range(offset, offset + limit - 1).execute()
+            # 1단계: ai_analysis_status 테이블에서 is_analyzed=TRUE인 ID 목록을 가져와서 제외 목록 생성
+            batch_size = 1000  # Supabase 최대 limit
+            analyzed_ids = set()
+            analysis_offset = 0
             
-            if not analysis_status_response.data:
-                return []
+            while True:
+                analysis_status_response = client.table("ai_analysis_status").select("id")\
+                    .eq("is_analyzed", True)\
+                    .limit(batch_size)\
+                    .range(analysis_offset, analysis_offset + batch_size - 1).execute()
+                
+                if not analysis_status_response.data:
+                    break
+                
+                # 이미 분석된 ID 목록에 추가
+                for item in analysis_status_response.data:
+                    analyzed_ids.add(item["id"])
+                
+                analysis_offset += batch_size
+                
+                # 마지막 배치면 종료
+                if len(analysis_status_response.data) < batch_size:
+                    break
             
-            # 조회된 ID들로 tb_instagram_crawling 테이블에서 COMPLETE 상태인 데이터 조회
-            crawling_ids = [item["id"] for item in analysis_status_response.data]
-            response = client.table("tb_instagram_crawling").select("*")\
-                .in_("id", crawling_ids)\
-                .eq("status", "COMPLETE").execute()
+            # 2단계: tb_instagram_crawling에서 status='COMPLETE'인 모든 데이터를 배치로 조회
+            collected_data = []
+            crawling_offset = 0
             
-            return response.data if response.data else []
+            while len(collected_data) < offset + limit:
+                response = client.table("tb_instagram_crawling").select("*")\
+                    .eq("status", "COMPLETE")\
+                    .limit(batch_size)\
+                    .range(crawling_offset, crawling_offset + batch_size - 1).execute()
+                
+                if not response.data:
+                    break
+                
+                # 필터링:
+                # 1. ai_analysis_status.is_analyzed=TRUE인 것은 제외 (이미 분석 완료)
+                # 2. posts 데이터가 있는 것만
+                filtered_data = [
+                    data for data in response.data
+                    if data.get("id") not in analyzed_ids
+                    and data.get("posts") and data.get("posts").strip()
+                ]
+                
+                collected_data.extend(filtered_data)
+                
+                crawling_offset += batch_size
+                
+                # 마지막 배치면 종료
+                if len(response.data) < batch_size:
+                    break
+            
+            # offset과 limit 적용하여 반환
+            return collected_data[offset:offset + limit]
         except Exception as e:
             error_msg = str(e)
             if "Server disconnected" in error_msg or "connection" in error_msg.lower():
@@ -54,7 +101,13 @@ def get_completed_crawling_data(client, limit=1000, offset=0):
     return []
 
 def get_completed_crawling_data_count(client):
-    """크롤링 완료되고 AI 분석이 필요한 데이터 총 개수"""
+    """크롤링 완료되고 AI 분석이 필요한 데이터 총 개수
+    - tb_instagram_crawling의 status='COMPLETE'인 모든 데이터
+    - ai_analysis_status 테이블에서 is_analyzed=FALSE인 것만 (TRUE인 것은 이미 분석 완료)
+    - ai_analysis_status 테이블에 없는 것도 포함 (아직 분석되지 않은 것으로 간주)
+    - posts 데이터가 있는 것만 카운트
+    Supabase의 1000개 제한을 고려하여 배치 처리
+    """
     max_retries = 3
     retry_delay = 1
     for attempt in range(max_retries):
@@ -62,36 +115,59 @@ def get_completed_crawling_data_count(client):
             if not client:
                 return 0
             
-            # ai_analysis_status 테이블에서 is_analyzed = FALSE인 항목의 count를 먼저 가져오기
-            # count="exact"를 사용하여 limit 문제를 피함
-            analysis_status_count_response = client.table("ai_analysis_status").select("id", count="exact")\
-                .eq("is_analyzed", False).execute()
+            # 1단계: ai_analysis_status 테이블에서 is_analyzed=TRUE인 ID 목록을 가져와서 제외 목록 생성
+            batch_size = 1000  # Supabase 최대 limit
+            analyzed_ids = set()
+            offset = 0
             
-            if not analysis_status_count_response.count or analysis_status_count_response.count == 0:
-                return 0
-            
-            # ai_analysis_status 테이블에서 is_analyzed = FALSE인 ID들을 배치로 조회
-            # Supabase의 기본 limit(1000)을 고려하여 배치 처리
-            total_count = 0
-            batch_size = 1000
-            total_batches = (analysis_status_count_response.count + batch_size - 1) // batch_size
-            
-            for batch_num in range(total_batches):
-                offset = batch_num * batch_size
+            while True:
                 analysis_status_response = client.table("ai_analysis_status").select("id")\
-                    .eq("is_analyzed", False)\
+                    .eq("is_analyzed", True)\
+                    .limit(batch_size)\
                     .range(offset, offset + batch_size - 1).execute()
                 
                 if not analysis_status_response.data:
                     break
                 
-                # 조회된 ID들로 tb_instagram_crawling 테이블에서 COMPLETE 상태인 데이터 개수 조회
-                crawling_ids = [item["id"] for item in analysis_status_response.data]
-                response = client.table("tb_instagram_crawling").select("id", count="exact")\
-                    .in_("id", crawling_ids)\
-                    .eq("status", "COMPLETE").execute()
+                # 이미 분석된 ID 목록에 추가
+                for item in analysis_status_response.data:
+                    analyzed_ids.add(item["id"])
                 
-                total_count += response.count if response.count else 0
+                offset += batch_size
+                
+                # 마지막 배치면 종료
+                if len(analysis_status_response.data) < batch_size:
+                    break
+            
+            # 2단계: tb_instagram_crawling에서 status='COMPLETE'인 모든 데이터를 배치로 조회
+            total_count = 0
+            crawling_offset = 0
+            
+            while True:
+                response = client.table("tb_instagram_crawling").select("id", "posts")\
+                    .eq("status", "COMPLETE")\
+                    .limit(batch_size)\
+                    .range(crawling_offset, crawling_offset + batch_size - 1).execute()
+                
+                if not response.data:
+                    break
+                
+                # 필터링:
+                # 1. ai_analysis_status.is_analyzed=TRUE인 것은 제외 (이미 분석 완료)
+                # 2. posts 데이터가 있는 것만 카운트
+                filtered_data = [
+                    data for data in response.data
+                    if data.get("id") not in analyzed_ids
+                    and data.get("posts") and data.get("posts").strip()
+                ]
+                
+                total_count += len(filtered_data)
+                
+                crawling_offset += batch_size
+                
+                # 마지막 배치면 종료
+                if len(response.data) < batch_size:
+                    break
             
             return total_count
         except Exception as e:

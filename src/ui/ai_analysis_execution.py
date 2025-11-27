@@ -3,6 +3,7 @@ AI 분석 실행 관련 컴포넌트
 """
 import streamlit as st
 import time
+from datetime import datetime
 from ..supabase.simple_client import simple_client
 from .ai_analysis_common import (
     get_completed_crawling_data, 
@@ -130,6 +131,9 @@ def execute_ai_analysis():
         failed_count = 0
         processed_count = 0
         failed_items = []
+        
+        # 실제 처리된 항목 수를 추적 (total_count는 초기 예상치일 뿐)
+        actual_processed_count = 0
 
         overall_progress_bar = st.progress(0)
         overall_status_text = st.empty()
@@ -157,6 +161,12 @@ def execute_ai_analysis():
             batch_data = get_completed_crawling_data(client, limit=batch_size, offset=offset)
             
             if not batch_data:
+                # 더 이상 처리할 데이터가 없으면 종료
+                # posts 필터링으로 인해 빈 배치가 나올 수 있으므로
+                # 실제 처리된 항목 수를 기준으로 total_count 조정
+                if actual_processed_count == 0:
+                    # 아무것도 처리되지 않았다면 실제로 분석할 데이터가 없는 것
+                    st.warning("⚠️ 분석할 데이터가 없습니다. (posts 데이터가 있는 항목이 없습니다.)")
                 break
 
             # 배치 진행 UI (간소화)
@@ -180,11 +190,18 @@ def execute_ai_analysis():
                 current_id = data.get('id', 'unknown')
                 
                 try:
-                    # 전체/배치 진행률
-                    overall_progress = (processed_count + index + 1) / total_count
+                    # 실제 처리된 항목 수 증가
+                    actual_processed_count += 1
+                    
+                    # 전체/배치 진행률 (실제 처리된 항목 수 기준)
+                    # total_count는 초기 예상치이므로, 실제 처리된 항목 수를 기준으로 진행률 계산
+                    if total_count > 0:
+                        overall_progress = min(1.0, actual_processed_count / total_count)
+                    else:
+                        overall_progress = 0.0
                     overall_progress_bar.progress(overall_progress)
                     overall_status_text.text(
-                        f"전체 진행: {processed_count + index + 1:,}/{total_count:,} (배치 {batch_num + 1}/{total_batches})"
+                        f"전체 진행: {actual_processed_count:,}/{total_count:,} (배치 {batch_num + 1}/{total_batches})"
                     )
 
                     batch_progress = (index + 1) / len(batch_data)
@@ -202,6 +219,22 @@ def execute_ai_analysis():
                     # 2) 입력 구성 (posts는 자르지 않음)
                     posts_content = data.get("posts", "") or ""
                     if not posts_content:
+                        # posts 데이터가 없는 경우는 분석 불가능하므로 is_analyzed를 TRUE로 업데이트
+                        # (다시 조회되지 않도록 하기 위함)
+                        try:
+                            client.table("ai_analysis_status").update({
+                                "is_analyzed": True,
+                                "updated_at": datetime.now().isoformat()
+                            }).eq("id", data["id"]).execute()
+                            
+                            client.table("tb_instagram_crawling").update({
+                                "ai_analysis_status": True,
+                                "updated_at": datetime.now().isoformat()
+                            }).eq("id", data["id"]).execute()
+                        except Exception as update_error:
+                            # 업데이트 실패해도 계속 진행
+                            pass
+                        
                         skipped_count += 1
                         skipped_no_posts += 1
                         continue
@@ -244,7 +277,7 @@ def execute_ai_analysis():
                                 c1.metric("✅ 성공", analyzed_count)
                                 c2.metric("⏭️ 건너뜀", skipped_count)
                                 c3.metric("❌ 실패", failed_count)
-                                c4.metric("📊 총 처리", processed_count + index + 1)
+                                c4.metric("📊 총 처리", actual_processed_count)
                                 
                                 # 건너뛴 이유 상세 정보
                                 if skipped_count > 0:
@@ -265,20 +298,48 @@ def execute_ai_analysis():
             processed_count += len(batch_data)
             batch_progress_bar.empty()
             batch_status_text.empty()
+            
+            # 실제 처리된 항목 수가 total_count보다 작으면 total_count 조정
+            # (posts 필터링으로 인해 실제 처리 가능한 항목이 적을 수 있음)
+            if actual_processed_count < total_count and batch_num == total_batches - 1:
+                # 마지막 배치까지 처리했는데 실제 처리된 항목이 적으면 total_count 조정
+                total_count = actual_processed_count
 
             # 배치 간 휴식 최소화(또는 제거)
             if batch_num < total_batches - 1:
                 time.sleep(0.1)
 
+        # 실제 처리된 항목 수를 기준으로 total_count 조정
+        # (posts 필터링으로 인해 실제 처리 가능한 항목이 예상보다 적을 수 있음)
+        if actual_processed_count > 0:
+            # 실제 처리된 항목 수가 예상보다 적으면 조정
+            if actual_processed_count < total_count:
+                st.info(f"ℹ️ 실제 처리 가능한 항목: {actual_processed_count:,}개 (예상: {total_count:,}개)")
+            total_count = actual_processed_count
+        elif total_count > 0:
+            # 예상했던 항목이 있지만 실제로는 처리된 것이 없음
+            st.warning(f"⚠️ 예상 항목 수: {total_count:,}개이지만 실제로 처리된 항목이 없습니다.")
+            st.warning("⚠️ posts 데이터가 있는 항목이 없거나, 모든 항목이 이미 분석되었을 수 있습니다.")
+            # 실제 처리된 항목이 없으므로 total_count를 0으로 설정
+            total_count = 0
+        
         overall_progress_bar.progress(1.0)
         overall_status_text.text("분석 완료!")
 
         with result_container.container():
             st.markdown("### 🎉 AI 분석 최종 결과")
             c1, c2, c3, c4 = st.columns(4)
-            c1.metric("✅ 성공", analyzed_count, delta=f"{(analyzed_count/total_count*100):.1f}%")
-            c2.metric("⏭️ 건너뜀", skipped_count, delta=f"{(skipped_count/total_count*100):.1f}%")
-            c3.metric("❌ 실패", failed_count, delta=f"{(failed_count/total_count*100):.1f}%")
+            
+            # 실제 처리된 항목 수가 0이면 비율 계산 불가
+            if total_count > 0:
+                c1.metric("✅ 성공", analyzed_count, delta=f"{(analyzed_count/total_count*100):.1f}%")
+                c2.metric("⏭️ 건너뜀", skipped_count, delta=f"{(skipped_count/total_count*100):.1f}%")
+                c3.metric("❌ 실패", failed_count, delta=f"{(failed_count/total_count*100):.1f}%")
+            else:
+                c1.metric("✅ 성공", analyzed_count)
+                c2.metric("⏭️ 건너뜀", skipped_count)
+                c3.metric("❌ 실패", failed_count)
+            
             c4.metric("📊 총 처리", total_count, delta="100%")
             
             # 건너뛴 이유 상세 정보 표시
