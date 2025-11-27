@@ -132,3 +132,4 @@ def render_commerce_orientation_statistics():
     else:
         st.info("추가 해석 데이터가 없습니다.")
 
+
