@@ -202,11 +202,13 @@ def save_ai_analysis_result(client, crawling_data, analysis_result, crawling_id)
                 raise
 
 def perform_ai_analysis(data):
-    """AI 분석 수행 - 5분 타임아웃, 재시도 없음"""
+    """AI 분석 수행 - 5분 타임아웃, 재시도 로직 포함"""
     from openai import OpenAI
     import time
 
-    timeout_seconds = 300  # 5분 타임아웃
+    timeout_seconds = 90  # 5분 타임아웃
+    max_retries = 3  # 최대 재시도 횟수
+    retry_delay = 2  # 재시도 간격 (초)
 
     # API 키 읽기 (환경변수 우선, 그 다음 secrets)
     api_key = os.getenv("OPENAI_API_KEY")
@@ -234,21 +236,45 @@ def perform_ai_analysis(data):
 
     input_data = json.dumps(data, ensure_ascii=False)
 
-    try:
-        resp = client.responses.create(
-            model=model,
-            prompt=prompt_payload,
-            input=input_data,
-            reasoning={"summary": "auto"},
-            store=True,
-            include=["reasoning.encrypted_content", "web_search_call.action.sources"],
-            timeout=timeout_seconds,  # 5분 timeout
-        )
-        return parse_ai_response(resp)
+    # 재시도 로직
+    for attempt in range(max_retries):
+        try:
+            resp = client.responses.create(
+                model=model,
+                prompt=prompt_payload,
+                input=input_data,
+                reasoning={"summary": "auto"},
+                store=True,
+                include=["reasoning.encrypted_content", "web_search_call.action.sources"],
+                timeout=timeout_seconds,  # 5분 timeout
+            )
+            return parse_ai_response(resp)
 
-    except Exception as e:
-        st.error(f"AI 분석 수행 중 오류: {e}")
-        return None
+        except Exception as e:
+            error_msg = str(e)
+            # 재시도 가능한 오류인지 확인
+            is_retryable = (
+                "timeout" in error_msg.lower() or
+                "connection" in error_msg.lower() or
+                "server" in error_msg.lower() or
+                "rate limit" in error_msg.lower() or
+                "503" in error_msg or
+                "502" in error_msg or
+                "500" in error_msg
+            )
+            
+            if is_retryable and attempt < max_retries - 1:
+                # 재시도 가능한 오류이고 재시도 횟수가 남아있으면 재시도
+                wait_time = retry_delay * (attempt + 1)  # 지수 백오프
+                time.sleep(wait_time)
+                continue
+            else:
+                # 재시도 불가능하거나 재시도 횟수 초과
+                if attempt == max_retries - 1:
+                    st.error(f"AI 분석 수행 중 오류 (재시도 {max_retries}회 실패): {error_msg}")
+                return None
+    
+    return None
 
 def parse_ai_response(response):
     """Responses API 표준 파서: output_text 우선, fallback로 content[*].text, 코드펜스 JSON 추출"""

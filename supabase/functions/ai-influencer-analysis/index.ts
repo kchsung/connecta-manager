@@ -42,6 +42,12 @@ serve(async (req) => {
       case 'get_statistics':
         return await getStatistics(supabaseClient)
       
+      case 'get_campaign_analysis':
+        return await getCampaignAnalysis(supabaseClient, data)
+      
+      case 'save_campaign_analysis':
+        return await saveCampaignAnalysis(supabaseClient, data)
+      
       default:
         return new Response(
           JSON.stringify({ error: 'Invalid action' }),
@@ -329,6 +335,130 @@ async function getStatistics(supabaseClient: any) {
 
     return new Response(
       JSON.stringify({ success: true, data: statistics }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
+  }
+}
+
+// 캠페인 분석 결과 조회
+async function getCampaignAnalysis(supabaseClient: any, data: any) {
+  try {
+    const { campaign_id } = data
+
+    if (!campaign_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'campaign_id is required' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    const { data: analysisData, error } = await supabaseClient
+      .from('campaign_analyses')
+      .select('*')
+      .eq('campaign_id', campaign_id)
+      .single()
+
+    if (error) {
+      // 데이터가 없는 경우 (404)는 정상적인 경우일 수 있음
+      if (error.code === 'PGRST116') {
+        return new Response(
+          JSON.stringify({ success: true, data: null }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        )
+      }
+      throw error
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, data: analysisData }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
+  }
+}
+
+// 캠페인 분석 결과 저장
+async function saveCampaignAnalysis(supabaseClient: any, data: any) {
+  try {
+    const { campaign_id, analysis_result } = data
+
+    if (!campaign_id || !analysis_result) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'campaign_id and analysis_result are required' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // 기존 데이터 확인
+    const { data: existingData, error: checkError } = await supabaseClient
+      .from('campaign_analyses')
+      .select('id')
+      .eq('campaign_id', campaign_id)
+      .single()
+
+    // 데이터 준비
+    const analysisData = {
+      campaign_id,
+      analysis_result,
+      analyzed_at: new Date().toISOString()
+    }
+
+    let result
+    if (existingData && !checkError) {
+      // 업데이트 (campaign_id가 unique이므로 upsert 사용)
+      const { data: updateData, error: updateError } = await supabaseClient
+        .from('campaign_analyses')
+        .update(analysisData)
+        .eq('id', existingData.id)
+        .select()
+        .single()
+
+      if (updateError) throw updateError
+      result = updateData
+    } else {
+      // 새로 생성
+      const { data: insertData, error: insertError } = await supabaseClient
+        .from('campaign_analyses')
+        .insert(analysisData)
+        .select()
+        .single()
+
+      if (insertError) throw insertError
+      result = insertData
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, data: result }),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

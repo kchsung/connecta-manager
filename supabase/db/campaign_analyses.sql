@@ -98,3 +98,5 @@ COMMENT ON COLUMN public.campaign_analyses.created_by IS '분석 결과 생성�
 COMMENT ON COLUMN public.campaign_analyses.created_at IS '레코드 생성 일시';
 COMMENT ON COLUMN public.campaign_analyses.updated_at IS '레코드 수정 일시';
 
+
+

@@ -124,7 +124,7 @@ def execute_ai_analysis():
         overall_status_text = st.empty()
         result_container = st.empty()
 
-        UI_UPDATE_EVERY = 50  # 갱신 주기 줄이기
+        UI_UPDATE_EVERY = 50  # 갱신 주기
 
         for batch_num in range(total_batches):
             # 중지 요청 확인
@@ -222,17 +222,21 @@ def execute_ai_analysis():
 
                     # UI 업데이트(희소)
                     if ((index + 1) % UI_UPDATE_EVERY == 0) or (index == len(batch_data) - 1):
-                        with result_container.container():
-                            st.markdown("### 📊 실시간 처리 결과")
-                            c1, c2, c3, c4 = st.columns(4)
-                            c1.metric("✅ 성공", analyzed_count)
-                            c2.metric("⏭️ 건너뜀", skipped_count)
-                            c3.metric("❌ 실패", failed_count)
-                            c4.metric("📊 총 처리", processed_count + index + 1)
-                            
-                            # 중지 요청 상태 표시
-                            if st.session_state.get("ai_analysis_stop_requested", False):
-                                st.warning("🛑 분석 중지 요청됨 - 현재 항목 완료 후 중지됩니다.")
+                        try:
+                            with result_container.container():
+                                st.markdown("### 📊 실시간 처리 결과")
+                                c1, c2, c3, c4 = st.columns(4)
+                                c1.metric("✅ 성공", analyzed_count)
+                                c2.metric("⏭️ 건너뜀", skipped_count)
+                                c3.metric("❌ 실패", failed_count)
+                                c4.metric("📊 총 처리", processed_count + index + 1)
+                                
+                                # 중지 요청 상태 표시
+                                if st.session_state.get("ai_analysis_stop_requested", False):
+                                    st.warning("🛑 분석 중지 요청됨 - 현재 항목 완료 후 중지됩니다.")
+                        except Exception as ui_error:
+                            # UI 업데이트 실패해도 분석은 계속 진행
+                            pass
 
                 except Exception as e:
                     failed_items.append({"id": current_id, "error": f"예상치 못한 오류: {str(e)}"})
